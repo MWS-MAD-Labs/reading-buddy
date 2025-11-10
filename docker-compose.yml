@@ -1,9 +1,9 @@
 services:
   reading-buddy:
     build:
-      # Build directly from GitHub repository - always pulls latest code
+      # Build directly from GitHub repository - always pulls latest code from main branch
       context: https://github.com/faisalnh/reading-companion.git#main
-      # To build locally instead, uncomment the line below and comment the line above:
+      # To build from local files instead, comment the line above and uncomment below:
       # context: .
       dockerfile: Dockerfile
       # Force rebuild without cache to ensure latest code
@@ -18,29 +18,30 @@ services:
         MINIO_USE_SSL: ${MINIO_USE_SSL:-true}
 
     container_name: reading-buddy
+    image: reading-buddy:latest
+    restart: unless-stopped
 
     ports:
       - "${PORT:-3000}:3000"
 
     environment:
-      # Runtime environment variables
+      # Runtime environment variables (override build-time placeholders)
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
-      # Public env vars (can override build-time values)
+      # Supabase Configuration
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-      # Server-side env vars
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      # MinIO Configuration
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
       - MINIO_PORT=${MINIO_PORT}
       - MINIO_USE_SSL=${MINIO_USE_SSL}
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
       - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME}
+      # AI Configuration
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-
-    restart: unless-stopped
 
     healthcheck:
       test:
@@ -54,3 +55,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+    networks:
+      - reading-buddy-network
+
+networks:
+  reading-buddy-network:
+    driver: bridge
