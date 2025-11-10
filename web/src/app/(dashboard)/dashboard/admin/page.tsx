@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AdminUserTable } from "@/components/dashboard/AdminUserTable";
 import { requireRole } from "@/lib/auth/roleCheck";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -8,13 +9,28 @@ export default async function AdminDashboardPage() {
   // Only ADMIN users can access this page
   await requireRole(["ADMIN"]);
 
-  const supabase = await createSupabaseServerClient();
-  const { data: users } = await supabase
+  const supabaseAdmin = getSupabaseAdminClient();
+
+  // Get profiles with their auth emails
+  const { data: profiles } = await supabaseAdmin
     .from("profiles")
-    .select("id, full_name, role")
+    .select("id, full_name, role, access_level")
     .order("updated_at", {
-      ascending: true,
+      ascending: false,
     });
+
+  // Fetch auth users to get emails
+  const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+
+  // Merge profile data with email
+  const users =
+    profiles?.map((profile) => {
+      const authUser = authUsers?.users.find((u) => u.id === profile.id);
+      return {
+        ...profile,
+        email: authUser?.email || null,
+      };
+    }) ?? [];
 
   return (
     <div className="space-y-6">
@@ -24,13 +40,13 @@ export default async function AdminDashboardPage() {
             ⚙️ Admin Panel
           </p>
         </div>
-        <h1 className="text-3xl font-black text-violet-900">Admin Control</h1>
+        <h1 className="text-3xl font-black text-violet-900">User Management</h1>
         <p className="text-base font-semibold text-violet-700">
-          Manage user roles and control access for everyone.
+          Manage users, roles, and access levels for the entire system.
         </p>
       </header>
 
-      <AdminUserTable users={users ?? []} />
+      <AdminUserTable users={users} />
     </div>
   );
 }

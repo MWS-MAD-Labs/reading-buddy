@@ -1,0 +1,9 @@
+email,password,full_name,role,access_level
+student1@school.com,password123,John Doe,STUDENT,LOWER_ELEMENTARY
+teacher1@school.com,password123,Jane Smith,TEACHER,
+librarian1@school.com,password123,Bob Johnson,LIBRARIAN,
+student2@school.com,password123,Alice Williams,STUDENT,UPPER_ELEMENTARY
+admin1@school.com,password123,Admin User,ADMIN,
+student3@school.com,password123,Tom Brown,STUDENT,KINDERGARTEN
+student4@school.com,password123,Sarah Davis,STUDENT,JUNIOR_HIGH
+teacher2@school.com,password123,Mike Wilson,TEACHER,
