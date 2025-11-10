@@ -9,8 +9,13 @@ services:
       # Force rebuild without cache to ensure latest code
       no_cache: true
       pull: true
-      # Build args removed - using Dockerfile defaults
-      # Runtime env vars override build-time placeholders
+      # Build args for NEXT_PUBLIC_ variables (must be set at build time)
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://placeholder.supabase.co}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-anon-key}
+        MINIO_ENDPOINT: ${MINIO_ENDPOINT:-placeholder.minio.com}
+        MINIO_PORT: ${MINIO_PORT:-443}
+        MINIO_USE_SSL: ${MINIO_USE_SSL:-true}
 
     container_name: reading-buddy
 
