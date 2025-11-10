@@ -41,11 +41,12 @@ COPY package*.json ./
 WORKDIR /app/web
 
 # Build arguments for Next.js public env vars
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ARG MINIO_ENDPOINT
-ARG MINIO_PORT
-ARG MINIO_USE_SSL
+# Provide placeholder defaults to allow build to succeed
+ARG NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key
+ARG MINIO_ENDPOINT=placeholder.minio.com
+ARG MINIO_PORT=443
+ARG MINIO_USE_SSL=true
 
 # Set environment variables for build
 # Next.js collects anonymous telemetry data - disable it
@@ -70,20 +71,18 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy the public folder
-COPY --from=builder /app/web/public ./web/public
-
-# Set the correct permission for prerender cache
-RUN mkdir -p ./web/.next
-RUN chown nextjs:nodejs ./web/.next
-
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./web/.next/static
 
-# Copy scripts for background jobs (PDF rendering)
-COPY --from=builder --chown=nextjs:nodejs /app/web/scripts ./web/scripts
+# Copy the static folder to the correct location
+COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./.next/static
+
+# Copy the public folder
+COPY --from=builder /app/web/public ./public
+
+# Set the correct permission for prerender cache
+RUN chown nextjs:nodejs ./.next
 
 USER nextjs
 
@@ -93,4 +92,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Start the application
-CMD ["node", "web/server.js"]
+CMD ["node", "server.js"]

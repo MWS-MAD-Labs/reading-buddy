@@ -2,7 +2,10 @@ import type { NextConfig } from "next";
 
 const minioHost = process.env.MINIO_ENDPOINT ?? "storage.yourschool.com";
 const minioProtocol = process.env.MINIO_USE_SSL === "false" ? "http" : "https";
-const minioPort = process.env.MINIO_PORT ?? "";
+const minioPort =
+  process.env.MINIO_PORT && process.env.MINIO_PORT !== ""
+    ? process.env.MINIO_PORT
+    : undefined;
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -12,7 +15,7 @@ const nextConfig: NextConfig = {
       {
         protocol: minioProtocol as "http" | "https",
         hostname: minioHost,
-        port: minioPort === "" ? undefined : minioPort,
+        port: minioPort,
         pathname: "/**",
       },
       {
