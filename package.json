@@ -9,6 +9,7 @@
     "lint": "cd web && npm run lint",
     "docker:up": "docker-compose up --build -d",
     "docker:up:github": "docker-compose -f docker-compose.github.yml up --build -d",
+    "docker:deploy": "bash docker-deploy.sh",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
     "docker:restart": "docker-compose restart"

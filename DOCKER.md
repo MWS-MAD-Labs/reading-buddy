@@ -11,25 +11,60 @@ This guide explains how to deploy Reading Buddy using Docker and Docker Compose.
 
 ### Option 1: Deploy from GitHub (Recommended for Production)
 
-Deploy directly from the GitHub repository without cloning:
+Deploy directly from the GitHub repository without cloning. This ensures you always get the latest code.
+
+**Quick Deploy (Automated):**
+
+```bash
+# Download deployment script
+curl -O https://raw.githubusercontent.com/faisalnh/reading-companion/main/docker-deploy.sh
+chmod +x docker-deploy.sh
+
+# Download environment template
+curl -O https://raw.githubusercontent.com/faisalnh/reading-companion/main/.env.example
+
+# Configure your credentials
+cp .env.example .env
+nano .env  # Edit with your actual values
+
+# Deploy!
+./docker-deploy.sh
+```
+
+The deployment script will:
+- ✓ Stop any existing containers
+- ✓ Remove old images and build cache
+- ✓ Pull latest code from GitHub
+- ✓ Build fresh Docker image (no cache)
+- ✓ Start the application
+- ✓ Verify health status
+
+**Manual Deploy:**
 
 **1. Create environment file:**
 ```bash
-# Download the example file
 curl -O https://raw.githubusercontent.com/faisalnh/reading-companion/main/.env.example
-
-# Copy and edit with your credentials
 cp .env.example .env
-nano .env  # or use your preferred editor
+nano .env  # Edit with your credentials
 ```
 
-**2. Download the GitHub compose file:**
+**2. Download compose file:**
 ```bash
 curl -O https://raw.githubusercontent.com/faisalnh/reading-companion/main/docker-compose.github.yml
 ```
 
-**3. Deploy:**
+**3. Clean deploy:**
 ```bash
+# Stop existing containers
+docker-compose -f docker-compose.github.yml down
+
+# Remove old images
+docker images | grep reading-companion | awk '{print $3}' | xargs -r docker rmi -f
+
+# Clean build cache
+docker builder prune -f
+
+# Deploy fresh
 docker-compose -f docker-compose.github.yml up --build -d
 ```
 

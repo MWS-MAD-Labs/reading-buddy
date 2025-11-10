@@ -7,7 +7,6 @@
 
 # Docker
 docker-compose.override.yml
-docker-build.sh
 
 # OS
 .DS_Store
