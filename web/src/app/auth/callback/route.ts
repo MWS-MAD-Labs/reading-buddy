@@ -21,8 +21,13 @@ export async function GET(request: NextRequest) {
   const type = requestUrl.searchParams.get('type');
   const nextPath = requestUrl.searchParams.get('next') ?? '/dashboard';
 
+  // Get the correct origin from headers (for Docker/proxy compatibility)
+  const host = request.headers.get('host') || requestUrl.host;
+  const protocol = request.headers.get('x-forwarded-proto') || requestUrl.protocol.replace(':', '');
+  const origin = `${protocol}://${host}`;
+
   if (!code) {
-    return redirectWithError(requestUrl.origin, 'missing_code');
+    return redirectWithError(origin, 'missing_code');
   }
 
   const targetPath = type === 'recovery' ? '/reset-password' : nextPath;
@@ -48,11 +53,11 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error('OAuth exchange error:', error);
-    return redirectWithError(requestUrl.origin, error.message || 'auth');
+    return redirectWithError(origin, error.message || 'auth');
   }
 
   // Now create the redirect response and copy all cookies from the temp response
-  const redirectResponse = NextResponse.redirect(new URL(targetPath, requestUrl.origin));
+  const redirectResponse = NextResponse.redirect(new URL(targetPath, origin));
 
   // Copy all cookies from the temporary response to the redirect response
   response.cookies.getAll().forEach((cookie) => {

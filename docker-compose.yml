@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  reading-buddy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Build-time arguments for Next.js public env vars
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+        MINIO_PORT: ${MINIO_PORT}
+        MINIO_USE_SSL: ${MINIO_USE_SSL}
+
+    container_name: reading-buddy
+
+    ports:
+      - "${PORT:-3000}:3000"
+
+    environment:
+      # Runtime environment variables
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
