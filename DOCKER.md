@@ -7,31 +7,54 @@ This guide explains how to deploy Reading Buddy using Docker and Docker Compose.
 - Docker installed (version 20.10 or higher)
 - Docker Compose installed (version 2.0 or higher)
 
-## Quick Start
+## Deployment Options
 
-### 1. Set Up Environment Variables
+### Option 1: Deploy from GitHub (Recommended for Production)
 
-Copy the example environment file and fill in your actual values:
+Deploy directly from the GitHub repository without cloning:
 
+**1. Create environment file:**
 ```bash
+# Download the example file
+curl -O https://raw.githubusercontent.com/faisalnh/reading-companion/main/.env.example
+
+# Copy and edit with your credentials
 cp .env.example .env
+nano .env  # or use your preferred editor
 ```
 
-Edit `.env` with your actual credentials:
-- Supabase URL and keys
-- MinIO configuration
-- Gemini API key
+**2. Download the GitHub compose file:**
+```bash
+curl -O https://raw.githubusercontent.com/faisalnh/reading-companion/main/docker-compose.github.yml
+```
 
-### 2. Deploy with Docker Compose
+**3. Deploy:**
+```bash
+docker-compose -f docker-compose.github.yml up --build -d
+```
 
-Build and start the container:
+The application will be available at `http://localhost:3000`
 
+### Option 2: Deploy from Local Clone
+
+**1. Clone the repository:**
+```bash
+git clone https://github.com/faisalnh/reading-companion.git
+cd reading-companion
+```
+
+**2. Set up environment variables:**
+```bash
+cp .env.example .env
+nano .env  # Edit with your actual credentials
+```
+
+**3. Deploy with Docker Compose:**
 ```bash
 npm run docker:up
 ```
 
 Or using docker-compose directly:
-
 ```bash
 docker-compose up --build -d
 ```

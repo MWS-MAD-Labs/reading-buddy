@@ -1,10 +1,8 @@
 services:
   reading-buddy:
     build:
-      # To build from GitHub, use:
-      # context: https://github.com/faisalnh/reading-companion.git#main
-      # To build locally, use:
-      context: .
+      # Build directly from GitHub repository
+      context: https://github.com/faisalnh/reading-companion.git#main
       dockerfile: Dockerfile
       args:
         # Build-time arguments for Next.js public env vars
