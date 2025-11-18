@@ -691,6 +691,250 @@ export const autoGenerateCheckpoints = async (input: {
   };
 };
 
+// ============================================================================
+// Quiz Management Actions
+// ============================================================================
+
+export const getQuizzesForBook = async (bookId: number) => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to view quizzes.");
+  }
+
+  // Query quizzes with statistics
+  const { data: quizzes, error } = await supabase
+    .from("quiz_statistics")
+    .select("*")
+    .eq("book_id", bookId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching quizzes:", error);
+    throw error;
+  }
+
+  return quizzes || [];
+};
+
+export const getAllQuizzesGroupedByBook = async () => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to view quizzes.");
+  }
+
+  // Get all quizzes with book information and statistics
+  const { data: quizzes, error } = await supabase
+    .from("quiz_statistics")
+    .select(
+      `
+      *,
+      book:books!quizzes_book_id_fkey(id, title, author)
+    `,
+    )
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching quizzes:", error);
+    throw error;
+  }
+
+  // Group by book
+  const grouped: Record<number, any[]> = {};
+  quizzes?.forEach((quiz: any) => {
+    const bookId = quiz.book_id;
+    if (!grouped[bookId]) {
+      grouped[bookId] = [];
+    }
+    grouped[bookId].push(quiz);
+  });
+
+  return { quizzes: quizzes || [], groupedByBook: grouped };
+};
+
+export const publishQuiz = async (quizId: number) => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to publish quizzes.");
+  }
+
+  const { error } = await supabase
+    .from("quizzes")
+    .update({
+      status: "published",
+      is_published: true,
+    })
+    .eq("id", quizId);
+
+  if (error) {
+    console.error("Error publishing quiz:", error);
+    throw error;
+  }
+
+  revalidatePath("/dashboard/librarian");
+  revalidatePath("/dashboard/library");
+};
+
+export const unpublishQuiz = async (quizId: number) => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to unpublish quizzes.");
+  }
+
+  const { error } = await supabase
+    .from("quizzes")
+    .update({
+      status: "draft",
+      is_published: false,
+    })
+    .eq("id", quizId);
+
+  if (error) {
+    console.error("Error unpublishing quiz:", error);
+    throw error;
+  }
+
+  revalidatePath("/dashboard/librarian");
+  revalidatePath("/dashboard/library");
+};
+
+export const archiveQuiz = async (quizId: number) => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to archive quizzes.");
+  }
+
+  const { error } = await supabase
+    .from("quizzes")
+    .update({
+      status: "archived",
+      is_published: false,
+    })
+    .eq("id", quizId);
+
+  if (error) {
+    console.error("Error archiving quiz:", error);
+    throw error;
+  }
+
+  revalidatePath("/dashboard/librarian");
+  revalidatePath("/dashboard/library");
+};
+
+export const deleteQuiz = async (quizId: number) => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to delete quizzes.");
+  }
+
+  // Check if quiz has any attempts
+  const { data: attempts, error: checkError } = await supabase
+    .from("quiz_attempts")
+    .select("id")
+    .eq("quiz_id", quizId)
+    .limit(1);
+
+  if (checkError) {
+    console.error("Error checking quiz attempts:", checkError);
+    throw checkError;
+  }
+
+  if (attempts && attempts.length > 0) {
+    throw new Error(
+      "Cannot delete quiz that has been attempted. Archive it instead.",
+    );
+  }
+
+  // Delete quiz
+  const { error } = await supabase.from("quizzes").delete().eq("id", quizId);
+
+  if (error) {
+    console.error("Error deleting quiz:", error);
+    throw error;
+  }
+
+  revalidatePath("/dashboard/librarian");
+  revalidatePath("/dashboard/library");
+};
+
+export const updateQuizMetadata = async (input: {
+  quizId: number;
+  title?: string;
+  tags?: string[];
+}) => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to update quizzes.");
+  }
+
+  // Get current quiz data
+  const { data: quiz, error: fetchError } = await supabase
+    .from("quizzes")
+    .select("questions")
+    .eq("id", input.quizId)
+    .single();
+
+  if (fetchError || !quiz) {
+    throw new Error("Quiz not found.");
+  }
+
+  const quizData = quiz.questions as any;
+  const updateData: any = { questions: quizData };
+
+  // Update title in the questions JSONB if provided
+  if (input.title !== undefined) {
+    updateData.questions = {
+      ...quizData,
+      title: input.title,
+    };
+  }
+
+  // Update tags if provided
+  if (input.tags !== undefined) {
+    updateData.tags = input.tags;
+  }
+
+  const { error } = await supabase
+    .from("quizzes")
+    .update(updateData)
+    .eq("id", input.quizId);
+
+  if (error) {
+    console.error("Error updating quiz:", error);
+    throw error;
+  }
+
+  revalidatePath("/dashboard/librarian");
+  revalidatePath("/dashboard/library");
+};
+
 export const renderBookImages = async (bookId: number) => {
   "use server";
 
@@ -791,4 +1035,121 @@ export const checkRenderStatus = async (bookId: number) => {
     processedPages: job?.processed_pages || 0,
     totalPages: job?.total_pages || 0,
   };
+};
+
+export const generateBookDescription = async (input: {
+  title: string;
+  author: string;
+  genre?: string;
+  pageCount?: number;
+  textPreview?: string;
+}) => {
+  "use server";
+
+  await ensureLibrarianOrAdmin();
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return { success: false, message: "Gemini API key not configured" };
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const prompt = `Generate a compelling and intriguing book description for the following book:
+
+Title: ${input.title}
+Author: ${input.author}
+${input.genre ? `Genre: ${input.genre}` : ""}
+${input.pageCount ? `Page Count: ${input.pageCount}` : ""}
+${input.textPreview ? `\nText Preview (first 500 words):\n${input.textPreview}` : ""}
+
+Please write a SHORT, punchy description that:
+1. Hooks readers with an intriguing opening line
+2. Creates mystery or excitement without revealing too much
+3. Is appropriate for a library catalog
+4. Avoids spoilers but teases the story
+5. Is MAXIMUM 50 words (approximately 250-300 characters)
+6. Uses vivid, engaging language that makes people want to read the book
+
+IMPORTANT: Keep it under 50 words. Be concise and impactful.
+Write in an exciting, cinematic style. Think movie trailer tagline, not full summary.
+
+Return ONLY the description text, without any preamble or additional commentary.`;
+
+    const result = await model.generateContent(prompt);
+    const description = result.response.text().trim();
+
+    return {
+      success: true,
+      description,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return {
+      success: false,
+      message: `AI generation failed: ${message}`,
+    };
+  }
+};
+
+export const extractBookText = async (bookId: number) => {
+  "use server";
+
+  await ensureLibrarianOrAdmin();
+
+  const supabase = getSupabaseAdminClient();
+
+  // Get book PDF URL
+  const { data: book, error: bookError } = await supabase
+    .from("books")
+    .select("id, title, pdf_url")
+    .eq("id", bookId)
+    .single();
+
+  if (bookError || !book) {
+    return { success: false, message: "Book not found" };
+  }
+
+  if (!book.pdf_url) {
+    return { success: false, message: "Book has no PDF URL" };
+  }
+
+  try {
+    // Import the PDF extractor
+    const { extractTextFromPDF } = await import("@/lib/pdf-extractor");
+
+    // Extract text
+    const textContent = await extractTextFromPDF(book.pdf_url);
+
+    // Save to database
+    const { error: updateError } = await supabase
+      .from("books")
+      .update({
+        page_text_content: {
+          pages: textContent.pages,
+          totalPages: textContent.totalPages,
+          totalWords: textContent.totalWords,
+          extractionMethod: textContent.extractionMethod,
+        },
+        text_extracted_at: new Date().toISOString(),
+        text_extraction_method: textContent.extractionMethod,
+      })
+      .eq("id", bookId);
+
+    if (updateError) {
+      return { success: false, message: updateError.message };
+    }
+
+    return {
+      success: true,
+      message: `Text extracted: ${textContent.totalPages} pages, ${textContent.totalWords} words`,
+      totalPages: textContent.totalPages,
+      totalWords: textContent.totalWords,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return { success: false, message: `Text extraction failed: ${message}` };
+  }
 };

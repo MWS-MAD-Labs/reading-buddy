@@ -2,8 +2,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BookManagementSection } from "@/components/dashboard/BookManagementSection";
 import type { ManagedBookRecord } from "@/components/dashboard/BookManager";
 import type { AccessLevelValue } from "@/constants/accessLevels";
-import { QuizGenerator } from "@/components/dashboard/QuizGenerator";
-import { EnhancedQuizGenerator } from "@/components/dashboard/EnhancedQuizGenerator";
 import { requireRole } from "@/lib/auth/roleCheck";
 
 export const dynamic = "force-dynamic";
@@ -74,30 +72,6 @@ export default async function LibrarianPage() {
         genreOptions={genreOptions}
         languageOptions={languageOptions}
       />
-      <EnhancedQuizGenerator
-        books={managedBooks.map((book) => ({
-          id: book.id,
-          title: book.title,
-          description: book.description ?? null,
-          page_count: book.pageCount ?? null,
-          text_extracted_at: book.textExtractedAt ?? null,
-        }))}
-      />
-      <QuizGenerator
-        books={managedBooks.map((book) => ({
-          id: book.id,
-          title: book.title,
-          description: book.description ?? null,
-        }))}
-      />
-      <section className="rounded-2xl border border-slate-800/80 bg-slate-950/40 p-6 text-sm text-slate-300">
-        <h2 className="text-lg font-semibold text-white">Next steps</h2>
-        <p className="mt-2">
-          Uploaded books will appear in the shared library once they are saved
-          in Supabase. From there, students can start reading and teachers can
-          assign them to classes.
-        </p>
-      </section>
     </div>
   );
 }

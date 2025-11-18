@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-type UserRole = 'ADMIN' | 'LIBRARIAN' | 'TEACHER' | 'STUDENT';
+type UserRole = "ADMIN" | "LIBRARIAN" | "TEACHER" | "STUDENT";
 
 type NavLink = {
   href: string;
@@ -18,65 +18,65 @@ type NavLink = {
 
 const navLinks: NavLink[] = [
   {
-    href: '/dashboard',
-    label: 'Overview',
-    emoji: '🏠',
-    color: 'from-purple-400 to-pink-400',
-    textColor: 'text-purple-600',
-    bgColor: 'bg-purple-100',
-    borderColor: 'border-purple-300',
-    roles: ['ADMIN', 'LIBRARIAN', 'TEACHER', 'STUDENT'],
+    href: "/dashboard",
+    label: "Overview",
+    emoji: "🏠",
+    color: "from-purple-400 to-pink-400",
+    textColor: "text-purple-600",
+    bgColor: "bg-purple-100",
+    borderColor: "border-purple-300",
+    roles: ["ADMIN", "LIBRARIAN", "TEACHER", "STUDENT"],
   },
   {
-    href: '/dashboard/library',
-    label: 'Library',
-    emoji: '📚',
-    color: 'from-blue-400 to-cyan-400',
-    textColor: 'text-blue-600',
-    bgColor: 'bg-blue-100',
-    borderColor: 'border-blue-300',
-    roles: ['ADMIN', 'LIBRARIAN', 'TEACHER', 'STUDENT'],
+    href: "/dashboard/library",
+    label: "Library",
+    emoji: "📚",
+    color: "from-blue-400 to-cyan-400",
+    textColor: "text-blue-600",
+    bgColor: "bg-blue-100",
+    borderColor: "border-blue-300",
+    roles: ["ADMIN", "LIBRARIAN", "TEACHER", "STUDENT"],
   },
   {
-    href: '/dashboard/student',
-    label: 'Student',
-    emoji: '🎒',
-    color: 'from-yellow-400 to-orange-400',
-    textColor: 'text-yellow-600',
-    bgColor: 'bg-yellow-100',
-    borderColor: 'border-yellow-300',
-    roles: ['ADMIN', 'STUDENT'],
+    href: "/dashboard/student",
+    label: "Student",
+    emoji: "🎒",
+    color: "from-yellow-400 to-orange-400",
+    textColor: "text-yellow-600",
+    bgColor: "bg-yellow-100",
+    borderColor: "border-yellow-300",
+    roles: ["ADMIN", "STUDENT"],
   },
   {
-    href: '/dashboard/teacher',
-    label: 'Teacher',
-    emoji: '👨‍🏫',
-    color: 'from-rose-400 to-pink-400',
-    textColor: 'text-rose-600',
-    bgColor: 'bg-rose-100',
-    borderColor: 'border-rose-300',
-    roles: ['ADMIN', 'TEACHER'],
+    href: "/dashboard/teacher",
+    label: "Teacher",
+    emoji: "👨‍🏫",
+    color: "from-rose-400 to-pink-400",
+    textColor: "text-rose-600",
+    bgColor: "bg-rose-100",
+    borderColor: "border-rose-300",
+    roles: ["ADMIN", "TEACHER"],
   },
 
   {
-    href: '/dashboard/librarian',
-    label: 'Librarian',
-    emoji: '👩‍💼',
-    color: 'from-emerald-400 to-teal-400',
-    textColor: 'text-emerald-600',
-    bgColor: 'bg-emerald-100',
-    borderColor: 'border-emerald-300',
-    roles: ['ADMIN', 'LIBRARIAN'],
+    href: "/dashboard/librarian",
+    label: "Librarian",
+    emoji: "👩‍💼",
+    color: "from-emerald-400 to-teal-400",
+    textColor: "text-emerald-600",
+    bgColor: "bg-emerald-100",
+    borderColor: "border-emerald-300",
+    roles: ["ADMIN", "LIBRARIAN"],
   },
   {
-    href: '/dashboard/admin',
-    label: 'Admin',
-    emoji: '⚙️',
-    color: 'from-violet-400 to-purple-400',
-    textColor: 'text-violet-600',
-    bgColor: 'bg-violet-100',
-    borderColor: 'border-violet-300',
-    roles: ['ADMIN'],
+    href: "/dashboard/admin",
+    label: "Admin",
+    emoji: "⚙️",
+    color: "from-violet-400 to-purple-400",
+    textColor: "text-violet-600",
+    bgColor: "bg-violet-100",
+    borderColor: "border-violet-300",
+    roles: ["ADMIN"],
   },
 ];
 
@@ -96,7 +96,8 @@ export const DashboardNav = ({ userRole }: DashboardNavProps) => {
   return (
     <nav className="flex flex-wrap gap-3">
       {visibleLinks.map((link) => {
-        const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
+        const isActive =
+          pathname === link.href || pathname.startsWith(`${link.href}/`);
         return (
           <Link
             key={link.href}

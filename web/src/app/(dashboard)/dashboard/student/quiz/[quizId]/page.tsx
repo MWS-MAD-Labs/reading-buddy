@@ -56,11 +56,13 @@ export default async function StudentQuizPage({ params }: PageProps) {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm uppercase tracking-wide text-white/60">Quiz</p>
-        <h1 className="text-3xl font-semibold text-white">
+        <p className="text-sm uppercase tracking-wide text-purple-600 font-bold">
+          Quiz
+        </p>
+        <h1 className="text-3xl font-black text-purple-900">
           {quizData?.title ?? book?.title ?? "AI Quiz"}
         </h1>
-        <p className="text-white/70">
+        <p className="text-purple-700 font-semibold">
           Answer every question to submit your score.
         </p>
       </div>

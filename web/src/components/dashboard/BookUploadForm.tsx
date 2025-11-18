@@ -13,6 +13,8 @@ import {
   saveBookMetadata,
   renderBookImages,
   checkRenderStatus,
+  extractBookText,
+  generateBookDescription,
 } from "@/app/(dashboard)/dashboard/librarian/actions";
 import {
   ACCESS_LEVEL_OPTIONS,
@@ -25,6 +27,7 @@ type UploadState =
   | "uploading_pdf"
   | "uploading_cover"
   | "rendering"
+  | "extracting_text"
   | "save";
 type PdfDetectionState = "idle" | "working" | "error";
 
@@ -69,6 +72,7 @@ export const BookUploadForm = ({
     total: number;
   }>({ current: 0, total: 0 });
   const [uploadedBookId, setUploadedBookId] = useState<number | null>(null);
+  const [generatingDescription, setGeneratingDescription] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   const genreListId = useId();
@@ -124,6 +128,52 @@ export const BookUploadForm = ({
       }
       return next;
     });
+  };
+
+  const handleGenerateDescription = async () => {
+    setGeneratingDescription(true);
+    setError(null);
+
+    try {
+      const form = formRef.current;
+      if (!form) return;
+
+      const formData = new FormData(form);
+      const title = String(formData.get("title") ?? "").trim();
+      const author = String(formData.get("author") ?? "").trim();
+      const genre = String(formData.get("genre") ?? "").trim();
+
+      if (!title || !author) {
+        setError("Title and author are required to generate description");
+        return;
+      }
+
+      const result = await generateBookDescription({
+        title,
+        author,
+        genre: genre || undefined,
+        pageCount: pageCount || undefined,
+      });
+
+      if (result.success && result.description) {
+        // Set the description in the textarea
+        const descriptionTextarea = form.querySelector<HTMLTextAreaElement>(
+          'textarea[name="description"]',
+        );
+        if (descriptionTextarea) {
+          descriptionTextarea.value = result.description;
+        }
+        setSuccess("AI description generated successfully!");
+      } else {
+        setError(result.message || "Failed to generate description");
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to generate description";
+      setError(message);
+    } finally {
+      setGeneratingDescription(false);
+    }
   };
 
   const handlePdfFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -357,9 +407,30 @@ export const BookUploadForm = ({
         );
       }
 
+      // Start automatic text extraction
+      setStatus("extracting_text");
+      setRenderingProgress(
+        "Extracting text from PDF for AI quiz generation...",
+      );
+
+      try {
+        const extractResult = await extractBookText(saveResult.bookId);
+        if (extractResult.success) {
+          setRenderingProgress(
+            `Text extraction complete! ${extractResult.totalWords} words extracted.`,
+          );
+        } else {
+          console.warn("Text extraction failed:", extractResult.message);
+          setRenderingProgress("Text extraction failed, but book is uploaded.");
+        }
+      } catch (extractErr) {
+        console.warn("Text extraction error:", extractErr);
+        // Don't fail the whole upload if text extraction fails
+      }
+
       setSuccess(
         renderComplete
-          ? "Book uploaded and rendered successfully!"
+          ? "Book uploaded, rendered, and text extracted successfully!"
           : "Book uploaded successfully. Rendering continues in background.",
       );
       form.reset();
@@ -512,15 +583,47 @@ export const BookUploadForm = ({
           </p>
         </label>
 
-        <label className="space-y-2 text-base font-bold text-purple-700 md:col-span-2">
-          Description
+        <div className="space-y-2 md:col-span-2">
+          <div className="flex items-center justify-between">
+            <label className="text-base font-bold text-purple-700">
+              Description
+            </label>
+            <button
+              type="button"
+              onClick={handleGenerateDescription}
+              disabled={generatingDescription || status !== "idle"}
+              className={`rounded-lg border-2 px-4 py-2 text-sm font-bold text-white shadow transition disabled:opacity-50 ${
+                generatingDescription
+                  ? "animate-pulse border-purple-400 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 bg-[length:200%_100%] animate-[gradient_2s_ease-in-out_infinite]"
+                  : "border-indigo-300 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+              }`}
+              style={
+                generatingDescription
+                  ? {
+                      animation:
+                        "pulse 1.5s ease-in-out infinite, gradient 2s ease-in-out infinite",
+                      backgroundSize: "200% 100%",
+                    }
+                  : undefined
+              }
+            >
+              {generatingDescription ? (
+                <span className="flex items-center gap-2">
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                  <span className="animate-pulse">✨ Generating...</span>
+                </span>
+              ) : (
+                "🤖 AI Generate"
+              )}
+            </button>
+          </div>
           <textarea
             name="description"
             rows={3}
             className="w-full rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 font-semibold text-purple-900 outline-none transition-all"
             placeholder="Quick summary for librarians and AI quiz prompts."
           />
-        </label>
+        </div>
 
         <fieldset className="space-y-2 text-base font-bold text-purple-700 md:col-span-2">
           <legend>Access</legend>
@@ -670,7 +773,9 @@ export const BookUploadForm = ({
                   ? "📤 Uploading Cover..."
                   : status === "rendering"
                     ? "🎨 Rendering..."
-                    : "💾 Saving..."
+                    : status === "extracting_text"
+                      ? "📝 Extracting Text..."
+                      : "💾 Saving..."
             : "📚 Upload Book"}
         </button>
         <button

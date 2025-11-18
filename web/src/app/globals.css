@@ -3,202 +3,226 @@
 @import "react-pdf/dist/Page/TextLayer.css";
 
 :root {
-  /* Vibrant playful color palette */
-  --background: #FFFBEB;
-  --foreground: #1e1b4b;
-  --bubble-1: #FCD34D; /* Sunny yellow */
-  --bubble-2: #FB7185; /* Coral pink */
-  --bubble-3: #3B82F6; /* Electric blue */
-  --bubble-4: #84CC16; /* Lime green */
-  --bubble-5: #F97316; /* Orange */
-  --card: rgba(255, 255, 255, 0.85);
-  --card-border: rgba(255, 255, 255, 0.95);
-  --accent: #7C3AED; /* Vibrant purple */
-  --accent-dark: #6D28D9; /* Darker purple */
-  --accent-secondary: #3B82F6; /* Electric blue */
-  --success: #10B981; /* Green */
-  --warning: #F59E0B; /* Amber */
-  --error: #EF4444; /* Red */
+    /* Vibrant playful color palette */
+    --background: #fffbeb;
+    --foreground: #1e1b4b;
+    --bubble-1: #fcd34d; /* Sunny yellow */
+    --bubble-2: #fb7185; /* Coral pink */
+    --bubble-3: #3b82f6; /* Electric blue */
+    --bubble-4: #84cc16; /* Lime green */
+    --bubble-5: #f97316; /* Orange */
+    --card: rgba(255, 255, 255, 0.85);
+    --card-border: rgba(255, 255, 255, 0.95);
+    --accent: #7c3aed; /* Vibrant purple */
+    --accent-dark: #6d28d9; /* Darker purple */
+    --accent-secondary: #3b82f6; /* Electric blue */
+    --success: #10b981; /* Green */
+    --warning: #f59e0b; /* Amber */
+    --error: #ef4444; /* Red */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: 'Nunito', 'Baloo 2', 'Comic Neue', var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', sans-serif;
-  --font-mono: var(--font-geist-mono);
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --font-sans:
+        "Nunito", "Baloo 2", "Comic Neue", var(--font-geist-sans), system-ui,
+        -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: radial-gradient(circle at 10% 20%, #FEF3C7, var(--background)) fixed;
-  color: var(--foreground);
-  font-family: 'Nunito', 'Baloo 2', 'Comic Neue', var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', sans-serif;
-  min-height: 100vh;
-  position: relative;
-  overflow-x: hidden;
-  font-weight: 600;
+    background: radial-gradient(circle at 10% 20%, #fef3c7, var(--background))
+        fixed;
+    color: var(--foreground);
+    font-family:
+        "Nunito",
+        "Baloo 2",
+        "Comic Neue",
+        var(--font-geist-sans),
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+    font-weight: 600;
 }
 
 /* Playful floating bubble decorations */
 body::before,
 body::after {
-  content: '';
-  position: fixed;
-  width: 45vw;
-  height: 45vw;
-  border-radius: 50%;
-  filter: blur(100px);
-  z-index: -2;
-  opacity: 0.5;
-  animation: floatBubble 20s ease-in-out infinite;
+    content: "";
+    position: fixed;
+    width: 45vw;
+    height: 45vw;
+    border-radius: 50%;
+    filter: blur(100px);
+    z-index: -2;
+    opacity: 0.5;
+    animation: floatBubble 20s ease-in-out infinite;
 }
 
 body::before {
-  background: linear-gradient(135deg, var(--bubble-1), var(--bubble-2));
-  top: -10vw;
-  left: -15vw;
-  animation-delay: 0s;
+    background: linear-gradient(135deg, var(--bubble-1), var(--bubble-2));
+    top: -10vw;
+    left: -15vw;
+    animation-delay: 0s;
 }
 
 body::after {
-  background: linear-gradient(135deg, var(--bubble-3), var(--bubble-4));
-  bottom: -15vw;
-  right: -10vw;
-  animation-delay: 10s;
+    background: linear-gradient(135deg, var(--bubble-3), var(--bubble-4));
+    bottom: -15vw;
+    right: -10vw;
+    animation-delay: 10s;
 }
 
 .book-viewer {
-  width: 100%;
-  min-height: 480px;
-  padding: 1rem;
+    width: 100%;
+    min-height: 480px;
+    padding: 1rem;
 }
 
 .book-spread {
-  display: flex;
-  gap: 2rem;
-  justify-content: center;
-  width: 100%;
-  perspective: 1200px;
-  transform-style: preserve-3d;
-  transition: transform 0.6s ease, box-shadow 0.6s ease;
-  position: relative;
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    width: 100%;
+    perspective: 1200px;
+    transform-style: preserve-3d;
+    transition:
+        transform 0.6s ease,
+        box-shadow 0.6s ease;
+    position: relative;
 }
 
 .book-spread--forward-a,
 .book-spread--forward-b {
-  animation: bookFlipForward 1.8s cubic-bezier(0.45, 0.03, 0.21, 1);
-  animation-fill-mode: both;
+    animation: bookFlipForward 1.8s cubic-bezier(0.45, 0.03, 0.21, 1);
+    animation-fill-mode: both;
 }
 
 .book-spread--backward-a,
 .book-spread--backward-b {
-  animation: bookFlipBackward 1.8s cubic-bezier(0.45, 0.03, 0.21, 1);
-  animation-fill-mode: both;
+    animation: bookFlipBackward 1.8s cubic-bezier(0.45, 0.03, 0.21, 1);
+    animation-fill-mode: both;
 }
 
 .book-spread--single::after {
-  content: '';
-  display: block;
-  width: 100%;
-  max-width: 420px;
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    content: "";
+    display: block;
+    width: 100%;
+    max-width: 420px;
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .book-page {
-  background: #ffffff;
-  border-radius: 1rem;
-  padding: 1rem;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(124, 58, 237, 0.2);
-  transform-origin: left center;
-  transition: transform 0.5s ease, box-shadow 0.5s ease;
+    background: #ffffff;
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow:
+        0 20px 45px rgba(0, 0, 0, 0.3),
+        0 0 0 3px rgba(124, 58, 237, 0.2);
+    transform-origin: left center;
+    transition:
+        transform 0.5s ease,
+        box-shadow 0.5s ease;
 }
 
 .book-page--right {
-  transform-origin: right center;
+    transform-origin: right center;
 }
 
 .book-page canvas {
-  width: 100% !important;
-  height: auto !important;
+    width: 100% !important;
+    height: auto !important;
 }
 
 .book-hotspot {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 35%;
-  border: none;
-  opacity: 0;
-  transition: opacity 0.25s ease;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 35%;
+    border: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
 }
 
 .book-hotspot--left {
-  left: 0;
-  border-radius: 1rem 0 0 1rem;
-  background: linear-gradient(90deg, rgba(124, 58, 237, 0.4), rgba(124, 58, 237, 0));
+    left: 0;
+    border-radius: 1rem 0 0 1rem;
+    background: linear-gradient(
+        90deg,
+        rgba(124, 58, 237, 0.4),
+        rgba(124, 58, 237, 0)
+    );
 }
 
 .book-hotspot--right {
-  right: 0;
-  border-radius: 0 1rem 1rem 0;
-  background: linear-gradient(270deg, rgba(124, 58, 237, 0.4), rgba(124, 58, 237, 0));
+    right: 0;
+    border-radius: 0 1rem 1rem 0;
+    background: linear-gradient(
+        270deg,
+        rgba(124, 58, 237, 0.4),
+        rgba(124, 58, 237, 0)
+    );
 }
 
 .book-hotspot:hover {
-  opacity: 0.4;
+    opacity: 0.4;
 }
 
 .book-hotspot:disabled {
-  opacity: 0;
-  cursor: not-allowed;
+    opacity: 0;
+    cursor: not-allowed;
 }
 
 @keyframes bookFlipForward {
-  0% {
-    transform: rotateY(-35deg) translateX(-40px) scale(0.98);
-  }
-  35% {
-    transform: rotateY(-12deg) translateX(-20px) scale(1);
-  }
-  70% {
-    transform: rotateY(6deg) translateX(6px) scale(1.01);
-  }
-  100% {
-    transform: rotateY(0deg) translateX(0) scale(1);
-  }
+    0% {
+        transform: rotateY(-35deg) translateX(-40px) scale(0.98);
+    }
+    35% {
+        transform: rotateY(-12deg) translateX(-20px) scale(1);
+    }
+    70% {
+        transform: rotateY(6deg) translateX(6px) scale(1.01);
+    }
+    100% {
+        transform: rotateY(0deg) translateX(0) scale(1);
+    }
 }
 
 @keyframes bookFlipBackward {
-  0% {
-    transform: rotateY(35deg) translateX(40px) scale(0.98);
-  }
-  35% {
-    transform: rotateY(12deg) translateX(20px) scale(1);
-  }
-  70% {
-    transform: rotateY(-6deg) translateX(-6px) scale(1.01);
-  }
-  100% {
-    transform: rotateY(0deg) translateX(0) scale(1);
-  }
+    0% {
+        transform: rotateY(35deg) translateX(40px) scale(0.98);
+    }
+    35% {
+        transform: rotateY(12deg) translateX(20px) scale(1);
+    }
+    70% {
+        transform: rotateY(-6deg) translateX(-6px) scale(1.01);
+    }
+    100% {
+        transform: rotateY(0deg) translateX(0) scale(1);
+    }
 }
 
 @media (max-width: 900px) {
-  .book-spread {
-    flex-direction: column;
-    align-items: center;
-  }
+    .book-spread {
+        flex-direction: column;
+        align-items: center;
+    }
 
-  .book-spread::after {
-    display: none;
-  }
+    .book-spread::after {
+        display: none;
+    }
 
-  .book-viewer {
-    padding: 0.5rem;
-  }
+    .book-viewer {
+        padding: 0.5rem;
+    }
 }
 
 /* ========================================
@@ -207,114 +231,132 @@ body::after {
 
 /* Floating bubble animation */
 @keyframes floatBubble {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(30px, -30px) scale(1.1);
-  }
-  66% {
-    transform: translate(-20px, 20px) scale(0.9);
-  }
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+    }
+    33% {
+        transform: translate(30px, -30px) scale(1.1);
+    }
+    66% {
+        transform: translate(-20px, 20px) scale(0.9);
+    }
 }
 
 /* Bounce animation for buttons and interactive elements */
 @keyframes bounce {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
 }
 
 /* Wiggle animation for fun hover effects */
 @keyframes wiggle {
-  0%, 100% {
-    transform: rotate(0deg);
-  }
-  25% {
-    transform: rotate(-5deg);
-  }
-  75% {
-    transform: rotate(5deg);
-  }
+    0%,
+    100% {
+        transform: rotate(0deg);
+    }
+    25% {
+        transform: rotate(-5deg);
+    }
+    75% {
+        transform: rotate(5deg);
+    }
 }
 
 /* Pop-in animation for cards and modals */
 @keyframes popIn {
-  0% {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 /* Pulse animation for attention */
 @keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.8;
-  }
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
 }
 
 /* Rainbow text gradient animation */
 @keyframes rainbowText {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
 }
 
 /* Confetti celebration (used for success states) */
 @keyframes confetti {
-  0% {
-    transform: translateY(0) rotate(0deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(100vh) rotate(360deg);
-    opacity: 0;
-  }
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(360deg);
+        opacity: 0;
+    }
 }
 
 /* Sparkle animation */
 @keyframes sparkle {
-  0%, 100% {
-    opacity: 0;
-    transform: scale(0);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1);
-  }
+    0%,
+    100% {
+        opacity: 0;
+        transform: scale(0);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Gradient animation for AI generating button */
+@keyframes gradient {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
 }
 
 /* Slide up animation for page transitions */
 @keyframes slideUp {
-  from {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 /* ========================================
@@ -323,102 +365,102 @@ body::after {
 
 /* Button squish effect on click */
 .btn-squish:active {
-  transform: scale(0.95);
-  transition: transform 0.1s ease;
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
 }
 
 /* Hover bounce effect */
 .hover-bounce:hover {
-  animation: bounce 0.6s ease;
+    animation: bounce 0.6s ease;
 }
 
 /* Hover wiggle effect */
 .hover-wiggle:hover {
-  animation: wiggle 0.5s ease;
+    animation: wiggle 0.5s ease;
 }
 
 /* Pop-in effect on mount */
 .pop-in {
-  animation: popIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    animation: popIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 /* Pulse effect for notifications */
 .pulse-attention {
-  animation: pulse 2s ease-in-out infinite;
+    animation: pulse 2s ease-in-out infinite;
 }
 
 /* Rainbow gradient text */
 .rainbow-text {
-  background: linear-gradient(
-    90deg,
-    #FF6B6B,
-    #FCD34D,
-    #84CC16,
-    #3B82F6,
-    #7C3AED,
-    #FB7185
-  );
-  background-size: 200% 200%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: rainbowText 3s ease infinite;
+    background: linear-gradient(
+        90deg,
+        #ff6b6b,
+        #fcd34d,
+        #84cc16,
+        #3b82f6,
+        #7c3aed,
+        #fb7185
+    );
+    background-size: 200% 200%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: rainbowText 3s ease infinite;
 }
 
 /* Sticker-style cards with rotation */
 .sticker-card {
-  transform: rotate(-2deg);
-  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    transform: rotate(-2deg);
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 .sticker-card:hover {
-  transform: rotate(0deg) scale(1.05);
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+    transform: rotate(0deg) scale(1.05);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
 }
 
 /* 3D button effect */
 .btn-3d {
-  box-shadow:
-    0 4px 0 rgba(0, 0, 0, 0.1),
-    0 8px 16px rgba(0, 0, 0, 0.1);
-  transition: all 0.15s ease;
+    box-shadow:
+        0 4px 0 rgba(0, 0, 0, 0.1),
+        0 8px 16px rgba(0, 0, 0, 0.1);
+    transition: all 0.15s ease;
 }
 
 .btn-3d:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 6px 0 rgba(0, 0, 0, 0.1),
-    0 12px 24px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    box-shadow:
+        0 6px 0 rgba(0, 0, 0, 0.1),
+        0 12px 24px rgba(0, 0, 0, 0.15);
 }
 
 .btn-3d:active {
-  transform: translateY(2px);
-  box-shadow:
-    0 2px 0 rgba(0, 0, 0, 0.1),
-    0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(2px);
+    box-shadow:
+        0 2px 0 rgba(0, 0, 0, 0.1),
+        0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Slide up page transition */
 .page-transition {
-  animation: slideUp 0.4s ease-out;
+    animation: slideUp 0.4s ease-out;
 }
 
 /* Floating shapes in background */
 .floating-shape {
-  position: fixed;
-  border-radius: 50%;
-  z-index: -1;
-  animation: floatBubble 15s ease-in-out infinite;
-  pointer-events: none;
+    position: fixed;
+    border-radius: 50%;
+    z-index: -1;
+    animation: floatBubble 15s ease-in-out infinite;
+    pointer-events: none;
 }
 
 /* Fun focus state for inputs */
 input:focus,
 textarea:focus,
 select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.2);
-  transform: scale(1.02);
-  transition: all 0.2s ease;
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.2);
+    transform: scale(1.02);
+    transition: all 0.2s ease;
 }

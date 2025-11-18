@@ -11,6 +11,7 @@ import {
   ACCESS_LEVEL_OPTIONS,
   type AccessLevelValue,
 } from "@/constants/accessLevels";
+import { BookQuizManagement } from "./BookQuizManagement";
 
 export type ManagedBookRecord = {
   id: number;
@@ -34,37 +35,32 @@ export type ManagedBookRecord = {
 
 const ACCESS_BADGES: Record<
   AccessLevelValue,
-  { label: string; color: string; emoji: string }
+  { label: string; color: string }
 > = {
   KINDERGARTEN: {
     label: "K",
     color:
       "bg-gradient-to-r from-emerald-400 to-teal-400 text-white border-emerald-300",
-    emoji: "🎨",
   },
   LOWER_ELEMENTARY: {
     label: "LE",
     color:
       "bg-gradient-to-r from-sky-400 to-blue-400 text-white border-sky-300",
-    emoji: "📚",
   },
   UPPER_ELEMENTARY: {
     label: "UE",
     color:
       "bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-300",
-    emoji: "🔬",
   },
   JUNIOR_HIGH: {
     label: "JH",
     color:
       "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-300",
-    emoji: "🎓",
   },
   TEACHERS_STAFF: {
     label: "TS",
     color:
       "bg-gradient-to-r from-amber-400 to-orange-400 text-white border-amber-300",
-    emoji: "👨‍🏫",
   },
 };
 
@@ -91,6 +87,8 @@ export const BookManager = ({
     message: string;
   } | null>(null);
   const [deletePendingId, setDeletePendingId] = useState<number | null>(null);
+  const [quizManagementBook, setQuizManagementBook] =
+    useState<ManagedBookRecord | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [genreFilter, setGenreFilter] = useState<string>("ALL");
   const [languageFilter, setLanguageFilter] = useState<string>("ALL");
@@ -483,7 +481,7 @@ export const BookManager = ({
                                   "bg-indigo-100 text-indigo-600 border-indigo-300",
                               )}
                             >
-                              {badge?.emoji} {badge?.label ?? level.slice(0, 2)}
+                              {badge?.label ?? level.slice(0, 2)}
                             </span>
                           );
                         })}
@@ -494,6 +492,15 @@ export const BookManager = ({
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setQuizManagementBook(book)}
+                        className="rounded-full border border-purple-200 bg-white/80 p-2 text-purple-600 shadow-sm transition hover:bg-purple-50"
+                        aria-label="Manage quizzes"
+                        title="Manage quizzes"
+                      >
+                        📝
+                      </button>
                       {!book.pageImagesCount && (
                         <button
                           type="button"
@@ -529,6 +536,36 @@ export const BookManager = ({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Quiz Management Modal */}
+      {quizManagementBook && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border-4 border-indigo-300 bg-white p-8 shadow-2xl">
+            <div className="mb-6 flex items-start justify-between">
+              <div>
+                <h3 className="text-2xl font-black text-indigo-900">
+                  📝 Quiz Management
+                </h3>
+                <p className="text-lg font-semibold text-indigo-600">
+                  {quizManagementBook.title}
+                </p>
+              </div>
+              <button
+                onClick={() => setQuizManagementBook(null)}
+                className="rounded-full border-2 border-gray-300 bg-white px-4 py-2 text-2xl font-bold text-gray-600 transition hover:bg-gray-100"
+              >
+                ✕
+              </button>
+            </div>
+            <BookQuizManagement
+              bookId={quizManagementBook.id}
+              bookTitle={quizManagementBook.title}
+              bookPageCount={quizManagementBook.pageCount}
+              hasExtractedText={!!quizManagementBook.textExtractedAt}
+            />
+          </div>
         </div>
       )}
     </section>
