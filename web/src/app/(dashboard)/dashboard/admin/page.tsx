@@ -12,23 +12,33 @@ export default async function AdminDashboardPage() {
   const supabaseAdmin = getSupabaseAdminClient();
 
   // Get profiles with their auth emails
-  const { data: profiles } = await supabaseAdmin
+  const { data: profiles, error: profilesError } = await supabaseAdmin
     .from("profiles")
     .select("id, full_name, role, access_level")
     .order("updated_at", {
       ascending: false,
     });
 
-  // Fetch auth users to get emails
-  const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+  if (profilesError) {
+    console.error("Error fetching profiles:", profilesError);
+  }
+
+  // Fetch user emails using RPC function (workaround for auth.admin.listUsers() issues)
+  const { data: userEmails, error: emailError } = await supabaseAdmin.rpc(
+    "get_all_user_emails",
+  );
+
+  if (emailError) {
+    console.error("Error fetching user emails:", emailError);
+  }
 
   // Merge profile data with email
   const users =
     profiles?.map((profile) => {
-      const authUser = authUsers?.users.find((u) => u.id === profile.id);
+      const emailData = userEmails?.find((e: any) => e.user_id === profile.id);
       return {
         ...profile,
-        email: authUser?.email || null,
+        email: emailData?.email || null,
       };
     }) ?? [];
 

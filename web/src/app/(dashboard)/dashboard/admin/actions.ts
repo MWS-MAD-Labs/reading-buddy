@@ -71,20 +71,37 @@ export const updateUserData = async (input: {
     throw new Error("You must be signed in to update user data.");
   }
 
-  const { error } = await supabase
+  console.log("Updating user:", input.userId, "with data:", {
+    full_name: input.fullName,
+    role: input.role,
+    access_level: input.accessLevel,
+  });
+
+  const supabaseAdmin = getSupabaseAdminClient();
+
+  const { data, error } = await supabaseAdmin
     .from("profiles")
     .update({
       full_name: input.fullName,
       role: input.role,
       access_level: input.accessLevel,
     })
-    .eq("id", input.userId);
+    .eq("id", input.userId)
+    .select();
+
+  console.log("Update result:", { data, error });
 
   if (error) {
+    console.error("Update error:", error);
     throw error;
   }
 
+  if (!data || data.length === 0) {
+    throw new Error("No rows were updated. User may not exist.");
+  }
+
   revalidatePath("/dashboard/admin");
+  return data[0];
 };
 
 export const addUser = async (input: {

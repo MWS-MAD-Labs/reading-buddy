@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   updateUserRole,
   updateUserAccessLevel,
@@ -34,6 +35,7 @@ const ROLES: UserRecord["role"][] = [
 ];
 
 export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +85,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
   const showSuccessMessage = (msg: string) => {
     setMessage(msg);
     setError(null);
+    router.refresh(); // Refresh the page data
     setTimeout(() => setMessage(null), 3000);
   };
 
