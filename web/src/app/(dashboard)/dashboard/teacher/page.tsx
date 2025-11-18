@@ -60,6 +60,27 @@ export default async function TeacherDashboardPage() {
 
   return (
     <div className="space-y-8">
+      {role === "ADMIN" && (
+        <div className="rounded-[28px] border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold text-purple-900">
+                💡 Looking for all classrooms?
+              </p>
+              <p className="text-xs text-purple-600">
+                View detailed stats and manage all classrooms in the system
+              </p>
+            </div>
+            <Link
+              href="/dashboard/teacher/classrooms"
+              className="rounded-full bg-purple-500 px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-purple-600"
+            >
+              View All Classrooms →
+            </Link>
+          </div>
+        </div>
+      )}
+
       <section className={cardClass}>
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-rose-400">

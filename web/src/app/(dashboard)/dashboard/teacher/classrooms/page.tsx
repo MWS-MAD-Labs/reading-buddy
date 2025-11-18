@@ -121,11 +121,19 @@ export default async function ClassroomManagementPage() {
         userRole={role as "TEACHER" | "ADMIN"}
       />
 
-      {role === "ADMIN" && (
+      {role === "ADMIN" && allClassrooms.length > 0 && (
         <AllClassroomsTable
           classrooms={allClassrooms}
           currentUserId={user.id}
         />
+      )}
+
+      {role === "ADMIN" && allClassrooms.length === 0 && (
+        <div className="rounded-[32px] border border-white/70 bg-white/95 p-8 text-center shadow-[0_25px_70px_rgba(147,118,255,0.2)]">
+          <p className="text-lg font-semibold text-indigo-500">
+            No classrooms in the system yet.
+          </p>
+        </div>
       )}
     </div>
   );
