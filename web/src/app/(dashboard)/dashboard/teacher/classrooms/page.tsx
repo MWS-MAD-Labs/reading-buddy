@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { ClassroomManager } from "@/components/dashboard/ClassroomManager";
+import { AllClassroomsTable } from "@/components/dashboard/AllClassroomsTable";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,8 @@ export default async function ClassroomManagementPage() {
     // Handle error appropriately
   }
 
-  const classrooms = classroomsData
+  // Get my classrooms (where I'm the teacher)
+  const myClassrooms = classroomsData
     ? await Promise.all(
         classroomsData.map(async (c) => {
           const { count } = await supabaseAdmin
@@ -41,6 +43,46 @@ export default async function ClassroomManagementPage() {
       )
     : [];
 
+  // Get all classrooms (for admin view)
+  const { data: allClassroomsData } = await supabaseAdmin
+    .from("classes")
+    .select("id, name, teacher_id, created_at");
+
+  const allClassrooms = allClassroomsData
+    ? await Promise.all(
+        allClassroomsData.map(async (c) => {
+          // Get student count
+          const { count: studentCount } = await supabaseAdmin
+            .from("class_students")
+            .select("*", { count: "exact", head: true })
+            .eq("class_id", c.id);
+
+          // Get book count
+          const { count: bookCount } = await supabaseAdmin
+            .from("class_books")
+            .select("*", { count: "exact", head: true })
+            .eq("class_id", c.id);
+
+          // Get teacher name
+          const { data: teacherData } = await supabaseAdmin
+            .from("profiles")
+            .select("full_name")
+            .eq("id", c.teacher_id)
+            .single();
+
+          return {
+            id: c.id,
+            name: c.name,
+            teacher_id: c.teacher_id,
+            teacher_name: teacherData?.full_name || "Unknown",
+            student_count: studentCount ?? 0,
+            book_count: bookCount ?? 0,
+            created_at: c.created_at,
+          };
+        }),
+      )
+    : [];
+
   const { data: allTeachersData, error: allTeachersError } = await supabase
     .from("profiles")
     .select("id, full_name")
@@ -48,7 +90,6 @@ export default async function ClassroomManagementPage() {
 
   if (allTeachersError) {
     console.error(allTeachersError);
-    // Handle error appropriately
   }
 
   const allTeachers =
@@ -75,10 +116,17 @@ export default async function ClassroomManagementPage() {
       </header>
 
       <ClassroomManager
-        classrooms={classrooms}
+        classrooms={myClassrooms}
         allTeachers={allTeachers}
         userRole={role as "TEACHER" | "ADMIN"}
       />
+
+      {role === "ADMIN" && (
+        <AllClassroomsTable
+          classrooms={allClassrooms}
+          currentUserId={user.id}
+        />
+      )}
     </div>
   );
 }

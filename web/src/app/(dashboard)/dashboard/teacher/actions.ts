@@ -17,16 +17,9 @@ export const createClassroom = async (input: {
   const { user, role } = await requireRole(["TEACHER", "ADMIN"]);
   const supabase = getSupabaseAdminClient();
 
-  let teacher_id: string | null = null;
-  if (role === "TEACHER") {
-    teacher_id = user.id;
-  } else if (role === "ADMIN") {
-    teacher_id = input.teacherId ?? null;
-  }
-
-  if (!teacher_id) {
-    throw new Error("A teacher must be assigned to the class.");
-  }
+  // Default to current user as teacher
+  // If admin provides a specific teacherId, use that, otherwise use current user
+  const teacher_id = input.teacherId || user.id;
 
   const { error } = await supabase.from("classes").insert({
     name: input.name,
@@ -38,6 +31,23 @@ export const createClassroom = async (input: {
   }
 
   revalidatePath("/dashboard/teacher");
+  revalidatePath("/dashboard/teacher/classrooms");
+};
+
+export const deleteClassroom = async (classId: number) => {
+  const { user, role } = await requireRole(["TEACHER", "ADMIN"]);
+  const supabase = getSupabaseAdminClient();
+
+  await assertCanManageClass(classId, user.id, role);
+
+  const { error } = await supabase.from("classes").delete().eq("id", classId);
+
+  if (error) {
+    throw error;
+  }
+
+  revalidatePath("/dashboard/teacher");
+  revalidatePath("/dashboard/teacher/classrooms");
 };
 
 export const addStudentToClass = async (input: {
