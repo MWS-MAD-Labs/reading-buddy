@@ -106,40 +106,37 @@ export const ClassroomManager = ({
         )}
       </div>
 
-      <div className="rounded-[32px] border border-indigo-100 bg-white/90 p-6 shadow-[0_25px_70px_rgba(93,80,255,0.18)]">
-        <h3 className="text-xl font-black text-indigo-900">Your Classes</h3>
-        <p className="text-sm font-medium text-indigo-500">
-          Tap manage to curate each roster.
-        </p>
-        <div className="mt-4 space-y-4">
-          {classrooms.map((classroom) => (
-            <div
-              key={classroom.id}
-              className="flex flex-col gap-3 rounded-2xl border border-indigo-100 bg-white/95 p-4 shadow-[0_18px_40px_rgba(93,80,255,0.15)] md:flex-row md:items-center md:justify-between"
-            >
-              <div>
-                <p className="text-lg font-bold text-indigo-900">
-                  {classroom.name}
-                </p>
-                <p className="text-sm font-medium text-indigo-500">
-                  {classroom.student_count} students
-                </p>
-              </div>
-              <Link
-                href={`/dashboard/teacher/classrooms/${classroom.id}`}
-                className="inline-flex items-center justify-center rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_15px_35px_rgba(79,70,229,0.35)] transition hover:bg-indigo-600"
+      {classrooms.length > 0 && (
+        <div className="rounded-[32px] border border-indigo-100 bg-white/90 p-6 shadow-[0_25px_70px_rgba(93,80,255,0.18)]">
+          <h3 className="text-xl font-black text-indigo-900">Your Classes</h3>
+          <p className="text-sm font-medium text-indigo-500">
+            Tap manage to curate each roster.
+          </p>
+          <div className="mt-4 space-y-4">
+            {classrooms.map((classroom) => (
+              <div
+                key={classroom.id}
+                className="flex flex-col gap-3 rounded-2xl border border-indigo-100 bg-white/95 p-4 shadow-[0_18px_40px_rgba(93,80,255,0.15)] md:flex-row md:items-center md:justify-between"
               >
-                Manage classroom
-              </Link>
-            </div>
-          ))}
-          {classrooms.length === 0 && (
-            <p className="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/60 p-6 text-center text-indigo-400">
-              You haven&rsquo;t created any classes yet.
-            </p>
-          )}
+                <div>
+                  <p className="text-lg font-bold text-indigo-900">
+                    {classroom.name}
+                  </p>
+                  <p className="text-sm font-medium text-indigo-500">
+                    {classroom.student_count} students
+                  </p>
+                </div>
+                <Link
+                  href={`/dashboard/teacher/classrooms/${classroom.id}`}
+                  className="inline-flex items-center justify-center rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-[0_15px_35px_rgba(79,70,229,0.35)] transition hover:bg-indigo-600"
+                >
+                  Manage classroom
+                </Link>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
