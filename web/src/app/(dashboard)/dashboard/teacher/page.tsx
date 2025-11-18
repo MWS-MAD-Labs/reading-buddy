@@ -14,12 +14,12 @@ export default async function TeacherDashboardPage() {
   const supabase = await createSupabaseServerClient();
   const supabaseAdmin = getSupabaseAdminClient();
 
-  let classesQuery = supabaseAdmin.from("classes").select("id, name");
-  if (role === "TEACHER") {
-    classesQuery = classesQuery.eq("teacher_id", user.id);
-  }
-
-  const { data: classroomsData, error: classroomsError } = await classesQuery;
+  // Always filter to current user's classes on the dashboard
+  // (even admins only see their own classes here)
+  const { data: classroomsData, error: classroomsError } = await supabaseAdmin
+    .from("classes")
+    .select("id, name")
+    .eq("teacher_id", user.id);
 
   if (classroomsError) {
     console.error(classroomsError);
