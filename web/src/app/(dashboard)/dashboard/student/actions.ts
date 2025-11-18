@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const recordReadingProgress = async (input: {
   bookId: number;
@@ -93,15 +94,84 @@ export const evaluateAchievements = async () => {
     return { awarded: 0 };
   }
 
-  await supabase
-    .from("student_achievements")
-    .insert(
-      toAward.map((achievement) => ({
-        student_id: user.id,
-        achievement_id: achievement.id,
-      })),
-    );
+  await supabase.from("student_achievements").insert(
+    toAward.map((achievement) => ({
+      student_id: user.id,
+      achievement_id: achievement.id,
+    })),
+  );
 
   revalidatePath("/dashboard/student");
   return { awarded: toAward.length };
+};
+
+export const getPendingCheckpointForPage = async (input: {
+  bookId: number;
+  currentPage: number;
+}) => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to check checkpoints.");
+  }
+
+  // Use admin client for checkpoint queries to avoid RLS recursion
+  const supabaseAdmin = getSupabaseAdminClient();
+
+  // Find the latest required checkpoint at or before the current page
+  const { data: checkpoints, error: checkpointError } = await supabaseAdmin
+    .from("quiz_checkpoints")
+    .select("id, page_number, quiz_id, is_required")
+    .eq("book_id", input.bookId)
+    .eq("is_required", true)
+    .not("quiz_id", "is", null)
+    .lte("page_number", input.currentPage)
+    .order("page_number", { ascending: false })
+    .limit(1);
+
+  if (checkpointError) {
+    throw checkpointError;
+  }
+
+  if (!checkpoints || checkpoints.length === 0) {
+    return { checkpointRequired: false as const };
+  }
+
+  const checkpoint = checkpoints[0] as {
+    quiz_id: number | null;
+    page_number: number;
+  };
+
+  if (!checkpoint.quiz_id) {
+    return { checkpointRequired: false as const };
+  }
+
+  // Check if the student has already completed this checkpoint quiz
+  const { data: attempt, error: attemptError } = await supabaseAdmin
+    .from("quiz_attempts")
+    .select("id, score")
+    .eq("quiz_id", checkpoint.quiz_id)
+    .eq("student_id", user.id)
+    .order("submitted_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (attemptError) {
+    throw attemptError;
+  }
+
+  const completed = attempt && attempt.score !== null;
+
+  if (completed) {
+    return { checkpointRequired: false as const };
+  }
+
+  return {
+    checkpointRequired: true as const,
+    quizId: checkpoint.quiz_id,
+    checkpointPage: checkpoint.page_number,
+  };
 };

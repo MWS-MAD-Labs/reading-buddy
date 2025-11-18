@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { FlipBookReader } from "@/components/dashboard/FlipBookReader";
 import {
   evaluateAchievements,
   recordReadingProgress,
+  getPendingCheckpointForPage,
 } from "@/app/(dashboard)/dashboard/student/actions";
 
 type PageImageInfo = {
@@ -29,6 +31,7 @@ export const BookReader = ({
 }: BookReaderProps) => {
   const [flipError, setFlipError] = useState<string | null>(null);
   const achievementsTriggeredRef = useRef(false);
+  const router = useRouter();
 
   useEffect(() => {
     achievementsTriggeredRef.current = false;
@@ -38,16 +41,28 @@ export const BookReader = ({
     (pageNumber: number) => {
       setFlipError(null);
       recordReadingProgress({ bookId, currentPage: pageNumber })
-        .then(() => {
+        .then(async () => {
+          // Check for required checkpoint quiz at or before this page
+          const checkpoint = await getPendingCheckpointForPage({
+            bookId,
+            currentPage: pageNumber,
+          });
+
+          if (checkpoint.checkpointRequired && checkpoint.quizId) {
+            router.push(
+              `/dashboard/student/quiz/${checkpoint.quizId}?bookId=${bookId}&page=${pageNumber}`,
+            );
+            return;
+          }
+
           if (
             expectedPages &&
             pageNumber >= expectedPages &&
             !achievementsTriggeredRef.current
           ) {
             achievementsTriggeredRef.current = true;
-            return evaluateAchievements();
+            await evaluateAchievements();
           }
-          return undefined;
         })
         .catch((err) => {
           const message =
@@ -57,7 +72,7 @@ export const BookReader = ({
           setFlipError(message);
         });
     },
-    [bookId, expectedPages],
+    [bookId, expectedPages, router],
   );
 
   if (!pageImages || pageImages.count === 0) {

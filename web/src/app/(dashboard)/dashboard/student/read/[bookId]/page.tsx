@@ -6,11 +6,16 @@ import { buildPublicPrefixUrl } from "@/lib/minioUtils";
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  params: { bookId: string };
+  params: Promise<{ bookId: string }>;
+  searchParams?: Promise<{ page?: string }>;
 };
 
-export default async function StudentReadPage({ params }: PageProps) {
+export default async function StudentReadPage({
+  params,
+  searchParams,
+}: PageProps) {
   const awaitedParams = await params;
+  const awaitedSearchParams = searchParams ? await searchParams : undefined;
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -47,7 +52,15 @@ export default async function StudentReadPage({ params }: PageProps) {
     .select("current_page")
     .eq("student_id", user.id)
     .eq("book_id", bookId)
+    .order("updated_at", { ascending: false, nullsFirst: false })
+    .limit(1)
     .maybeSingle();
+
+  const requestedPage = awaitedSearchParams?.page
+    ? Number.parseInt(awaitedSearchParams.page, 10) || undefined
+    : undefined;
+
+  const initialPage = requestedPage ?? progress?.current_page ?? 1;
 
   return (
     <div className="space-y-3">
@@ -63,7 +76,7 @@ export default async function StudentReadPage({ params }: PageProps) {
       <BookReader
         bookId={book.id}
         pdfUrl={book.pdf_url}
-        initialPage={progress?.current_page ?? 1}
+        initialPage={initialPage}
         expectedPages={book.page_count}
         pageImages={pageImages}
       />

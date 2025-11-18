@@ -19,12 +19,14 @@ type ClassroomManagerProps = {
   classrooms: Classroom[];
   allTeachers: Teacher[];
   userRole: "TEACHER" | "ADMIN";
+  hideClassroomsList?: boolean;
 };
 
 export const ClassroomManager = ({
   classrooms,
   allTeachers,
   userRole,
+  hideClassroomsList = false,
 }: ClassroomManagerProps) => {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export const ClassroomManager = ({
         )}
       </div>
 
-      {classrooms.length > 0 && (
+      {!hideClassroomsList && classrooms.length > 0 && (
         <div className="rounded-[32px] border border-indigo-100 bg-white/90 p-6 shadow-[0_25px_70px_rgba(93,80,255,0.18)]">
           <h3 className="text-xl font-black text-indigo-900">Your Classes</h3>
           <p className="text-sm font-medium text-indigo-500">

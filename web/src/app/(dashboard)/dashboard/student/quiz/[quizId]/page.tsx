@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ quizId: string }>;
+  searchParams?: Promise<{ page?: string; bookId?: string }>;
 };
 
 type QuizPayload = {
@@ -18,7 +19,11 @@ type QuizPayload = {
   }[];
 };
 
-export default async function StudentQuizPage({ params }: PageProps) {
+export default async function StudentQuizPage({
+  params,
+  searchParams,
+}: PageProps) {
+  const awaitedSearchParams = searchParams ? await searchParams : undefined;
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -36,7 +41,7 @@ export default async function StudentQuizPage({ params }: PageProps) {
 
   const { data: quiz } = await supabase
     .from("quizzes")
-    .select("id, questions, books(title)")
+    .select("id, book_id, questions, books(title)")
     .eq("id", quizId)
     .single();
 
@@ -53,6 +58,10 @@ export default async function StudentQuizPage({ params }: PageProps) {
 
   const quizData = quiz.questions as QuizPayload;
 
+  const requestedPage = awaitedSearchParams?.page
+    ? Number.parseInt(awaitedSearchParams.page, 10) || undefined
+    : undefined;
+
   return (
     <div className="space-y-6">
       <div>
@@ -66,7 +75,12 @@ export default async function StudentQuizPage({ params }: PageProps) {
           Answer every question to submit your score.
         </p>
       </div>
-      <QuizPlayer quizId={quiz.id} quizData={quizData} />
+      <QuizPlayer
+        quizId={quiz.id}
+        quizData={quizData}
+        bookId={quiz.book_id}
+        returnPage={requestedPage}
+      />
     </div>
   );
 }
