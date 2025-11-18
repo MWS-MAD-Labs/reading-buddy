@@ -445,6 +445,19 @@ body::after {
     animation: slideUp 0.4s ease-out;
 }
 
+/* Indeterminate top loading bar animation */
+@keyframes loading-bar {
+    0% {
+        transform: translateX(-100%);
+    }
+    50% {
+        transform: translateX(0%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
 /* Floating shapes in background */
 .floating-shape {
     position: fixed;
