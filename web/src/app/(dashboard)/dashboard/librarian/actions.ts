@@ -347,7 +347,7 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.4,
@@ -409,6 +409,286 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
 
   revalidatePath("/dashboard/library");
   return { quizId: inserted.id, quiz: quizPayload };
+};
+
+export const generateQuizForBookWithContent = async (input: {
+  bookId: number;
+  pageRangeStart?: number;
+  pageRangeEnd?: number;
+  quizType: "checkpoint" | "classroom";
+  checkpointPage?: number;
+  questionCount?: number;
+}) => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to generate a quiz.");
+  }
+
+  // Validate input
+  if (input.quizType === "checkpoint" && !input.checkpointPage) {
+    throw new Error("Checkpoint page is required for checkpoint quizzes.");
+  }
+
+  // Fetch book data including extracted text
+  const { data: book, error: bookError } = await supabase
+    .from("books")
+    .select(
+      "id, title, author, genre, description, page_count, page_text_content, text_extracted_at",
+    )
+    .eq("id", input.bookId)
+    .single();
+
+  if (bookError || !book) {
+    throw new Error("Book not found.");
+  }
+
+  // Check if text has been extracted
+  const hasExtractedText = book.text_extracted_at && book.page_text_content;
+
+  let bookContent = "";
+  let contentSource = "description";
+
+  if (hasExtractedText && book.page_text_content) {
+    const textContent = book.page_text_content as {
+      pages: { pageNumber: number; text: string; wordCount: number }[];
+      totalPages: number;
+      totalWords: number;
+    };
+
+    // Extract text from specified page range or full book
+    const startPage = input.pageRangeStart ?? 1;
+    const endPage = input.pageRangeEnd ?? textContent.totalPages;
+
+    const pagesInRange = textContent.pages.filter(
+      (p) => p.pageNumber >= startPage && p.pageNumber <= endPage,
+    );
+
+    bookContent = pagesInRange
+      .map((p) => `[Page ${p.pageNumber}]\n${p.text}`)
+      .join("\n\n");
+
+    contentSource = `pages ${startPage}-${endPage}`;
+
+    // Fallback to description if no text content in range
+    if (!bookContent.trim() || bookContent.split(" ").length < 50) {
+      bookContent = book.description || "";
+      contentSource = "description (fallback - insufficient text extracted)";
+    }
+  } else {
+    // Use description if no extracted text
+    bookContent = book.description || "";
+    if (!bookContent) {
+      throw new Error(
+        "No book content available. Please add a description or extract text from the PDF.",
+      );
+    }
+  }
+
+  // Determine question count
+  const questionCount = input.questionCount ?? 5;
+
+  // Generate quiz with Gemini
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured.");
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: 0.4,
+    },
+  });
+
+  const quizTypeDescription =
+    input.quizType === "checkpoint"
+      ? `a checkpoint quiz that students must complete while reading`
+      : `a classroom quiz for assessment`;
+
+  const pageRangeInfo =
+    input.pageRangeStart && input.pageRangeEnd
+      ? `Content: Pages ${input.pageRangeStart}-${input.pageRangeEnd}`
+      : "Content: Full book";
+
+  const prompt = `
+You are an educational assistant creating ${quizTypeDescription} for students aged 10-16.
+
+Book: "${book.title}" by ${book.author}
+${pageRangeInfo}
+Genre: ${book.genre || "General"}
+
+Below is the actual content from the book:
+"""
+${bookContent}
+"""
+
+Generate ${questionCount} multiple-choice questions that:
+1. Test comprehension of key concepts and plot points from the provided content
+2. Are appropriate for the target age group (10-16 years old)
+3. Include varied difficulty levels (mix of easy, medium, and hard)
+4. Focus on important themes, character development, and story elements
+5. Have clear, unambiguous correct answers
+
+Return JSON with this exact structure:
+{
+  "title": "${book.title} Quiz - ${contentSource}",
+  "questions": [
+    {
+      "question": "Question text here",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "answerIndex": 0,
+      "difficulty": "easy|medium|hard",
+      "explanation": "Brief explanation of why this answer is correct"
+    }
+  ]
+}
+
+Important: answerIndex should be 0-3 (zero-based index of the correct option).
+`;
+
+  const result = await model.generateContent(prompt);
+  const response = result.response;
+  const text = response.text();
+
+  if (!text) {
+    throw new Error("Gemini did not return any content.");
+  }
+
+  let quizPayload: unknown;
+  try {
+    quizPayload = JSON.parse(text);
+  } catch (err) {
+    throw new Error(
+      `Gemini returned invalid JSON: ${err instanceof Error ? err.message : "unknown error"}`,
+    );
+  }
+
+  // Save quiz to database
+  const { data: inserted, error: quizError } = await supabase
+    .from("quizzes")
+    .insert({
+      book_id: book.id,
+      created_by_id: user.id,
+      questions: quizPayload,
+      quiz_type: input.quizType,
+      page_range_start: input.pageRangeStart,
+      page_range_end: input.pageRangeEnd,
+      checkpoint_page: input.checkpointPage,
+    })
+    .select("id")
+    .single();
+
+  if (quizError || !inserted) {
+    throw quizError ?? new Error("Failed to save quiz.");
+  }
+
+  // If this is a checkpoint quiz, create the checkpoint record
+  if (input.quizType === "checkpoint" && input.checkpointPage) {
+    const { error: checkpointError } = await supabase
+      .from("quiz_checkpoints")
+      .insert({
+        book_id: book.id,
+        page_number: input.checkpointPage,
+        quiz_id: inserted.id,
+        is_required: true,
+        created_by_id: user.id,
+      });
+
+    if (checkpointError) {
+      console.error("Failed to create checkpoint record:", checkpointError);
+      // Don't fail the whole operation, just log the error
+    }
+  }
+
+  revalidatePath("/dashboard/library");
+  revalidatePath("/dashboard/librarian");
+
+  return {
+    quizId: inserted.id,
+    quiz: quizPayload,
+    contentSource,
+    questionCount,
+  };
+};
+
+export const autoGenerateCheckpoints = async (input: {
+  bookId: number;
+  customPages?: number[];
+}) => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to generate checkpoints.");
+  }
+
+  // Fetch book data
+  const { data: book, error: bookError } = await supabase
+    .from("books")
+    .select("id, title, page_count, page_text_content, text_extracted_at")
+    .eq("id", input.bookId)
+    .single();
+
+  if (bookError || !book) {
+    throw new Error("Book not found.");
+  }
+
+  if (!book.page_count) {
+    throw new Error("Book page count not available.");
+  }
+
+  // Import helper functions
+  const { suggestCheckpoints, suggestQuestionCount } = await import(
+    "@/lib/pdf-extractor"
+  );
+
+  // Determine checkpoint pages
+  const checkpointPages =
+    input.customPages ?? suggestCheckpoints(book.page_count);
+
+  if (checkpointPages.length === 0) {
+    throw new Error("No checkpoints to generate. Book may be too short.");
+  }
+
+  const suggestedCheckpoints: Array<{
+    page: number;
+    questionCount: number;
+    preview: string;
+  }> = [];
+
+  // Calculate page ranges for each checkpoint
+  let previousPage = 1;
+  for (const checkpointPage of checkpointPages) {
+    const pageRangeStart = previousPage;
+    const pageRangeEnd = checkpointPage;
+    const pageRange = pageRangeEnd - pageRangeStart + 1;
+    const questionCount = suggestQuestionCount(pageRange);
+
+    suggestedCheckpoints.push({
+      page: checkpointPage,
+      questionCount,
+      preview: `Quiz about pages ${pageRangeStart}-${pageRangeEnd} (${questionCount} questions)`,
+    });
+
+    previousPage = checkpointPage + 1;
+  }
+
+  return {
+    bookId: book.id,
+    bookTitle: book.title,
+    totalPages: book.page_count,
+    suggestedCheckpoints,
+    hasExtractedText: !!book.text_extracted_at,
+    status: "pending_approval",
+  };
 };
 
 export const renderBookImages = async (bookId: number) => {

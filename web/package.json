@@ -7,7 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "render:book-images": "tsx scripts/render-book-images.ts"
+    "render:book-images": "tsx scripts/render-book-images.ts",
+    "extract:book-text": "tsx scripts/extract-book-text.ts",
+    "list-books": "tsx scripts/list-books.ts",
+    "check:extracted-text": "tsx scripts/check-extracted-text.ts",
+    "test:quiz-generation": "tsx scripts/test-quiz-generation.ts",
+    "test:auto-checkpoints": "tsx scripts/test-auto-checkpoints.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

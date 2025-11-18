@@ -29,6 +29,7 @@ export type ManagedBookRecord = {
   accessLevels: AccessLevelValue[];
   pageImagesCount?: number | null;
   pageImagesRenderedAt?: string | null;
+  textExtractedAt?: string | null;
 };
 
 const ACCESS_BADGES: Record<

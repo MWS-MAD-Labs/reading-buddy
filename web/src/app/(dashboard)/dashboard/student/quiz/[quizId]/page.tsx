@@ -5,7 +5,7 @@ import { QuizPlayer } from "@/components/dashboard/QuizPlayer";
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  params: { quizId: string };
+  params: Promise<{ quizId: string }>;
 };
 
 type QuizPayload = {
@@ -28,7 +28,8 @@ export default async function StudentQuizPage({ params }: PageProps) {
     redirect("/login");
   }
 
-  const quizId = Number(params.quizId);
+  const { quizId: quizIdParam } = await params;
+  const quizId = Number(quizIdParam);
   if (Number.isNaN(quizId)) {
     notFound();
   }

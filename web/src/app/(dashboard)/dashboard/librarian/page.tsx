@@ -3,6 +3,7 @@ import { BookManagementSection } from "@/components/dashboard/BookManagementSect
 import type { ManagedBookRecord } from "@/components/dashboard/BookManager";
 import type { AccessLevelValue } from "@/constants/accessLevels";
 import { QuizGenerator } from "@/components/dashboard/QuizGenerator";
+import { EnhancedQuizGenerator } from "@/components/dashboard/EnhancedQuizGenerator";
 import { requireRole } from "@/lib/auth/roleCheck";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function LibrarianPage() {
   const { data: bookRows } = await supabase
     .from("books")
     .select(
-      "id, isbn, title, author, publisher, publication_year, genre, language, description, page_count, pdf_url, cover_url, created_at, page_images_count, page_images_rendered_at, book_access(access_level)",
+      "id, isbn, title, author, publisher, publication_year, genre, language, description, page_count, pdf_url, cover_url, created_at, page_images_count, page_images_rendered_at, text_extracted_at, book_access(access_level)",
     )
     .order("created_at", { ascending: false });
 
@@ -47,6 +48,7 @@ export default async function LibrarianPage() {
         ) ?? [],
       pageImagesCount: book.page_images_count ?? null,
       pageImagesRenderedAt: book.page_images_rendered_at ?? null,
+      textExtractedAt: book.text_extracted_at ?? null,
     })) ?? [];
 
   const genreOptions = Array.from(
@@ -71,6 +73,15 @@ export default async function LibrarianPage() {
         books={managedBooks}
         genreOptions={genreOptions}
         languageOptions={languageOptions}
+      />
+      <EnhancedQuizGenerator
+        books={managedBooks.map((book) => ({
+          id: book.id,
+          title: book.title,
+          description: book.description ?? null,
+          page_count: book.pageCount ?? null,
+          text_extracted_at: book.textExtractedAt ?? null,
+        }))}
       />
       <QuizGenerator
         books={managedBooks.map((book) => ({
