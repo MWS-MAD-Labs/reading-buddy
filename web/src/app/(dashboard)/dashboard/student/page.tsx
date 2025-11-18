@@ -23,6 +23,56 @@ export default async function StudentDashboardPage() {
   const assignedBookIds =
     assignments?.map((assignment) => assignment.book_id) ?? [];
 
+  // Get student's classes
+  const { data: studentClasses } = await supabase
+    .from("class_students")
+    .select("class_id")
+    .eq("student_id", user.id);
+
+  const classIds = studentClasses?.map((c) => c.class_id) ?? [];
+
+  // Get quizzes assigned to student's classes
+  let assignedQuizzes: Array<{
+    id: number;
+    book_id: number;
+    books: { title: string } | null;
+    due_date: string | null;
+    quiz_type: string;
+  }> = [];
+
+  if (classIds.length > 0) {
+    const { data: classQuizData } = await supabase
+      .from("class_quiz_assignments")
+      .select(
+        "quiz_id, due_date, quizzes(id, book_id, quiz_type, books(title))",
+      )
+      .in("class_id", classIds)
+      .eq("is_active", true)
+      .order("due_date", { ascending: true, nullsFirst: false });
+
+    assignedQuizzes = (classQuizData ?? []).map((item: any) => {
+      const quizData =
+        Array.isArray(item.quizzes) && item.quizzes.length > 0
+          ? item.quizzes[0]
+          : item.quizzes;
+      const bookData =
+        quizData?.books &&
+        Array.isArray(quizData.books) &&
+        quizData.books.length > 0
+          ? quizData.books[0]
+          : quizData?.books;
+
+      return {
+        id: quizData?.id ?? 0,
+        book_id: quizData?.book_id ?? 0,
+        quiz_type: quizData?.quiz_type ?? "classroom",
+        books: bookData ? { title: bookData.title } : null,
+        due_date: item.due_date,
+      };
+    });
+  }
+
+  // Get all available quizzes for assigned books (legacy support)
   let quizzes: Array<{
     id: number;
     book_id: number;
@@ -148,6 +198,72 @@ export default async function StudentDashboardPage() {
           </p>
         )}
       </section>
+
+      {assignedQuizzes.length > 0 && (
+        <section className="space-y-3 rounded-[28px] border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-6 text-indigo-950 shadow-[0_20px_60px_rgba(168,85,247,0.25)]">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1">
+              <span className="text-lg">📝</span>
+              <p className="text-xs font-black uppercase tracking-wide text-purple-600">
+                Assigned by Teacher
+              </p>
+            </div>
+            <h2 className="text-xl font-black">Required Quizzes</h2>
+            <p className="text-sm text-indigo-500">
+              Complete these quizzes assigned by your teacher.
+            </p>
+          </div>
+          <ul className="space-y-3">
+            {assignedQuizzes.map((quiz) => {
+              const formatDueDate = (dateString: string | null) => {
+                if (!dateString) return null;
+                const date = new Date(dateString);
+                const now = new Date();
+                const isOverdue = date < now;
+                const dateStr = date.toLocaleDateString();
+                return { dateStr, isOverdue };
+              };
+              const dueInfo = formatDueDate(quiz.due_date);
+
+              return (
+                <li
+                  key={quiz.id}
+                  className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-purple-200 bg-white/90 p-4 text-indigo-900 shadow-[0_10px_30px_rgba(168,85,247,0.15)]"
+                >
+                  <div className="flex-1">
+                    <p className="text-xs uppercase tracking-[0.25em] text-purple-400">
+                      {quiz.quiz_type === "checkpoint"
+                        ? "Checkpoint Quiz"
+                        : "Classroom Quiz"}
+                    </p>
+                    <p className="text-base font-semibold">
+                      {quiz.books?.title ?? "Untitled"}
+                    </p>
+                    {dueInfo && (
+                      <p
+                        className={`text-xs font-medium ${
+                          dueInfo.isOverdue
+                            ? "text-rose-500"
+                            : "text-indigo-500"
+                        }`}
+                      >
+                        {dueInfo.isOverdue ? "⚠️ Overdue" : "📅 Due"}:{" "}
+                        {dueInfo.dateStr}
+                      </p>
+                    )}
+                  </div>
+                  <Link
+                    href={`/dashboard/student/quiz/${quiz.id}`}
+                    className="rounded-full bg-gradient-to-r from-purple-500 to-pink-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
+                  >
+                    Take quiz
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/85 p-6 text-indigo-950 shadow-[0_20px_60px_rgba(147,118,255,0.18)]">
         <div>

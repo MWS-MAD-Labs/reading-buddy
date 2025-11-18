@@ -5,6 +5,11 @@ import { requireRole } from "@/lib/auth/roleCheck";
 import { assertCanManageClass } from "@/lib/classrooms/permissions";
 import { ClassroomRoster } from "@/components/dashboard/ClassroomRoster";
 import { ClassReadingList } from "@/components/dashboard/ClassReadingList";
+import { ClassQuizList } from "@/components/dashboard/ClassQuizList";
+import {
+  getPublishedQuizzesByBook,
+  getClassQuizAssignments,
+} from "@/app/(dashboard)/dashboard/teacher/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -413,6 +418,62 @@ export default async function ManageClassroomPage({
         assignedBooks={assignedBooks}
         availableBooks={availableBooks}
       />
+
+      {assignedBooks.length > 0 && (
+        <section className="space-y-6">
+          <div className="rounded-[32px] border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-4">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1">
+              <span className="text-lg">📝</span>
+              <p className="text-xs font-black uppercase tracking-wide text-purple-600">
+                Quiz Assignments
+              </p>
+            </div>
+            <h2 className="text-xl font-black text-indigo-950">
+              Assign Quizzes to Class
+            </h2>
+            <p className="text-sm text-indigo-500">
+              Assign quizzes created by librarians for each book below.
+            </p>
+          </div>
+
+          {assignedBooks.map((book) => (
+            <BookQuizSection
+              key={book.book_id}
+              classId={classId}
+              bookId={book.book_id}
+              bookTitle={book.title}
+            />
+          ))}
+        </section>
+      )}
     </div>
+  );
+}
+
+async function BookQuizSection({
+  classId,
+  bookId,
+  bookTitle,
+}: {
+  classId: number;
+  bookId: number;
+  bookTitle: string;
+}) {
+  // Fetch available quizzes for this book
+  const availableQuizzes = await getPublishedQuizzesByBook(bookId);
+
+  // Fetch assigned quizzes for this class
+  const allAssignments = await getClassQuizAssignments(classId);
+  const assignedQuizzes =
+    allAssignments?.filter((a) => a.book_id === bookId) ?? [];
+
+  return (
+    <ClassQuizList
+      classId={classId}
+      bookId={bookId}
+      bookTitle={bookTitle}
+      availableQuizzes={availableQuizzes}
+      assignedQuizzes={assignedQuizzes}
+    />
   );
 }
