@@ -61,29 +61,38 @@ A modern K-12 e-library platform with gamification, AI-powered quizzes, and role
    cd reading-companion
    ```
 
-2. **Configure environment**
+2. **Set up Supabase database**
+   - Create a Supabase project at [supabase.com](https://supabase.com)
+   - Run the `database-setup.sql` script in Supabase SQL Editor
+   - See [DATABASE_SETUP.md](DATABASE_SETUP.md) for detailed instructions
+
+3. **Configure environment**
    ```bash
    cp .env.example .env
-   nano .env  # Add your credentials
+   nano .env  # Add your credentials (Supabase, MinIO, Gemini API)
    ```
 
-3. **Deploy with Docker**
+4. **Deploy with Docker**
    ```bash
    docker-compose up --build -d
    ```
 
-4. **Access the application**
+5. **Create your first admin user**
+   - Sign up through the app
+   - Manually set your role to 'ADMIN' in Supabase Table Editor → profiles
+
+6. **Access the application**
    Open http://localhost:3000
 
-See [DOCKER.md](DOCKER.md) for detailed deployment instructions.
+See [DATABASE_SETUP.md](DATABASE_SETUP.md) for database setup and [DOCKER.md](DOCKER.md) for deployment instructions.
 
 ## Documentation
 
+- [Database Setup Guide](DATABASE_SETUP.md) - **Start here!** Complete database setup instructions
 - [Project Roadmap](Project-Roadmap.md) - Development phases and progress
 - [Docker Deployment](DOCKER.md) - Production deployment guide
 - [AI Development Guide](AI-Readme.md) - Architecture and development guidelines
 - [Admin Panel](web/ADMIN_PANEL.md) - Admin features documentation
-- [Database Migrations](migrations/README.md) - Database schema updates
 - [Changelog](CHANGELOG.md) - Version history and release notes
 
 ## Development
