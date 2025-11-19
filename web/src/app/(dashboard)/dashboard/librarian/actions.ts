@@ -850,8 +850,11 @@ export const deleteQuiz = async (quizId: number) => {
     throw new Error("You must be signed in to delete quizzes.");
   }
 
+  // Use admin client to avoid RLS recursion issues when checking attempts
+  const supabaseAdmin = getSupabaseAdminClient();
+
   // Check if quiz has any attempts
-  const { data: attempts, error: checkError } = await supabase
+  const { data: attempts, error: checkError } = await supabaseAdmin
     .from("quiz_attempts")
     .select("id")
     .eq("quiz_id", quizId)
@@ -868,8 +871,11 @@ export const deleteQuiz = async (quizId: number) => {
     );
   }
 
-  // Delete quiz
-  const { error } = await supabase.from("quizzes").delete().eq("id", quizId);
+  // Delete quiz using admin client as well
+  const { error } = await supabaseAdmin
+    .from("quizzes")
+    .delete()
+    .eq("id", quizId);
 
   if (error) {
     console.error("Error deleting quiz:", error);
