@@ -279,6 +279,44 @@ message: 'null value in column "access_level" of relation "profiles" violates no
 - Staff roles (TEACHER, LIBRARIAN, ADMIN) will have access_level = NULL
 - No more constraint errors when updating roles
 
+### Student dashboard shows "No books in progress" even when reading
+
+**Issue:** Students have started reading books, but the dashboard still shows "No books in progress yet. Once you start reading, your books will show up here."
+
+**Error in logs (may not be visible to user):**
+```
+Failed to fetch student_books
+Policy violation or RLS blocking access
+```
+
+**Cause:** The `student_books` table has RLS enabled but is missing the policies that allow students to read and write their own progress.
+
+**Solution:**
+
+1. **For new installations:** The `database-setup.sql` script now includes the policies. No action needed.
+
+2. **For existing installations:** Run the fix script:
+   - Go to Supabase **SQL Editor**
+   - Run the `fix-student-books-rls.sql` script
+   - This will add the missing policies:
+     - Students can view their own progress
+     - Students can insert/update their own progress
+     - Teachers can view all student progress
+   
+3. **Verify the fix:**
+   ```sql
+   SELECT policyname, cmd 
+   FROM pg_policies 
+   WHERE tablename = 'student_books';
+   -- Should return 4 policies
+   ```
+
+**Expected behavior after fix:**
+- Students can see books they're currently reading on dashboard
+- Reading progress saves correctly when turning pages
+- Teachers can view student progress in their dashboards
+- "Books in progress" section shows actual books being read
+
 ## Advanced Configuration
 
 ### Custom Badges
