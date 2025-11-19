@@ -139,14 +139,18 @@ export default async function StudentDashboardPage() {
                   {/* Book Info */}
                   <div className="flex flex-1 flex-col gap-2">
                     <p className="text-xs uppercase tracking-wide text-rose-400">
-                      Assigned reading
                       {bookClassrooms.has(assignment.book_id) &&
-                        bookClassrooms.get(assignment.book_id)!.length > 0 && (
+                      bookClassrooms.get(assignment.book_id)!.length > 0 ? (
+                        <>
+                          Assigned reading
                           <span className="ml-2 font-normal">
                             •{" "}
                             {bookClassrooms.get(assignment.book_id)!.join(", ")}
                           </span>
-                        )}
+                        </>
+                      ) : (
+                        "Personal reading"
+                      )}
                     </p>
                     <h2 className="text-xl font-black text-indigo-950">
                       {book?.title ?? "Unknown title"}
