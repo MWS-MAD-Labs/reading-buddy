@@ -242,6 +242,43 @@ Make sure you're using the correct API keys in your `.env` file. The `anon` key 
 
 **Future signups:** After running the database setup or fix script, all new Google OAuth signups will automatically have their name populated.
 
+### Cannot update user role to staff (TEACHER, LIBRARIAN, ADMIN)
+
+**Issue:** Getting error `null value in column "access_level" violates not-null constraint` when changing a user from STUDENT to staff role.
+
+**Error message:**
+```
+code: '23502'
+message: 'null value in column "access_level" of relation "profiles" violates not-null constraint'
+```
+
+**Cause:** The `access_level` column in your database has a NOT NULL constraint, but staff roles don't need access levels (only students do).
+
+**Solution:**
+
+1. **For new installations:** The `database-setup.sql` script includes `access_level` as nullable. No action needed.
+
+2. **For existing installations:** Run the fix script:
+   - Go to Supabase **SQL Editor**
+   - Run the `fix-access-level-column.sql` script
+   - This will:
+     - Add the column if missing
+     - Remove the NOT NULL constraint
+     - Set NULL for all staff roles
+   
+3. **Verify the fix:**
+   ```sql
+   SELECT is_nullable 
+   FROM information_schema.columns 
+   WHERE table_name = 'profiles' AND column_name = 'access_level';
+   -- Should return: YES
+   ```
+
+**Expected behavior after fix:**
+- Students can have access_level (KINDERGARTEN, LOWER_ELEMENTARY, etc.)
+- Staff roles (TEACHER, LIBRARIAN, ADMIN) will have access_level = NULL
+- No more constraint errors when updating roles
+
 ## Advanced Configuration
 
 ### Custom Badges
