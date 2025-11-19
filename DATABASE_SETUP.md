@@ -218,9 +218,29 @@ Check that RLS policies are enabled. Go to **Table Editor**, click on a table, t
 
 Make sure you're using the correct API keys in your `.env` file. The `anon` key is for public client access, while the `service_role` key is for server-side admin operations.
 
-### Migration files vs setup script
+### Google OAuth users showing no name in admin dashboard
 
-For **new installations** (v1.0.0+), use `database-setup.sql` only. The migration files in the `migrations/` folder are for historical reference or if you're upgrading from a pre-v1.0.0 development version.
+**Issue:** Users who sign up with Google OAuth don't have their name populated in the admin dashboard.
+
+**Cause:** The `handle_new_user()` trigger function in older versions didn't capture the name from OAuth metadata.
+
+**Solution:**
+
+1. **For new installations:** The `database-setup.sql` script includes the fixed function. No action needed.
+
+2. **For existing installations:** Run the fix script to backfill names for existing OAuth users:
+   - Go to Supabase **SQL Editor**
+   - Run the `fix-oauth-names.sql` script
+   - This will update all profiles with missing names using their OAuth data
+   
+3. **Manual update:** Alternatively, update individual profiles:
+   ```sql
+   UPDATE profiles
+   SET full_name = 'User Name'
+   WHERE id = 'user-uuid-here';
+   ```
+
+**Future signups:** After running the database setup or fix script, all new Google OAuth signups will automatically have their name populated.
 
 ## Advanced Configuration
 
