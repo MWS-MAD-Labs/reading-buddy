@@ -92,13 +92,16 @@ This is the first production-ready release of Reading Buddy, a comprehensive K-1
 - Project Roadmap (all phases complete)
 - AI Development Guide
 - Docker Deployment Guide
-- Database Migration Guide
+- Database Setup Guide (single-script installation)
 - Admin Panel Documentation
 - Environment configuration examples
 
 ### Database
-- Complete schema with RLS policies
-- Quiz enhancements migration (text extraction, checkpoints, badges)
+- Complete schema with RLS policies (18 tables)
+- Single-script database setup for new installations
+- Text extraction support for AI quiz generation
+- Checkpoint quiz system with progress tracking
+- Badge/achievement system with 6 default badges
 - User email function for admin queries
 - Optimized indexes for performance
 
@@ -111,7 +114,7 @@ This is the first production-ready release of Reading Buddy, a comprehensive K-1
 
 ### Known Limitations
 - PDF rendering worker requires manual or cron execution
-- Database migrations require manual application via Supabase dashboard
 - MinIO must be self-hosted (infrastructure requirement)
+- Initial database setup requires Supabase SQL Editor access
 
 [1.0.0]: https://github.com/faisalnh/reading-companion/releases/tag/v1.0.0
