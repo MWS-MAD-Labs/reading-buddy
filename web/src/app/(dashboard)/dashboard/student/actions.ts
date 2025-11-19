@@ -17,19 +17,32 @@ export const recordReadingProgress = async (input: {
     throw new Error("You must be signed in to save progress.");
   }
 
-  const { error } = await supabase.from("student_books").upsert(
-    {
-      student_id: user.id,
-      book_id: input.bookId,
-      current_page: input.currentPage,
-    },
-    { onConflict: "student_id,book_id" },
-  );
+  console.log("📖 Recording progress:", {
+    student_id: user.id,
+    book_id: input.bookId,
+    current_page: input.currentPage,
+  });
+
+  const { data, error } = await supabase
+    .from("student_books")
+    .upsert(
+      {
+        student_id: user.id,
+        book_id: input.bookId,
+        current_page: input.currentPage,
+      },
+      { onConflict: "student_id,book_id" },
+    )
+    .select();
+
+  console.log("📖 Progress save result:", { data, error });
 
   if (error) {
+    console.error("❌ Failed to save progress:", error);
     throw error;
   }
 
+  console.log("✅ Progress saved successfully");
   revalidatePath("/dashboard/student");
 };
 

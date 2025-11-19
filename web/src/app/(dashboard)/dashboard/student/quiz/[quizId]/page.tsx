@@ -49,6 +49,14 @@ export default async function StudentQuizPage({
     notFound();
   }
 
+  // Find which classroom this quiz belongs to (for redirect after completion)
+  const { data: quizAssignment } = await supabase
+    .from("class_quiz_assignments")
+    .select("class_id")
+    .eq("quiz_id", quizId)
+    .eq("is_active", true)
+    .maybeSingle();
+
   // Extract book data from array if it exists
   const bookData =
     Array.isArray(quiz.books) && quiz.books.length > 0
@@ -80,6 +88,7 @@ export default async function StudentQuizPage({
         quizData={quizData}
         bookId={quiz.book_id}
         returnPage={requestedPage}
+        classId={quizAssignment?.class_id}
       />
     </div>
   );

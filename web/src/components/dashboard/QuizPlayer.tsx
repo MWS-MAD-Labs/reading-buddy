@@ -21,6 +21,7 @@ type QuizPlayerProps = {
   quizData: QuizData;
   bookId?: number;
   returnPage?: number;
+  classId?: number;
 };
 
 export const QuizPlayer = ({
@@ -28,6 +29,7 @@ export const QuizPlayer = ({
   quizData,
   bookId,
   returnPage,
+  classId,
 }: QuizPlayerProps) => {
   const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(
     quizData.questions.map(() => null),
@@ -175,19 +177,15 @@ export const QuizPlayer = ({
         </div>
       ) : null}
 
-      {status === "completed" && score !== null && bookId ? (
+      {status === "completed" && score !== null && classId ? (
         <button
           type="button"
           onClick={() =>
-            router.push(
-              `/dashboard/student/read/${bookId}${
-                returnPage && returnPage > 0 ? `?page=${returnPage}` : ""
-              }`,
-            )
+            router.push(`/dashboard/student/classrooms/${classId}`)
           }
           className="btn-3d btn-squish mt-4 w-full rounded-3xl border-4 border-blue-300 bg-gradient-to-r from-blue-400 to-indigo-500 px-8 py-4 text-xl font-black text-white shadow-2xl hover:from-blue-500 hover:to-indigo-600"
         >
-          ⬅️ Back to reading
+          ⬅️ Back to classroom
         </button>
       ) : null}
 

@@ -90,6 +90,23 @@ export default async function StudentClassroomPage({
       };
     }) ?? [];
 
+  // Get student's reading progress for these books
+  const bookIds = assignedBooks.map((b) => b.book_id);
+  let readingProgress: Map<number, { current_page: number }> = new Map();
+  if (bookIds.length > 0) {
+    const { data: progress } = await supabaseAdmin
+      .from("student_books")
+      .select("book_id, current_page")
+      .eq("student_id", user.id)
+      .in("book_id", bookIds);
+
+    progress?.forEach((p: any) => {
+      readingProgress.set(p.book_id, {
+        current_page: p.current_page,
+      });
+    });
+  }
+
   // Load quizzes assigned to this classroom
   const { data: quizAssignments } = await supabaseAdmin
     .from("class_quiz_assignments")
@@ -119,6 +136,25 @@ export default async function StudentClassroomPage({
         due_date: item.due_date as string | null,
       };
     }) ?? [];
+
+  // Get quiz attempts to check which quizzes have been taken
+  const quizIds = assignedQuizzes.map((q) => q.id);
+  let quizAttempts: Map<number, { score: number; submitted_at: string }> =
+    new Map();
+  if (quizIds.length > 0) {
+    const { data: attempts } = await supabaseAdmin
+      .from("quiz_attempts")
+      .select("quiz_id, score, submitted_at")
+      .eq("student_id", user.id)
+      .in("quiz_id", quizIds);
+
+    attempts?.forEach((attempt: any) => {
+      quizAttempts.set(attempt.quiz_id, {
+        score: attempt.score,
+        submitted_at: attempt.submitted_at,
+      });
+    });
+  }
 
   const formatDate = (value: string | null) => {
     if (!value) return "—";
@@ -164,38 +200,62 @@ export default async function StudentClassroomPage({
           </div>
         </div>
         {assignedBooks.length ? (
-          <ul className="mt-2 grid gap-4 md:grid-cols-2">
-            {assignedBooks.map((book) => (
-              <li
-                key={book.book_id}
-                className="flex flex-col justify-between gap-3 rounded-2xl border border-indigo-100 bg-white/90 p-4 shadow-[0_16px_40px_rgba(79,70,229,0.15)]"
-              >
-                <div>
-                  <p className="text-xs uppercase tracking-[0.25em] text-indigo-400">
-                    Assigned book
-                  </p>
-                  <p className="text-base font-semibold text-indigo-900">
-                    {book.title}
-                  </p>
-                  <p className="text-sm text-indigo-500">
-                    {book.author ?? "Unknown author"}
-                  </p>
-                  {book.assigned_at && (
-                    <p className="mt-1 text-xs text-indigo-400">
-                      Assigned: {formatDate(book.assigned_at)}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Link
-                    href={`/dashboard/student/read/${book.id}`}
-                    className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 to-sky-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
-                  >
-                    Start reading →
-                  </Link>
-                </div>
-              </li>
-            ))}
+          <ul className="mt-2 grid gap-5 md:grid-cols-2">
+            {assignedBooks.map((book) => {
+              const progress = readingProgress.get(book.book_id);
+              const hasStarted = !!progress;
+              const currentPage = progress?.current_page ?? 1;
+
+              return (
+                <li
+                  key={book.book_id}
+                  className="rounded-[28px] border border-white/70 bg-gradient-to-br from-white via-pink-50 to-amber-50 p-5 text-indigo-900 shadow-[0_15px_50px_rgba(255,158,197,0.3)]"
+                >
+                  <div className="flex gap-4">
+                    {/* Book Cover */}
+                    {book.cover_url && (
+                      <div className="flex-shrink-0">
+                        <img
+                          src={book.cover_url}
+                          alt={`Cover of ${book.title}`}
+                          className="h-32 w-24 rounded-lg object-cover shadow-md"
+                        />
+                      </div>
+                    )}
+
+                    {/* Book Info */}
+                    <div className="flex flex-1 flex-col gap-2">
+                      <p className="text-xs uppercase tracking-wide text-rose-400">
+                        Assigned book
+                      </p>
+                      <h2 className="text-xl font-black text-indigo-950">
+                        {book.title}
+                      </h2>
+                      <p className="text-sm text-indigo-500">
+                        {book.author ?? "Unknown author"}
+                      </p>
+                      {hasStarted ? (
+                        <p className="text-xs text-indigo-400">
+                          Current page: {currentPage}
+                        </p>
+                      ) : (
+                        book.assigned_at && (
+                          <p className="text-xs text-indigo-400">
+                            Assigned: {formatDate(book.assigned_at)}
+                          </p>
+                        )
+                      )}
+                      <Link
+                        href={`/dashboard/student/read/${book.id}${hasStarted ? `?page=${currentPage}` : ""}`}
+                        className="mt-3 inline-flex w-fit items-center gap-2 rounded-full bg-gradient-to-r from-indigo-400 to-sky-400 px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
+                      >
+                        {hasStarted ? "Continue reading" : "Start reading"} →
+                      </Link>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p className="text-sm text-indigo-400">
@@ -220,13 +280,19 @@ export default async function StudentClassroomPage({
           </div>
           <ul className="mt-3 space-y-3">
             {assignedQuizzes.map((quiz) => {
+              const attempt = quizAttempts.get(quiz.id);
+              const isCompleted = !!attempt;
               const dueDateLabel = quiz.due_date
                 ? `Due: ${formatDate(quiz.due_date)}`
                 : "No due date";
               return (
                 <li
                   key={quiz.id}
-                  className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-purple-200 bg-white/90 p-4 text-indigo-900 shadow-[0_10px_30px_rgba(168,85,247,0.15)]"
+                  className={`flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4 text-indigo-900 shadow-[0_10px_30px_rgba(168,85,247,0.15)] ${
+                    isCompleted
+                      ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50"
+                      : "border-purple-200 bg-white/90"
+                  }`}
                 >
                   <div className="flex-1">
                     <p className="text-xs uppercase tracking-[0.25em] text-purple-400">
@@ -237,14 +303,33 @@ export default async function StudentClassroomPage({
                     <p className="text-base font-semibold">
                       {quiz.books?.title ?? "Untitled"}
                     </p>
-                    <p className="text-xs text-indigo-500">{dueDateLabel}</p>
+                    {isCompleted ? (
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-lg">✅</span>
+                        <p className="text-sm font-semibold text-emerald-600">
+                          Score: {attempt.score}%
+                        </p>
+                        <p className="text-xs text-indigo-400">
+                          • Completed on{" "}
+                          {new Date(attempt.submitted_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-indigo-500">{dueDateLabel}</p>
+                    )}
                   </div>
-                  <Link
-                    href={`/dashboard/student/quiz/${quiz.id}`}
-                    className="rounded-full bg-gradient-to-r from-purple-500 to-pink-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
-                  >
-                    Take quiz
-                  </Link>
+                  {isCompleted ? (
+                    <div className="rounded-full bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-500">
+                      Completed
+                    </div>
+                  ) : (
+                    <Link
+                      href={`/dashboard/student/quiz/${quiz.id}`}
+                      className="rounded-full bg-gradient-to-r from-purple-500 to-pink-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
+                    >
+                      Take quiz
+                    </Link>
+                  )}
                 </li>
               );
             })}
