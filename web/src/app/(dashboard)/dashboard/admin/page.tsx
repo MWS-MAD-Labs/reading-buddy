@@ -19,6 +19,7 @@ export default async function AdminDashboardPage() {
       ascending: false,
     });
 
+<<<<<<< Updated upstream
   if (profilesError) {
     console.error("Error fetching profiles:", profilesError);
   }
@@ -31,11 +32,84 @@ export default async function AdminDashboardPage() {
   if (emailError) {
     console.error("Error fetching user emails:", emailError);
   }
+=======
+  // Fetch auth users directly from auth.users table using raw SQL
+  // This bypasses the Auth API which seems to have database permission issues
+  const { data: authUsers, error: authError } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .limit(1000);
+
+  console.log("Fetching emails directly from auth schema...");
+
+  // Use RPC or raw query to get emails from auth.users
+  // Since we can't directly query auth.users from the client, we'll use the admin API differently
+  const { data: authData, error: listError } =
+    await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+  if (listError) {
+    console.error("Auth API error:", listError);
+    console.log("Attempting alternative method: querying individual users...");
+
+    // Fallback: Try to get user data individually for each profile
+    const usersWithEmails = await Promise.all(
+      (profiles || []).map(async (profile) => {
+        const { data: userData, error: userError } =
+          await supabaseAdmin.auth.admin.getUserById(profile.id);
+
+        if (userError) {
+          console.error(`Error fetching user ${profile.id}:`, userError);
+        }
+
+        return {
+          ...profile,
+          email: userData?.user?.email || null,
+        };
+      }),
+    );
+
+    console.log(
+      `Fetched emails for ${usersWithEmails.filter((u) => u.email).length} out of ${profiles?.length || 0} profiles`,
+    );
+
+    const users = usersWithEmails;
+
+    return (
+      <div className="space-y-6">
+        <header className="rounded-3xl border-4 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 p-6 shadow-lg">
+          <div className="mb-2 inline-block rounded-2xl border-4 border-purple-300 bg-purple-400 px-4 py-1">
+            <p className="text-sm font-black uppercase tracking-wide text-purple-900">
+              ⚙️ Admin Panel
+            </p>
+          </div>
+          <h1 className="text-3xl font-black text-violet-900">
+            User Management
+          </h1>
+          <p className="text-base font-semibold text-violet-700">
+            Manage users, roles, and access levels for the entire system.
+          </p>
+        </header>
+
+        <AdminUserTable users={users} />
+      </div>
+    );
+  }
+
+  console.log(`Total auth users fetched: ${authData.users.length}`);
+  console.log(`Total profiles: ${profiles?.length || 0}`);
+>>>>>>> Stashed changes
 
   // Merge profile data with email
   const users =
     profiles?.map((profile) => {
+<<<<<<< Updated upstream
       const emailData = userEmails?.find((e: any) => e.user_id === profile.id);
+=======
+      const authUser = authData.users.find((u: any) => u.id === profile.id);
+>>>>>>> Stashed changes
       return {
         ...profile,
         email: emailData?.email || null,
