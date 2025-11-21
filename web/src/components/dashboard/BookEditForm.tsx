@@ -104,6 +104,15 @@ export const BookEditForm = ({
     [languageOptions],
   );
 
+  const getFilenameFromUrl = (
+    url: string | null | undefined,
+    fallback: string,
+  ) => {
+    if (!url) return fallback;
+    const last = url.split("/").pop();
+    return last && last.trim() ? last : fallback;
+  };
+
   const loadPdfModule = async (): Promise<PdfJsModule> => {
     const pdfModule = await import("pdfjs-dist");
     if (pdfModule.GlobalWorkerOptions?.workerSrc !== workerSrc) {
@@ -315,10 +324,10 @@ export const BookEditForm = ({
         const uploadInfo = await generatePresignedUploadUrls({
           pdfFilename: hasNewPdf
             ? pdfFile.name
-            : book.pdfUrl.split("/").pop() || "book.pdf",
+            : getFilenameFromUrl(book.pdfUrl, "book.pdf"),
           coverFilename: hasNewCover
             ? coverFile.name
-            : book.coverUrl.split("/").pop() || "cover.jpg",
+            : getFilenameFromUrl(book.coverUrl, "cover.jpg"),
         });
 
         // Upload PDF if new one provided
@@ -695,7 +704,7 @@ export const BookEditForm = ({
               className="w-full rounded-2xl border border-dashed border-indigo-200 bg-white/50 px-3 py-2 text-indigo-900 file:mr-4 file:rounded-full file:border-0 file:bg-gradient-to-r file:from-rose-400 file:to-fuchsia-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
             />
             <p className="text-xs text-indigo-500">
-              Current: {book.pdfUrl.split("/").pop()}
+              Current: {getFilenameFromUrl(book.pdfUrl, "book.pdf")}
             </p>
           </label>
 
@@ -708,7 +717,7 @@ export const BookEditForm = ({
               className="w-full rounded-2xl border border-dashed border-indigo-200 bg-white/50 px-3 py-2 text-indigo-900 file:mr-4 file:rounded-full file:border-0 file:bg-gradient-to-r file:from-sky-400 file:to-emerald-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
             />
             <p className="text-xs text-indigo-500">
-              Current: {book.coverUrl.split("/").pop()}
+              Current: {getFilenameFromUrl(book.coverUrl, "cover.jpg")}
             </p>
           </label>
         </div>
