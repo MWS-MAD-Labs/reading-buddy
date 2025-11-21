@@ -5,116 +5,262 @@ All notable changes to Reading Buddy will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2025-11-19
+---
 
-### MVP Complete - All 6 Phases Implemented
+## [1.0.0] - 2025-11-20
 
-This is the first production-ready release of Reading Buddy, a comprehensive K-12 e-library platform with gamification and AI-powered features.
+### 🎉 Initial Release - MVP Complete!
+
+Reading Buddy v1.0.0 marks the successful completion of the Minimum Viable Product with all core features implemented and ready for production use.
 
 ### Added
 
-#### Phase 1-2: Core Infrastructure & Authentication
-- Next.js 15+ application with App Router
-- Supabase authentication with password and Google OAuth
-- Role-based access control (Student, Teacher, Librarian, Admin)
-- Route protection middleware
-- User profile management
+#### Infrastructure & Setup
+- MinIO server deployment on Proxmox for self-hosted file storage
+- Reverse proxy configuration with SSL/HTTPS
+- DNS and firewall configuration for secure access
 
-#### Phase 3: Book Management (Librarian)
-- Book upload system with MinIO storage
-- Presigned URL workflow for secure direct uploads
-- PDF and cover image management
-- Book metadata (ISBN, title, author, publisher, genre, etc.)
-- Access level controls (Kindergarten, Lower/Upper Elementary, Junior High, Teachers/Staff)
-- Book library gallery view
+#### Backend & Database
+- Supabase project with complete PostgreSQL schema
+- Row Level Security (RLS) policies for all tables
+- Database tables: `profiles`, `books`, `classes`, `student_books`, `quizzes`, `quiz_attempts`, `badges`, `student_badges`
+- Automatic profile creation via SQL triggers
+- Google OAuth authentication integration
+
+#### Frontend & UI
+- Next.js 15+ project with App Router
+- TypeScript implementation throughout
+- Tailwind CSS styling system
+- shadcn/ui component library integration
+- Responsive design for desktop and tablet
+
+#### Authentication & Authorization
+- Login page with email/password authentication
+- Sign Up page with profile creation
+- Password reset functionality
+- Google OAuth sign-in
+- Route protection middleware
+- Role-based access control (Student, Teacher, Librarian, Admin)
+
+#### Librarian Features
+- Librarian dashboard with book management interface
+- Book upload form (PDF + cover image)
+- MinIO presigned URL upload workflow
+- Book metadata management (title, author, grade level, description)
+- Library view showing all uploaded books
 - Book editing and deletion capabilities
 
-#### Phase 4: Student Features
+#### Student Features
 - Student dashboard with assigned books
-- PDF reader with react-pdf
-- 3D flip-book reader with rendered page images
-- Reading progress tracking (current page persistence)
-- Classroom assignment view
-- Quiz-taking interface with score tracking
+- PDF reader using react-pdf
+- Page-by-page navigation
+- Reading progress tracking (current page saved automatically)
+- Basic achievement/badge system
+- Quiz-taking interface
+- Quiz results and score tracking
 
-#### Phase 5: AI Quiz Generation
-- AI-powered quiz generation using Google Gemini
-- Quiz generation from book summaries
-- Quiz generation from extracted PDF text
-- Checkpoint quiz system (quizzes at specific pages)
-- Auto-checkpoint suggestion algorithm
-- Configurable question counts and difficulty
-- Page range support for targeted quizzes
-- Quiz management (publish, unpublish, archive, delete)
-- Quiz statistics and attempt tracking
+#### Teacher Features
+- Teacher dashboard with class overview
+- Student progress monitoring
+- Reading progress visualization
+- Quiz score tracking per student
+- Classroom management (view assigned students)
 
-#### Phase 6: Teacher & Admin Dashboards
-- Teacher dashboard with student progress tracking
-- Classroom creation and management
-- Student assignment to classrooms
-- Book assignment to classrooms
-- Quiz assignment to classrooms
-- Student reading progress monitoring
-- Admin user management panel
+#### Admin Features
+- Admin dashboard
+- User management interface
 - Role assignment and modification
-- System-wide analytics
+- System overview and statistics
 
-#### Additional Features
-- PDF text extraction with pdfjs-dist
-- AI-generated book descriptions
-- Book page image rendering for flip-book mode
-- Background job system for PDF processing
-- Badge/achievement system
-- Checkpoint progress tracking
-- Top progress bar for navigation feedback
-- Responsive design with Tailwind CSS
-- Docker deployment support
-- Comprehensive documentation
+#### AI Features
+- Google Gemini API integration
+- AI-powered quiz generation from book content
+- Quiz question generation with multiple-choice format
+- Automatic quiz storage in database
+- Quiz checkpoint system
 
-### Technical Stack
-- **Frontend:** Next.js 16.0.1, React 19.2.0, TypeScript
-- **Styling:** Tailwind CSS 4, shadcn/ui components
-- **Backend:** Next.js Server Actions, Supabase PostgreSQL
-- **Storage:** MinIO (self-hosted S3-compatible)
-- **AI:** Google Gemini 2.5 Flash
-- **PDF:** pdfjs-dist, react-pdf, canvas for rendering
-- **Auth:** Supabase Auth with Google OAuth
-- **Deployment:** Docker with multi-stage builds
+#### Gamification
+- Basic badge system (6 default badges)
+- Badge database schema (`badges` and `student_badges` tables)
+- Achievement tracking foundation
+- Badge icon storage in MinIO
 
-### Fixed
-- RLS recursion issues in quiz deletion (use admin client)
-- Empty classroom display on student dashboard
-- Teacher dashboard filtering to show only current user's classrooms
-- Admin user management email retrieval
-- OAuth redirect handling
+### Technical Details
 
-### Documentation
-- Project Roadmap (all phases complete)
-- AI Development Guide
-- Docker Deployment Guide
-- Database Setup Guide (single-script installation)
-- Admin Panel Documentation
-- Environment configuration examples
+#### Stack
+- **Frontend:** Next.js 15+, TypeScript, Tailwind CSS, shadcn/ui
+- **Backend:** Supabase (PostgreSQL + Authentication)
+- **Storage:** MinIO (Self-hosted)
+- **AI:** Google Gemini API
+- **PDF Rendering:** react-pdf
 
-### Database
-- Complete schema with RLS policies (18 tables)
-- Single-script database setup for new installations
-- Text extraction support for AI quiz generation
-- Checkpoint quiz system with progress tracking
-- Badge/achievement system with 6 default badges
-- User email function for admin queries
-- Optimized indexes for performance
+#### Security
+- Row Level Security (RLS) policies on all database tables
+- Secure authentication with Supabase Auth
+- Protected routes with middleware
+- Environment variable configuration for sensitive data
+- HTTPS/SSL for all connections
 
-### Deployment
-- Production-ready Docker configuration
-- GitHub-based deployment workflow
-- Automated deployment script
-- Health checks and monitoring
-- Reverse proxy support (Nginx, Caddy)
+#### Performance
+- Presigned URL uploads (direct client-to-MinIO)
+- Optimized database queries
+- Server-side rendering where appropriate
+- Lazy loading for book images
+
+### Database Schema
+
+```sql
+-- Core tables implemented:
+- profiles (user data and roles)
+- books (book metadata and file URLs)
+- classes (classroom information)
+- student_books (reading progress tracking)
+- quizzes (AI-generated quiz data)
+- quiz_attempts (student quiz submissions)
+- badges (achievement badges)
+- student_badges (earned badges per student)
+```
 
 ### Known Limitations
-- PDF rendering worker requires manual or cron execution
-- MinIO must be self-hosted (infrastructure requirement)
-- Initial database setup requires Supabase SQL Editor access
 
-[1.0.0]: https://github.com/faisalnh/reading-companion/releases/tag/v1.0.0
+- PDF-only format support (EPUB, MOBI not yet supported)
+- Basic badge system (not fully integrated into student dashboard)
+- Legacy `achievements` table still in use (planned migration to `badges`)
+- Limited analytics and reporting features
+- No mobile app (web-only)
+- Single AI provider (Google Gemini only)
+- 19 TypeScript `any` types that need addressing
+
+### Success Criteria - All Met ✅
+
+- ✅ Librarians can upload PDFs and cover images to MinIO
+- ✅ Students can log in and read books via react-pdf
+- ✅ Teachers can view student reading progress
+- ✅ AI quizzes can be generated and taken by students
+- ✅ Role-based access control functioning properly
+- ✅ Reading progress tracking working correctly
+- ✅ Basic gamification with badges operational
+
+### Notes
+
+This release represents the completion of all 6 planned development phases:
+- Phase 0: Infrastructure Setup
+- Phase 1: Project Scaffolding & Core Backend
+- Phase 2: Authentication & User Roles
+- Phase 3: Librarian & Book Management
+- Phase 4: Student Reader & Gamification
+- Phase 5: AI Quiz Generation
+- Phase 6: Teacher & Admin Dashboards
+
+### Migration Notes
+
+This is the initial release. No migration required.
+
+### Contributors
+
+- Faisal Nur Hidayat (Lead Developer & Maintainer)
+
+---
+
+## [Unreleased]
+
+### Planned for v1.1.0 (Q1 2026) - Polish & Stability
+
+#### Planned
+- Bug fixes based on v1.0.0 user feedback
+- Address 19 TypeScript `any` types flagged by ESLint
+- Implement automated testing (target: 60%+ coverage with Jest)
+- Security hardening (rate limiting, CAPTCHA)
+- Performance optimizations
+- Improved error handling and user-friendly error messages
+- Code quality improvements
+- CI/CD pipeline setup with GitHub Actions
+
+### Planned for v1.2.0 (Q2 2026) - Enhanced UX & Gamification
+
+#### Planned
+- Migrate from legacy `achievements` to `badges` system
+- Enhanced student dashboard with XP, levels, and badges
+- Reading streak tracking (daily reading consistency)
+- Leaderboards (global, class, grade level)
+- Enhanced reader features (bookmarks, annotations)
+- Dark mode for PDF reader
+- WCAG 2.1 AA accessibility compliance
+- Mobile responsiveness improvements
+
+### Planned for v1.3.0 (Q3 2026) - AI Flexibility & Features
+
+#### Planned
+- BYOAI (Bring Your Own AI) support
+  - OpenAI (GPT-4, GPT-3.5)
+  - Anthropic (Claude 3.5, Claude 3)
+  - Ollama (local LLM support)
+- Personalized quiz difficulty based on student performance
+- AI-generated book summaries
+- Advanced badge types and tiers (Bronze, Silver, Gold, Platinum)
+- Reading challenges system
+- Enhanced leaderboard features
+
+### Planned for v1.4.0 (Q4 2026) - Content & Competition
+
+#### Planned
+- Class vs class competitions
+- Bulk book upload functionality
+- Book series management
+- Advanced search and filtering
+- Curated reading lists and collections
+- Teacher analytics dashboard
+- Enhanced reporting features
+
+### Planned for v1.5.0 (Q1 2027) - Multi-Format Support
+
+#### Planned
+- EPUB file support
+- MOBI/AZW (Kindle) format support
+- DOCX (Word document) support
+- CBZ/CBR (Comic book) format support
+- ODT (OpenDocument) support
+- Unified content storage in MinIO
+- Format conversion pipeline
+
+### Planned for v2.0.0 (Q3 2027) - Major Architecture Changes
+
+#### Planned
+- Image-only storage architecture (remove PDF storage requirement)
+- Full self-hosted option (replace Supabase with PostgreSQL + Keycloak/Authentik)
+- Mobile apps (iOS and Android with React Native)
+- Social and collaborative features
+- Plugin system for extensibility
+- Advanced AI features
+- Multi-language support (i18n)
+
+---
+
+## Version History Summary
+
+| Version | Release Date | Milestone |
+|---------|--------------|-----------|
+| 1.0.0   | 2025-11-20   | 🎉 MVP Complete - Initial Production Release |
+
+---
+
+## Semantic Versioning Guide
+
+This project follows [Semantic Versioning](https://semver.org/):
+
+- **MAJOR** version (X.0.0): Incompatible API changes or major architecture changes
+- **MINOR** version (0.X.0): New features in a backward-compatible manner
+- **PATCH** version (0.0.X): Backward-compatible bug fixes
+
+---
+
+## Contributing
+
+See [Project-Roadmap.md](./Project-Roadmap.md) for the full development roadmap and contribution guidelines.
+
+For bug reports and feature requests, please open an issue on GitHub.
+
+---
+
+**Maintainer:** Faisal Nur Hidayat  
+**Last Updated:** November 20, 2025

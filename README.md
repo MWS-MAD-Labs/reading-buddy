@@ -89,11 +89,11 @@ See [DATABASE_SETUP.md](DATABASE_SETUP.md) for database setup and [DOCKER.md](DO
 ## Documentation
 
 - [Database Setup Guide](DATABASE_SETUP.md) - **Start here!** Complete database setup instructions
-- [Project Roadmap](Project-Roadmap.md) - Development phases and progress
+- [Project Roadmap](Project-Roadmap.md) - **Complete roadmap** from v1.0.0 to v2.0.0+ with detailed feature planning
+- [Changelog](CHANGELOG.md) - **Version history** and detailed release notes
 - [Docker Deployment](DOCKER.md) - Production deployment guide
 - [AI Development Guide](AI-Readme.md) - Architecture and development guidelines
 - [Admin Panel](web/ADMIN_PANEL.md) - Admin features documentation
-- [Changelog](CHANGELOG.md) - Version history and release notes
 
 ## Development
 
@@ -137,13 +137,21 @@ This architecture provides:
 
 ## Contributing
 
-This project was developed as an MVP for K-12 schools. Contributions, issues, and feature requests are welcome!
+Reading Buddy v1.0.0 is complete! We welcome contributions for future versions.
 
+**Before contributing:**
+- Check the [Project Roadmap](Project-Roadmap.md) to see planned features
+- Review the [Changelog](CHANGELOG.md) for recent changes
+- Open a GitHub Discussion for new feature ideas
+
+**Contribution workflow:**
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+See the [Contribution Guidelines](Project-Roadmap.md#10-contribution-guidelines) in the roadmap for details.
 
 ## License
 
