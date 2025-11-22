@@ -128,6 +128,8 @@ export const saveBookMetadata = async (input: {
   accessLevels: AccessLevelValue[];
   pdfUrl: string;
   coverUrl: string;
+  fileFormat?: "pdf" | "epub";
+  fileSizeBytes?: number;
 }) => {
   await ensureLibrarianOrAdmin();
 
@@ -151,6 +153,9 @@ export const saveBookMetadata = async (input: {
       page_count: input.pageCount,
       pdf_url: input.pdfUrl,
       cover_url: input.coverUrl,
+      file_format: input.fileFormat || "pdf",
+      original_file_url: input.pdfUrl,
+      file_size_bytes: input.fileSizeBytes,
     })
     .select("id")
     .single();
@@ -1107,10 +1112,10 @@ export const extractBookText = async (bookId: number) => {
 
   const supabase = getSupabaseAdminClient();
 
-  // Get book PDF URL
+  // Get book URL and format
   const { data: book, error: bookError } = await supabase
     .from("books")
-    .select("id, title, pdf_url")
+    .select("id, title, pdf_url, file_format, original_file_url")
     .eq("id", bookId)
     .single();
 
@@ -1118,16 +1123,36 @@ export const extractBookText = async (bookId: number) => {
     return { success: false, message: "Book not found" };
   }
 
-  if (!book.pdf_url) {
-    return { success: false, message: "Book has no PDF URL" };
+  const fileUrl = book.original_file_url || book.pdf_url;
+  if (!fileUrl) {
+    return { success: false, message: "Book has no file URL" };
   }
 
-  try {
-    // Import the PDF extractor
-    const { extractTextFromPDF } = await import("@/lib/pdf-extractor");
+  const fileFormat = book.file_format || "pdf";
 
-    // Extract text
-    const textContent = await extractTextFromPDF(book.pdf_url);
+  try {
+    let textContent;
+    let pdfUrlToExtract = fileUrl;
+
+    // For EPUB files, we need to use the converted PDF
+    if (fileFormat === "epub") {
+      // Get the converted PDF URL from the book record
+      const convertedPdfUrl = book.pdf_url;
+
+      if (!convertedPdfUrl) {
+        return {
+          success: false,
+          message:
+            "EPUB file has not been converted to PDF yet. Please render the book first.",
+        };
+      }
+
+      pdfUrlToExtract = convertedPdfUrl;
+    }
+
+    // Extract text from PDF (either original PDF or converted from EPUB)
+    const { extractTextFromPDF } = await import("@/lib/pdf-extractor");
+    textContent = await extractTextFromPDF(pdfUrlToExtract);
 
     // Save to database
     const { error: updateError } = await supabase
@@ -1157,5 +1182,72 @@ export const extractBookText = async (bookId: number) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return { success: false, message: `Text extraction failed: ${message}` };
+  }
+};
+
+export const convertEpubToImages = async (bookId: number) => {
+  "use server";
+
+  await ensureLibrarianOrAdmin();
+
+  const supabase = getSupabaseAdminClient();
+
+  // Get book details
+  const { data: book, error: bookError } = await supabase
+    .from("books")
+    .select("id, title, file_format, original_file_url, pdf_url")
+    .eq("id", bookId)
+    .single();
+
+  if (bookError || !book) {
+    return { success: false, message: "Book not found" };
+  }
+
+  if (book.file_format !== "epub") {
+    return { success: false, message: "Book is not an EPUB file" };
+  }
+
+  const epubUrl = book.original_file_url || book.pdf_url;
+  if (!epubUrl) {
+    return { success: false, message: "EPUB file URL not found" };
+  }
+
+  try {
+    // Step 1: Convert EPUB to PDF using Calibre
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const response = await fetch(`${baseUrl}/api/convert-epub`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookId, epubUrl }),
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      return {
+        success: false,
+        message: result.error || "EPUB to PDF conversion failed",
+      };
+    }
+
+    console.log(`EPUB converted to PDF: ${result.pdfUrl}`);
+
+    // Step 2: Trigger PDF rendering using existing pipeline
+    const renderResult = await renderBookImages(bookId);
+
+    if (!renderResult.success) {
+      return {
+        success: false,
+        message: `PDF created but rendering failed: ${renderResult.message || "Unknown error"}`,
+      };
+    }
+
+    return {
+      success: true,
+      message: `EPUB converted to PDF and rendering started for "${book.title}"`,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return { success: false, message: `EPUB conversion failed: ${message}` };
   }
 };

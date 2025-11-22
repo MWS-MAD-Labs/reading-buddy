@@ -1,7 +1,7 @@
 # Reading Buddy - Production Dockerfile
 FROM node:20-alpine AS base
 
-# Install dependencies for native modules (canvas, pdf2pic)
+# Install dependencies for native modules (canvas, pdf2pic) and Calibre
 RUN apk add --no-cache \
     libc6-compat \
     cairo-dev \
@@ -12,7 +12,14 @@ RUN apk add --no-cache \
     pixman-dev \
     python3 \
     make \
-    g++
+    g++ \
+    calibre \
+    qt5-qtbase \
+    qt5-qtwebkit \
+    libxrender \
+    libxcomposite \
+    fontconfig \
+    freetype
 
 # 1. Install dependencies only when needed
 FROM base AS deps

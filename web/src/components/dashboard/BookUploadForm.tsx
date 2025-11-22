@@ -20,6 +20,12 @@ import {
   ACCESS_LEVEL_OPTIONS,
   type AccessLevelValue,
 } from "@/constants/accessLevels";
+import {
+  validateEbookFile,
+  getFormatName,
+  getFormatColor,
+  type SupportedEbookFormat,
+} from "@/lib/file-type-detector";
 
 type UploadState =
   | "idle"
@@ -54,6 +60,8 @@ export const BookUploadForm = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState<number | null>(null);
+  const [detectedFormat, setDetectedFormat] =
+    useState<SupportedEbookFormat | null>(null);
   const [pdfDetectionState, setPdfDetectionState] =
     useState<PdfDetectionState>("idle");
   const [pdfDetectionMessage, setPdfDetectionMessage] = useState<string | null>(
@@ -180,6 +188,8 @@ export const BookUploadForm = ({
     const file = event.target.files?.[0] ?? null;
     setPageCount(null);
     setPdfDetectionMessage(null);
+    setDetectedFormat(null);
+    setError(null);
 
     if (!file) {
       setPdfDetectionState("idle");
@@ -187,14 +197,37 @@ export const BookUploadForm = ({
     }
 
     setPdfDetectionState("working");
+
     try {
-      const detectedPages = await extractPageCount(file);
-      setPageCount(detectedPages);
+      // Validate file format and size
+      const validation = await validateEbookFile(file);
+
+      if (!validation.valid) {
+        setPdfDetectionState("error");
+        setPdfDetectionMessage(validation.error || "Invalid file");
+        setError(validation.error || "Invalid file");
+        return;
+      }
+
+      setDetectedFormat(validation.format!);
+
+      // Extract page count (only works for PDF currently)
+      if (validation.format === "pdf") {
+        const detectedPages = await extractPageCount(file);
+        setPageCount(detectedPages);
+      } else if (validation.format === "epub") {
+        // For EPUB, we'll get page count after conversion
+        setPdfDetectionMessage(
+          "EPUB file detected. Page count will be determined after upload.",
+        );
+      }
+
       setPdfDetectionState("idle");
     } catch (err) {
-      console.error("Failed to detect page count:", err);
+      console.error("Failed to validate/detect file:", err);
       setPdfDetectionState("error");
-      setPdfDetectionMessage("Unable to detect page count from this PDF.");
+      setPdfDetectionMessage("Unable to process this file.");
+      setError("Unable to process this file.");
     }
   };
 
@@ -263,7 +296,7 @@ export const BookUploadForm = ({
     }
 
     if (!pdfFile || pdfFile.size === 0) {
-      setError("A PDF file is required.");
+      setError("A book file (PDF or EPUB) is required.");
       return;
     }
 
@@ -278,7 +311,8 @@ export const BookUploadForm = ({
 
       let resolvedPageCount = pageCount;
 
-      if (!resolvedPageCount) {
+      // Only require page count for PDFs (EPUB page count determined after conversion)
+      if (!resolvedPageCount && detectedFormat === "pdf") {
         setPdfDetectionState("working");
         try {
           resolvedPageCount = await extractPageCount(pdfFile);
@@ -294,11 +328,16 @@ export const BookUploadForm = ({
         }
       }
 
-      if (!resolvedPageCount) {
+      if (!resolvedPageCount && detectedFormat === "pdf") {
         setError(
           "Unable to detect page count from the PDF. Please try another file.",
         );
         return;
+      }
+
+      // For EPUB, use placeholder page count (will be updated after conversion)
+      if (detectedFormat === "epub" && !resolvedPageCount) {
+        resolvedPageCount = 1; // Placeholder
       }
 
       setStatus("request");
@@ -349,15 +388,27 @@ export const BookUploadForm = ({
         accessLevels,
         pdfUrl: uploadInfo.pdfPublicUrl,
         coverUrl: uploadInfo.coverPublicUrl,
+        fileFormat: detectedFormat || "pdf",
+        fileSizeBytes: pdfFile.size,
       });
 
       setUploadedBookId(saveResult.bookId);
 
-      // Start automatic rendering
+      // Start automatic rendering/conversion
       setStatus("rendering");
-      setRenderingProgress("Starting book rendering...");
 
-      const renderResult = await renderBookImages(saveResult.bookId);
+      let renderResult;
+      if (detectedFormat === "epub") {
+        setRenderingProgress("Converting EPUB to images...");
+        // Import and call the EPUB conversion action
+        const { convertEpubToImages } = await import(
+          "@/app/(dashboard)/dashboard/librarian/actions"
+        );
+        renderResult = await convertEpubToImages(saveResult.bookId);
+      } else {
+        setRenderingProgress("Starting book rendering...");
+        renderResult = await renderBookImages(saveResult.bookId);
+      }
 
       if (!renderResult.success) {
         throw new Error(renderResult.message);
@@ -656,7 +707,19 @@ export const BookUploadForm = ({
               : "Select a PDF to detect page count"}
           </div>
           {pdfDetectionState === "working" ? (
-            <p className="text-xs text-indigo-500">Analyzing PDF…</p>
+            <p className="text-xs text-indigo-500">Analyzing file…</p>
+          ) : null}
+          {detectedFormat && pdfDetectionState === "idle" ? (
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getFormatColor(detectedFormat)}`}
+              >
+                {getFormatName(detectedFormat)}
+              </span>
+              {pdfDetectionMessage ? (
+                <p className="text-xs text-indigo-600">{pdfDetectionMessage}</p>
+              ) : null}
+            </div>
           ) : null}
           {pdfDetectionState === "error" && pdfDetectionMessage ? (
             <p className="text-xs text-rose-500">{pdfDetectionMessage}</p>
@@ -666,11 +729,11 @@ export const BookUploadForm = ({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <label className="space-y-2 text-base font-bold text-purple-700">
-          Book PDF
+          Book File (PDF or EPUB)
           <input
             name="pdfFile"
             type="file"
-            accept="application/pdf"
+            accept=".pdf,.epub,application/pdf,application/epub+zip"
             required
             onChange={handlePdfFileChange}
             className="w-full rounded-2xl border border-dashed border-indigo-200 bg-white/50 px-3 py-2 text-indigo-900 file:mr-4 file:rounded-full file:border-0 file:bg-gradient-to-r file:from-rose-400 file:to-fuchsia-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
