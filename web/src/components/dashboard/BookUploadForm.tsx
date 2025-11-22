@@ -340,6 +340,12 @@ export const BookUploadForm = ({
         resolvedPageCount = 1; // Placeholder
       }
 
+      // Ensure we have a valid page count (TypeScript safety)
+      if (!resolvedPageCount) {
+        setError("Page count is required");
+        return;
+      }
+
       setStatus("request");
       const uploadInfo = await generatePresignedUploadUrls({
         pdfFilename: pdfFile.name,
