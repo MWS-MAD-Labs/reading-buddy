@@ -20,6 +20,8 @@ This guide covers deploying Reading Buddy with Docker, including support for EPU
 - ✅ Supabase authentication and database
 - ✅ AI-powered quiz generation
 
+**Base Image:** `node:20-slim` (Debian-based for Calibre support)
+
 ## Quick Start
 
 ### 1. Clone the Repository
@@ -225,12 +227,22 @@ services:
 If converted PDFs have font problems, you may need to install additional fonts:
 
 ```dockerfile
-# In Dockerfile, add to the RUN apk command:
-RUN apk add --no-cache \
+# In Dockerfile, add to the apt-get install command:
+RUN apt-get update && apt-get install -y \
     # ... existing packages ...
-    ttf-dejavu \
-    ttf-liberation
+    fonts-dejavu \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
 ```
+
+### Image Size
+
+The Debian-based image is larger than Alpine (~300MB more) but provides:
+- Native Calibre support from apt repositories
+- Better compatibility with EPUB conversion
+- Easier troubleshooting and debugging
+
+Expected final image size: **~700-800MB**
 
 ## Performance Optimization
 

@@ -1,25 +1,23 @@
-# Reading Buddy - Production Dockerfile
-FROM node:20-alpine AS base
+# Reading Buddy - Production Dockerfile with EPUB Support
+FROM node:20-slim AS base
 
 # Install dependencies for native modules (canvas, pdf2pic) and Calibre
-RUN apk add --no-cache \
-    libc6-compat \
-    cairo-dev \
-    pango-dev \
-    jpeg-dev \
-    giflib-dev \
-    librsvg-dev \
-    pixman-dev \
+RUN apt-get update && apt-get install -y \
+    # Native module dependencies
     python3 \
     make \
     g++ \
+    pkg-config \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    libpixman-1-dev \
+    # Calibre for EPUB conversion
     calibre \
-    qt5-qtbase \
-    qt5-qtwebkit \
-    libxrender \
-    libxcomposite \
-    fontconfig \
-    freetype
+    # Cleanup
+    && rm -rf /var/lib/apt/lists/*
 
 # 1. Install dependencies only when needed
 FROM base AS deps
@@ -75,8 +73,8 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Create a non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs \
+    && useradd --system --uid 1001 --gid nodejs nextjs
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
