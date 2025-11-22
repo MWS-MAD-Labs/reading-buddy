@@ -19,20 +19,6 @@ export default async function AdminDashboardPage() {
       ascending: false,
     });
 
-<<<<<<< Updated upstream
-  if (profilesError) {
-    console.error("Error fetching profiles:", profilesError);
-  }
-
-  // Fetch user emails using RPC function (workaround for auth.admin.listUsers() issues)
-  const { data: userEmails, error: emailError } = await supabaseAdmin.rpc(
-    "get_all_user_emails",
-  );
-
-  if (emailError) {
-    console.error("Error fetching user emails:", emailError);
-  }
-=======
   // Fetch auth users directly from auth.users table using raw SQL
   // This bypasses the Auth API which seems to have database permission issues
   const { data: authUsers, error: authError } = await supabaseAdmin
@@ -100,19 +86,14 @@ export default async function AdminDashboardPage() {
 
   console.log(`Total auth users fetched: ${authData.users.length}`);
   console.log(`Total profiles: ${profiles?.length || 0}`);
->>>>>>> Stashed changes
 
   // Merge profile data with email
   const users =
     profiles?.map((profile) => {
-<<<<<<< Updated upstream
-      const emailData = userEmails?.find((e: any) => e.user_id === profile.id);
-=======
       const authUser = authData.users.find((u: any) => u.id === profile.id);
->>>>>>> Stashed changes
       return {
         ...profile,
-        email: emailData?.email || null,
+        email: authUser?.email || null,
       };
     }) ?? [];
 
