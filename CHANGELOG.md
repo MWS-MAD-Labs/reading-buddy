@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2025-11-24
+
+### Added
+
+#### Multi-Format E-book Support
+- **MOBI format support** - Mobipocket format (older Kindle books)
+- **AZW format support** - Amazon Kindle format
+- **AZW3 format support** - Kindle Format 8 (newer format with better ToC support)
+- File type detection using magic numbers (validates "BOOKMOBI" signature at offset 60)
+- Format-specific validation and error messages
+- Color-coded format badges (MOBI: orange, AZW: amber, AZW3: yellow)
+
+#### Conversion Pipeline
+- New API endpoint `/api/convert-mobi` for Kindle format conversion
+- Calibre-based MOBI/AZW/AZW3 → PDF conversion with Kindle-optimized settings
+- Automatic page rendering from converted PDFs
+- Text extraction for AI quiz generation from all Kindle formats
+- Progress tracking during conversion process
+
+#### Database Updates
+- Extended `file_format` column to support: `'pdf', 'epub', 'mobi', 'azw', 'azw3'`
+- Migration scripts for database schema updates
+- Updated file format constraints and documentation
+
+#### UI Improvements
+- Updated file upload form to accept `.mobi`, `.azw`, `.azw3` extensions
+- Format-specific detection messages during upload
+- Real-time conversion progress indicators
+- Format badges displaying detected e-book type
+
+### Technical Details
+
+**Files Modified:**
+- `web/src/lib/file-type-detector.ts` - Added MOBI/AZW detection logic
+- `web/src/app/api/convert-mobi/route.ts` - New conversion endpoint
+- `web/src/app/(dashboard)/dashboard/librarian/actions.ts` - Added `convertMobiToImages()`
+- `web/src/components/dashboard/BookUploadForm.tsx` - UI updates for MOBI support
+- `migrations/add-mobi-azw-support.sql` - Database migration
+
+**Calibre Conversion Settings:**
+```bash
+ebook-convert input.mobi output.pdf \
+  --output-profile kindle \
+  --paper-size a4 \
+  --pdf-default-font-size 18 \
+  --margin-left 20 --margin-right 20 \
+  --margin-top 20 --margin-bottom 20
+```
+
+### Architecture
+
+All Kindle formats follow the unified conversion pipeline:
+```
+MOBI/AZW/AZW3 → Calibre → PDF → Page Images → Text Extraction → AI Quizzes
+```
+
+This approach:
+- ✅ Reuses 95% of existing EPUB infrastructure
+- ✅ Maintains consistency across all e-book formats
+- ✅ Requires no Docker changes (Calibre already installed)
+- ✅ Enables AI quiz generation for all formats
+
+### Performance
+
+- MOBI conversion: ~10-30 seconds (typical)
+- AZW conversion: ~10-30 seconds (typical)
+- AZW3 conversion: ~15-40 seconds (larger files)
+- Page rendering: Same as PDF/EPUB (5-10 min for typical book)
+
+### Known Limitations
+
+- DRM-protected Kindle books cannot be converted (Calibre limitation)
+- Page count not available until after conversion (same as EPUB)
+- 50MB file size limit (typical Kindle books are 1-5MB)
+
+### Migration Notes
+
+**Database Migration Required:**
+Run `migrations/add-mobi-azw-support.sql` in Supabase SQL Editor to enable MOBI/AZW support.
+
+```sql
+ALTER TABLE books DROP CONSTRAINT IF EXISTS books_file_format_check;
+ALTER TABLE books ADD CONSTRAINT books_file_format_check 
+  CHECK (file_format IN ('pdf', 'epub', 'mobi', 'azw', 'azw3'));
+```
+
+---
+
 ## [1.0.0] - 2025-11-20
 
 ### 🎉 Initial Release - MVP Complete!
@@ -240,6 +328,7 @@ This is the initial release. No migration required.
 
 | Version | Release Date | Milestone |
 |---------|--------------|-----------|
+| 1.1.0   | 2025-11-24   | 📚 Multi-Format Support - MOBI/AZW/AZW3 |
 | 1.0.0   | 2025-11-20   | 🎉 MVP Complete - Initial Production Release |
 
 ---

@@ -128,7 +128,7 @@ export const saveBookMetadata = async (input: {
   accessLevels: AccessLevelValue[];
   pdfUrl: string;
   coverUrl: string;
-  fileFormat?: "pdf" | "epub";
+  fileFormat?: "pdf" | "epub" | "mobi" | "azw" | "azw3";
   fileSizeBytes?: number;
 }) => {
   await ensureLibrarianOrAdmin();
@@ -1134,23 +1134,22 @@ export const extractBookText = async (bookId: number) => {
     let textContent;
     let pdfUrlToExtract = fileUrl;
 
-    // For EPUB files, we need to use the converted PDF
-    if (fileFormat === "epub") {
+    // For EPUB and MOBI/AZW files, we need to use the converted PDF
+    if (["epub", "mobi", "azw", "azw3"].includes(fileFormat)) {
       // Get the converted PDF URL from the book record
       const convertedPdfUrl = book.pdf_url;
 
       if (!convertedPdfUrl) {
         return {
           success: false,
-          message:
-            "EPUB file has not been converted to PDF yet. Please render the book first.",
+          message: `${fileFormat.toUpperCase()} file has not been converted to PDF yet. Please render the book first.`,
         };
       }
 
       pdfUrlToExtract = convertedPdfUrl;
     }
 
-    // Extract text from PDF (either original PDF or converted from EPUB)
+    // Extract text from PDF (either original PDF or converted from EPUB/MOBI/AZW)
     const { extractTextFromPDF } = await import("@/lib/pdf-extractor");
     textContent = await extractTextFromPDF(pdfUrlToExtract);
 
@@ -1249,5 +1248,80 @@ export const convertEpubToImages = async (bookId: number) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return { success: false, message: `EPUB conversion failed: ${message}` };
+  }
+};
+
+export const convertMobiToImages = async (bookId: number) => {
+  "use server";
+
+  await ensureLibrarianOrAdmin();
+
+  const supabase = getSupabaseAdminClient();
+
+  // Get book details
+  const { data: book, error: bookError } = await supabase
+    .from("books")
+    .select("id, title, file_format, original_file_url, pdf_url")
+    .eq("id", bookId)
+    .single();
+
+  if (bookError || !book) {
+    return { success: false, message: "Book not found" };
+  }
+
+  if (!["mobi", "azw", "azw3"].includes(book.file_format || "")) {
+    return { success: false, message: "Book is not a MOBI/AZW/AZW3 file" };
+  }
+
+  const mobiUrl = book.original_file_url || book.pdf_url;
+  if (!mobiUrl) {
+    return { success: false, message: "MOBI/AZW file URL not found" };
+  }
+
+  try {
+    // Step 1: Convert MOBI/AZW/AZW3 to PDF using Calibre
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const response = await fetch(`${baseUrl}/api/convert-mobi`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bookId,
+        mobiUrl,
+        format: book.file_format as "mobi" | "azw" | "azw3",
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      return {
+        success: false,
+        message: result.error || "MOBI/AZW to PDF conversion failed",
+      };
+    }
+
+    const formatUpper = book.file_format?.toUpperCase();
+    console.log(`${formatUpper} converted to PDF: ${result.pdfUrl}`);
+
+    // Step 2: Trigger PDF rendering using existing pipeline
+    const renderResult = await renderBookImages(bookId);
+
+    if (!renderResult.success) {
+      return {
+        success: false,
+        message: `PDF created but rendering failed: ${renderResult.message || "Unknown error"}`,
+      };
+    }
+
+    return {
+      success: true,
+      message: `${formatUpper} converted to PDF and rendering started for "${book.title}"`,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return {
+      success: false,
+      message: `MOBI/AZW conversion failed: ${message}`,
+    };
   }
 };

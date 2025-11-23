@@ -18,7 +18,7 @@ ALTER TABLE books
 
 ALTER TABLE books
   ADD CONSTRAINT books_file_format_check
-  CHECK (file_format IN ('pdf', 'epub'));
+  CHECK (file_format IN ('pdf', 'epub', 'mobi', 'azw', 'azw3'));
 
 -- Backfill existing books with default values
 UPDATE books
@@ -28,7 +28,7 @@ SET
 WHERE file_format IS NULL OR original_file_url IS NULL;
 
 -- Add comments for documentation
-COMMENT ON COLUMN books.file_format IS 'Original file format: pdf, epub (more formats to be added)';
+COMMENT ON COLUMN books.file_format IS 'Original file format: pdf, epub, mobi, azw, azw3';
 COMMENT ON COLUMN books.original_file_url IS 'URL to original uploaded file before conversion';
 COMMENT ON COLUMN books.file_size_bytes IS 'Size of original file in bytes';
 
@@ -39,7 +39,7 @@ BEGIN
   RAISE NOTICE 'Multi-Format Support Migration Complete!';
   RAISE NOTICE '=============================================';
   RAISE NOTICE 'Added columns:';
-  RAISE NOTICE '  - file_format (pdf, epub)';
+  RAISE NOTICE '  - file_format (pdf, epub, mobi, azw, azw3)';
   RAISE NOTICE '  - original_file_url';
   RAISE NOTICE '  - file_size_bytes';
   RAISE NOTICE '=============================================';

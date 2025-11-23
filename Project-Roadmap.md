@@ -126,11 +126,12 @@ A web-based e-library for K-12 students (Reading Buddy) with role-based access f
 | Version | Target | Focus Area | Status |
 |---------|--------|------------|--------|
 | v1.0.0 | Nov 2025 | MVP Launch | ✅ Complete |
-| v1.1.0 | Q1 2026 | Polish & Stability | 📋 Planned |
-| v1.2.0 | Q2 2026 | UX & Gamification | 📋 Planned |
-| v1.3.0 | Q3 2026 | AI Flexibility | 📋 Planned |
-| v1.4.0 | Q4 2026 | Content & Competition | 📋 Planned |
-| v1.5.0 | Q1 2027 | Multi-Format Support | 📋 Planned |
+| v1.1.0 | Nov 2025 | MOBI/AZW Format Support | ✅ Complete |
+| v1.2.0 | Q1 2026 | Polish & Stability | 📋 Planned |
+| v1.3.0 | Q2 2026 | UX & Gamification | 📋 Planned |
+| v1.4.0 | Q3 2026 | AI Flexibility | 📋 Planned |
+| v1.5.0 | Q4 2026 | Content & Competition | 📋 Planned |
+| v1.6.0 | Q1 2027 | Additional Formats (CBZ/DOCX) | 📋 Planned |
 | v2.0.0 | Q3 2027 | Major Architecture Changes | 💡 Proposed |
 
 ---
@@ -171,30 +172,41 @@ ALTER TABLE books
 ---
 
 #### Multi-Format E-book Support
-**Priority:** High | **Target:** v1.5.0 or v2.0.0
+**Priority:** High | **Status:** ✅ Partially Complete (v1.1.0)
 
 **Supported Formats:**
-- PDF (current format)
-- EPUB (most common e-book format)
-- MOBI/AZW (Kindle formats)
-- CBZ/CBR (Comic book formats)
-- DOCX (Word documents)
-- ODT (OpenDocument Text)
+- ✅ PDF (v1.0.0 - original format)
+- ✅ EPUB (v1.0.0 - most common e-book format)
+- ✅ MOBI (v1.1.0 - Mobipocket/Kindle format)
+- ✅ AZW (v1.1.0 - Amazon Kindle format)
+- ✅ AZW3 (v1.1.0 - Kindle Format 8)
+- ⏳ CBZ/CBR (Comic book formats) - Planned for v1.5.0
+- ⏳ DOCX (Word documents) - Planned for v1.5.0
+- ⏳ ODT (OpenDocument Text) - Planned for v1.5.0
 
-**Technical Approach:**
-1. Conversion libraries: `epub.js`, `mobi`, `mammoth`, archive extraction
-2. Convert all formats to standardized image sequence
-3. Extract text content for search and accessibility
-4. **Store in MinIO:**
-   - Page images: `book-pages/<bookId>/page-XXXX.jpg`
-   - Text content: `book-text/<bookId>/full-text.json`
-   - Metadata: `book-metadata/<bookId>/info.json`
-5. Reference MinIO paths in Supabase
+**Technical Approach (v1.1.0 Implementation):**
+1. ✅ **Calibre-based conversion pipeline** - Uses existing Calibre installation
+2. ✅ **Unified format handling** - All formats → PDF → Images
+3. ✅ **Magic number detection** - Validates file signatures (BOOKMOBI at offset 60)
+4. ✅ **Automatic conversion** - `/api/convert-mobi` endpoint with progress tracking
+5. ✅ **Text extraction** - Enables AI quiz generation for all formats
+6. ✅ **MinIO storage** - Original files + converted PDFs stored in MinIO
 
-**Benefits:**
-- Broader content compatibility
-- Easier for librarians (no manual conversion)
-- Support for comics and graphic novels
+**Current Pipeline:**
+```
+EPUB/MOBI/AZW → Calibre → PDF → pdf2pic → Page Images → Text Extraction → AI Quizzes
+```
+
+**Benefits Achieved:**
+- ✅ Broader content compatibility (5 formats supported)
+- ✅ Easier for librarians (no manual conversion required)
+- ✅ Reuses 95% of existing infrastructure
+- ✅ No Docker changes needed
+
+**Remaining Work (v1.5.0):**
+- ⏳ CBZ/CBR comic book format support
+- ⏳ DOCX Word document support
+- ⏳ ODT OpenDocument support
 
 ---
 
@@ -692,15 +704,25 @@ CREATE TABLE xp_transactions (
 
 ## 7. Implementation Timeline
 
-### v1.1.0 (Q1 2026) - Polish & Stability
-- Bug fixes from v1.0.0 feedback
+### v1.1.0 (Nov 2025) - MOBI/AZW Format Support ✅ COMPLETE
+- ✅ MOBI format support (Mobipocket/Kindle)
+- ✅ AZW format support (Amazon Kindle)
+- ✅ AZW3 format support (Kindle Format 8)
+- ✅ Calibre-based conversion pipeline
+- ✅ Magic number file validation (BOOKMOBI signature)
+- ✅ `/api/convert-mobi` endpoint with progress tracking
+- ✅ Text extraction for AI quiz generation
+- ✅ Format-specific UI badges and messaging
+
+### v1.2.0 (Q1 2026) - Polish & Stability
+- Bug fixes from v1.0.0 and v1.1.0 feedback
 - Address ESLint warnings (19 `any` types)
 - Add basic test coverage (60%+)
 - Security hardening (rate limiting, CAPTCHA)
 - Performance optimizations
 - Better error messages
 
-### v1.2.0 (Q2 2026) - Enhanced UX & Gamification
+### v1.3.0 (Q2 2026) - Enhanced UX & Gamification
 - Badge system integration (migrate from achievements)
 - Student dashboard with badges, XP, levels
 - Reading streak tracking
@@ -708,7 +730,7 @@ CREATE TABLE xp_transactions (
 - Dark mode for reader
 - Accessibility improvements (WCAG 2.1 AA)
 
-### v1.3.0 (Q3 2026) - AI Flexibility & Features
+### v1.4.0 (Q3 2026) - AI Flexibility & Features
 - BYOAI support (OpenAI, Anthropic, Ollama)
 - Leaderboards (global, class, grade)
 - Personalized quiz difficulty
@@ -716,7 +738,7 @@ CREATE TABLE xp_transactions (
 - Advanced badge types
 - Reading challenges system
 
-### v1.4.0 (Q4 2026) - Content & Competition
+### v1.5.0 (Q4 2026) - Content & Competition
 - Class vs class competitions
 - Bulk book upload
 - Book series management
@@ -724,12 +746,14 @@ CREATE TABLE xp_transactions (
 - Reading lists/collections
 - Analytics dashboard for teachers
 
-### v1.5.0 (Q1 2027) - Multi-Format Support
-- EPUB, MOBI, DOCX support
-- Store all content in MinIO (text + images)
-- Enhanced upload workflow
-- Format conversion pipeline
-- Improved text extraction
+### v1.6.0 (Q1 2027) - Additional Format Support
+- ✅ EPUB support (completed in v1.0.0)
+- ✅ MOBI/AZW/AZW3 support (completed in v1.1.0)
+- CBZ/CBR comic book format support
+- DOCX Word document support
+- ODT OpenDocument support
+- Enhanced upload workflow for bulk operations
+- Improved text extraction for complex layouts
 
 ### v2.0.0 (Q3 2027) - Major Architectural Changes
 - Image-only storage (remove PDF requirement)

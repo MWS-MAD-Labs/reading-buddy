@@ -215,10 +215,11 @@ export const BookUploadForm = ({
       if (validation.format === "pdf") {
         const detectedPages = await extractPageCount(file);
         setPageCount(detectedPages);
-      } else if (validation.format === "epub") {
-        // For EPUB, we'll get page count after conversion
+      } else if (["epub", "mobi", "azw", "azw3"].includes(validation.format)) {
+        // For EPUB and MOBI/AZW formats, we'll get page count after conversion
+        const formatName = validation.format.toUpperCase();
         setPdfDetectionMessage(
-          "EPUB file detected. Page count will be determined after upload.",
+          `${formatName} file detected. Page count will be determined after upload.`,
         );
       }
 
@@ -335,8 +336,11 @@ export const BookUploadForm = ({
         return;
       }
 
-      // For EPUB, use placeholder page count (will be updated after conversion)
-      if (detectedFormat === "epub" && !resolvedPageCount) {
+      // For EPUB and MOBI/AZW, use placeholder page count (will be updated after conversion)
+      if (
+        ["epub", "mobi", "azw", "azw3"].includes(detectedFormat || "") &&
+        !resolvedPageCount
+      ) {
         resolvedPageCount = 1; // Placeholder
       }
 
@@ -411,6 +415,14 @@ export const BookUploadForm = ({
           "@/app/(dashboard)/dashboard/librarian/actions"
         );
         renderResult = await convertEpubToImages(saveResult.bookId);
+      } else if (["mobi", "azw", "azw3"].includes(detectedFormat || "")) {
+        const formatUpper = detectedFormat?.toUpperCase();
+        setRenderingProgress(`Converting ${formatUpper} to images...`);
+        // Import and call the MOBI conversion action
+        const { convertMobiToImages } = await import(
+          "@/app/(dashboard)/dashboard/librarian/actions"
+        );
+        renderResult = await convertMobiToImages(saveResult.bookId);
       } else {
         setRenderingProgress("Starting book rendering...");
         renderResult = await renderBookImages(saveResult.bookId);
@@ -735,11 +747,11 @@ export const BookUploadForm = ({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <label className="space-y-2 text-base font-bold text-purple-700">
-          Book File (PDF or EPUB)
+          Book File (PDF, EPUB, MOBI, AZW, AZW3)
           <input
             name="pdfFile"
             type="file"
-            accept=".pdf,.epub,application/pdf,application/epub+zip"
+            accept=".pdf,.epub,.mobi,.azw,.azw3,application/pdf,application/epub+zip,application/x-mobipocket-ebook"
             required
             onChange={handlePdfFileChange}
             className="w-full rounded-2xl border border-dashed border-indigo-200 bg-white/50 px-3 py-2 text-indigo-900 file:mr-4 file:rounded-full file:border-0 file:bg-gradient-to-r file:from-rose-400 file:to-fuchsia-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
