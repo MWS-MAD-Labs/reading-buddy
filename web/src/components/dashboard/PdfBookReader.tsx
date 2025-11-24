@@ -251,18 +251,19 @@ export const PdfBookReader = ({
     : null;
 
   return (
-    <div className="pop-in space-y-5 rounded-3xl border-4 border-purple-300 bg-gradient-to-br from-purple-50 via-pink-50 to-yellow-50 p-6 shadow-2xl md:p-8">
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-3 text-lg font-black text-purple-900">
+    <div className="pop-in space-y-4 rounded-3xl border-4 border-purple-300 bg-gradient-to-br from-purple-50 via-pink-50 to-yellow-50 p-4 shadow-2xl md:space-y-5 md:p-8">
+      {/* Mobile Controls */}
+      <div className="flex flex-col gap-3 lg:hidden">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => turnBackward()}
             disabled={reachedBookStart}
-            className="btn-3d btn-squish rounded-2xl border-4 border-blue-300 bg-blue-100 px-5 py-2 text-blue-600 transition hover:bg-blue-200 disabled:pointer-events-none disabled:opacity-40"
+            className="btn-3d btn-squish min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-blue-300 bg-blue-100 px-4 py-3 text-base font-black text-blue-600 transition hover:bg-blue-200 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
           >
             ⬅️ Back
           </button>
-          <span className="rounded-2xl border-4 border-purple-300 bg-white px-5 py-2 text-base">
+          <span className="min-h-[44px] flex-1 rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-center text-sm font-black">
             📄 {displayMode === DISPLAY_MODES.SPREAD ? "Pages " : "Page "}
             {pageSpread.leftPage}
             {displayMode === DISPLAY_MODES.SPREAD && pageSpread.rightPage
@@ -274,7 +275,44 @@ export const PdfBookReader = ({
             type="button"
             onClick={() => turnForward()}
             disabled={reachedBookEnd}
-            className="btn-3d btn-squish rounded-2xl border-4 border-pink-300 bg-gradient-to-r from-pink-400 to-rose-400 px-5 py-2 font-black text-white shadow-sm transition hover:from-pink-500 hover:to-rose-500 disabled:pointer-events-none disabled:opacity-40"
+            className="btn-3d btn-squish min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-pink-300 bg-gradient-to-r from-pink-400 to-rose-400 px-4 py-3 text-base font-black text-white shadow-sm transition hover:from-pink-500 hover:to-rose-500 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
+          >
+            Next ➡️
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowSettings((value) => !value)}
+          className="btn-3d btn-squish min-h-[44px] w-full rounded-2xl border-4 border-violet-300 bg-violet-100 px-4 py-3 text-base font-black text-violet-600 transition hover:bg-violet-200 active:scale-95"
+        >
+          ⚙️ Settings
+        </button>
+      </div>
+
+      {/* Desktop Controls */}
+      <div className="hidden flex-wrap items-center gap-4 lg:flex">
+        <div className="flex items-center gap-3 text-lg font-black text-purple-900">
+          <button
+            type="button"
+            onClick={() => turnBackward()}
+            disabled={reachedBookStart}
+            className="btn-3d btn-squish min-h-[44px] rounded-2xl border-4 border-blue-300 bg-blue-100 px-5 py-2 text-blue-600 transition hover:bg-blue-200 disabled:pointer-events-none disabled:opacity-40"
+          >
+            ⬅️ Back
+          </button>
+          <span className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-5 py-2 text-base">
+            📄 {displayMode === DISPLAY_MODES.SPREAD ? "Pages " : "Page "}
+            {pageSpread.leftPage}
+            {displayMode === DISPLAY_MODES.SPREAD && pageSpread.rightPage
+              ? `-${pageSpread.rightPage}`
+              : ""}
+            {numPages ? ` / ${numPages}` : null}
+          </span>
+          <button
+            type="button"
+            onClick={() => turnForward()}
+            disabled={reachedBookEnd}
+            className="btn-3d btn-squish min-h-[44px] rounded-2xl border-4 border-pink-300 bg-gradient-to-r from-pink-400 to-rose-400 px-5 py-2 font-black text-white shadow-sm transition hover:from-pink-500 hover:to-rose-500 disabled:pointer-events-none disabled:opacity-40"
           >
             Next ➡️
           </button>
@@ -283,7 +321,7 @@ export const PdfBookReader = ({
           <button
             type="button"
             onClick={() => setShowSettings((value) => !value)}
-            className="btn-3d btn-squish rounded-2xl border-4 border-violet-300 bg-violet-100 px-4 py-2 text-base font-black text-violet-600 transition hover:bg-violet-200"
+            className="btn-3d btn-squish min-h-[44px] rounded-2xl border-4 border-violet-300 bg-violet-100 px-4 py-2 text-base font-black text-violet-600 transition hover:bg-violet-200"
           >
             ⚙️ Settings
           </button>
@@ -291,59 +329,63 @@ export const PdfBookReader = ({
       </div>
 
       {showSettings ? (
-        <div className="pop-in flex flex-wrap items-center gap-6 rounded-2xl border-4 border-yellow-300 bg-yellow-50 p-5 shadow-inner">
-          <div className="flex items-center gap-3">
-            <span className="text-base font-black text-yellow-700">
-              🔍 Zoom
-            </span>
-            <button
-              type="button"
-              onClick={() => adjustZoom(-0.1)}
-              className="btn-3d btn-squish rounded-2xl border-4 border-orange-300 bg-white px-4 py-2 text-xl font-black leading-none text-orange-600 hover:bg-orange-50"
-            >
-              –
-            </button>
-            <span className="w-16 rounded-2xl border-4 border-yellow-300 bg-white px-3 py-2 text-center text-base font-black text-yellow-700">
-              {zoomLabel}
-            </span>
-            <button
-              type="button"
-              onClick={() => adjustZoom(0.1)}
-              className="btn-3d btn-squish rounded-2xl border-4 border-orange-300 bg-white px-4 py-2 text-xl font-black leading-none text-orange-600 hover:bg-orange-50"
-            >
-              +
-            </button>
-          </div>
+        <div className="pop-in space-y-4 rounded-2xl border-4 border-yellow-300 bg-yellow-50 p-4 shadow-inner md:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <div className="flex items-center gap-3">
+              <span className="text-base font-black text-yellow-700">
+                🔍 Zoom
+              </span>
+              <div className="flex flex-1 items-center gap-2 sm:flex-initial">
+                <button
+                  type="button"
+                  onClick={() => adjustZoom(-0.1)}
+                  className="btn-3d btn-squish min-h-[44px] min-w-[44px] rounded-2xl border-4 border-orange-300 bg-white px-4 py-2 text-xl font-black leading-none text-orange-600 hover:bg-orange-50 active:scale-95"
+                >
+                  –
+                </button>
+                <span className="min-h-[44px] w-16 rounded-2xl border-4 border-yellow-300 bg-white px-3 py-2 text-center text-base font-black text-yellow-700">
+                  {zoomLabel}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => adjustZoom(0.1)}
+                  className="btn-3d btn-squish min-h-[44px] min-w-[44px] rounded-2xl border-4 border-orange-300 bg-white px-4 py-2 text-xl font-black leading-none text-orange-600 hover:bg-orange-50 active:scale-95"
+                >
+                  +
+                </button>
+              </div>
+            </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-base font-black text-yellow-700">
-              📖 Layout
-            </span>
-            <div className="flex gap-2 rounded-2xl border-4 border-yellow-300 bg-white p-2">
-              <button
-                type="button"
-                onClick={() => setDisplayMode(DISPLAY_MODES.SINGLE)}
-                className={clsx(
-                  "btn-squish rounded-xl px-4 py-2 text-sm font-black transition",
-                  displayMode === DISPLAY_MODES.SINGLE
-                    ? "bg-gradient-to-r from-blue-400 to-cyan-400 text-white shadow-md"
-                    : "bg-gray-100 text-gray-600",
-                )}
-              >
-                📄 Single
-              </button>
-              <button
-                type="button"
-                onClick={() => setDisplayMode(DISPLAY_MODES.SPREAD)}
-                className={clsx(
-                  "btn-squish rounded-xl px-4 py-2 text-sm font-black transition",
-                  displayMode === DISPLAY_MODES.SPREAD
-                    ? "bg-gradient-to-r from-rose-400 to-orange-400 text-white shadow-md"
-                    : "bg-gray-100 text-gray-600",
-                )}
-              >
-                📖 Spread
-              </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <span className="text-base font-black text-yellow-700">
+                📖 Layout
+              </span>
+              <div className="flex gap-2 rounded-2xl border-4 border-yellow-300 bg-white p-2">
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode(DISPLAY_MODES.SINGLE)}
+                  className={clsx(
+                    "btn-squish min-h-[44px] flex-1 rounded-xl px-4 py-2 text-sm font-black transition active:scale-95 sm:flex-initial",
+                    displayMode === DISPLAY_MODES.SINGLE
+                      ? "bg-gradient-to-r from-blue-400 to-cyan-400 text-white shadow-md"
+                      : "bg-gray-100 text-gray-600",
+                  )}
+                >
+                  📄 Single
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode(DISPLAY_MODES.SPREAD)}
+                  className={clsx(
+                    "btn-squish min-h-[44px] flex-1 rounded-xl px-4 py-2 text-sm font-black transition active:scale-95 sm:flex-initial",
+                    displayMode === DISPLAY_MODES.SPREAD
+                      ? "bg-gradient-to-r from-rose-400 to-orange-400 text-white shadow-md"
+                      : "bg-gray-100 text-gray-600",
+                  )}
+                >
+                  📖 Spread
+                </button>
+              </div>
             </div>
           </div>
         </div>

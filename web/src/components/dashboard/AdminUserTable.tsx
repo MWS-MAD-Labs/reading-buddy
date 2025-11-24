@@ -151,8 +151,94 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
         </div>
       )}
 
-      {/* User Table */}
-      <div className="overflow-hidden rounded-3xl border-2 border-white/60 bg-white/85 shadow-[0_20px_60px_rgba(147,118,255,0.18)] backdrop-blur-xl">
+      {/* Mobile Card View */}
+      <div className="space-y-4 lg:hidden">
+        {filteredUsers.length === 0 ? (
+          <div className="rounded-3xl border-2 border-white/60 bg-white/85 px-6 py-12 text-center shadow-[0_20px_60px_rgba(147,118,255,0.18)] backdrop-blur-xl">
+            <p className="text-sm font-semibold text-violet-500">
+              {searchQuery
+                ? "No users found matching your search."
+                : "No users found."}
+            </p>
+          </div>
+        ) : (
+          <>
+            {filteredUsers.map((user) => (
+              <div
+                key={user.id}
+                className="rounded-3xl border-2 border-white/60 bg-white/85 p-5 shadow-[0_20px_60px_rgba(147,118,255,0.18)] backdrop-blur-xl transition-all hover:shadow-[0_25px_70px_rgba(147,118,255,0.25)]"
+              >
+                <div className="mb-4">
+                  <h3 className="mb-1 text-lg font-black text-violet-900">
+                    {user.full_name || "No name"}
+                  </h3>
+                  <p className="text-sm font-medium text-violet-700">
+                    {user.email || "No email"}
+                  </p>
+                </div>
+
+                <div className="mb-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-violet-600">
+                      Role:
+                    </span>
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+                        user.role === "ADMIN"
+                          ? "bg-purple-100 text-purple-800"
+                          : user.role === "TEACHER"
+                            ? "bg-blue-100 text-blue-800"
+                            : user.role === "LIBRARIAN"
+                              ? "bg-indigo-100 text-indigo-800"
+                              : "bg-pink-100 text-pink-800"
+                      }`}
+                    >
+                      {user.role}
+                    </span>
+                  </div>
+                  {user.role === "STUDENT" && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black uppercase tracking-wider text-violet-600">
+                        Access Level:
+                      </span>
+                      <span className="text-sm font-semibold text-violet-800">
+                        {getAccessLevelLabel(user.access_level)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEditUser(user)}
+                    className="min-h-[44px] flex-1 rounded-2xl bg-violet-500 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-violet-600 hover:shadow-md active:scale-95"
+                  >
+                    <PencilIcon className="mx-auto h-5 w-5 lg:hidden" />
+                    <span className="hidden lg:inline">Edit</span>
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleDeleteUser(user.id, user.full_name || "this user")
+                    }
+                    className="min-h-[44px] flex-1 rounded-2xl bg-rose-500 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-rose-600 hover:shadow-md active:scale-95"
+                  >
+                    <TrashIcon className="mx-auto h-5 w-5 lg:hidden" />
+                    <span className="hidden lg:inline">Delete</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+            <div className="rounded-2xl border-2 border-violet-200 bg-violet-50/50 px-4 py-3">
+              <p className="text-xs font-semibold text-violet-600">
+                Showing {filteredUsers.length} of {users.length} users
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden overflow-hidden rounded-3xl border-2 border-white/60 bg-white/85 shadow-[0_20px_60px_rgba(147,118,255,0.18)] backdrop-blur-xl lg:block">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-violet-100">
             <thead className="bg-gradient-to-r from-violet-100 to-purple-100">
@@ -227,7 +313,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => handleEditUser(user)}
-                          className="rounded-full bg-violet-500 p-2 text-white transition-all hover:bg-violet-600 hover:shadow-md active:scale-95"
+                          className="min-h-[44px] min-w-[44px] rounded-full bg-violet-500 p-2 text-white transition-all hover:bg-violet-600 hover:shadow-md active:scale-95"
                           title="Edit user"
                         >
                           <PencilIcon className="h-4 w-4" />
@@ -239,7 +325,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
                               user.full_name || "this user",
                             )
                           }
-                          className="rounded-full bg-rose-500 p-2 text-white transition-all hover:bg-rose-600 hover:shadow-md active:scale-95"
+                          className="min-h-[44px] min-w-[44px] rounded-full bg-rose-500 p-2 text-white transition-all hover:bg-rose-600 hover:shadow-md active:scale-95"
                           title="Delete user"
                         >
                           <TrashIcon className="h-4 w-4" />

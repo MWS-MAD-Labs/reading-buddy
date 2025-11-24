@@ -94,7 +94,7 @@ export const DashboardNav = ({ userRole }: DashboardNavProps) => {
   });
 
   return (
-    <nav className="flex flex-wrap gap-3">
+    <nav className="hidden gap-3 lg:flex">
       {visibleLinks.map((link) => {
         const isActive =
           pathname === link.href || pathname.startsWith(`${link.href}/`);
@@ -104,6 +104,7 @@ export const DashboardNav = ({ userRole }: DashboardNavProps) => {
             href={link.href}
             className={`
               btn-squish hover-bounce
+              min-h-[44px]
               rounded-2xl border-4 px-6 py-3 text-base font-black transition-all
               ${
                 isActive
