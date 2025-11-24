@@ -29,7 +29,28 @@ export const FlipBookReader = ({
   const [jumpToPage, setJumpToPage] = useState("");
   const [zoom, setZoom] = useState(1);
   const [showSettings, setShowSettings] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const bookRef = useRef<any>(null);
+
+  // Detect screen orientation and size
+  useEffect(() => {
+    const checkOrientation = () => {
+      const portrait = window.innerHeight > window.innerWidth;
+      const mobile = window.innerWidth < 768;
+      setIsPortrait(portrait);
+      setIsMobile(mobile);
+    };
+
+    checkOrientation();
+    window.addEventListener("resize", checkOrientation);
+    window.addEventListener("orientationchange", checkOrientation);
+
+    return () => {
+      window.removeEventListener("resize", checkOrientation);
+      window.removeEventListener("orientationchange", checkOrientation);
+    };
+  }, []);
 
   const pageNumbers = useMemo(
     () => Array.from({ length: pageImages.count }, (_, index) => index + 1),
@@ -72,9 +93,25 @@ export const FlipBookReader = ({
 
   const zoomLabel = `${Math.round(zoom * 100)}%`;
 
-  // Calculate responsive dimensions based on zoom and viewport
-  const baseWidth = 500;
-  const baseHeight = 700;
+  // Calculate responsive dimensions based on zoom, viewport, and orientation
+  // In portrait mode on mobile: use single page view with dimensions that fit the screen width
+  // In landscape mode or desktop: use spread view with wider pages
+  const getResponsiveDimensions = () => {
+    if (isMobile && isPortrait) {
+      // On mobile portrait, make the page fill most of the screen width
+      const viewportWidth =
+        typeof window !== "undefined" ? window.innerWidth : 375;
+      // Account for padding (6 on each side = 12 total, plus some margin)
+      const availableWidth = viewportWidth - 60; // 48px for padding, 12px for breathing room
+      return {
+        baseWidth: Math.min(availableWidth, 500),
+        baseHeight: Math.min(availableWidth * 1.4, 700), // Maintain aspect ratio
+      };
+    }
+    return { baseWidth: 500, baseHeight: 700 };
+  };
+
+  const { baseWidth, baseHeight } = getResponsiveDimensions();
   const width = Math.round(baseWidth * zoom);
   const height = Math.round(baseHeight * zoom);
 
@@ -215,44 +252,56 @@ export const FlipBookReader = ({
       )}
 
       <div
-        className="relative mx-auto rounded-lg p-4"
-        style={{
-          background:
-            "linear-gradient(to right, #8B4513 0%, #A0522D 2%, transparent 2%, transparent 98%, #A0522D 98%, #8B4513 100%)",
-          boxShadow:
-            "0 10px 40px rgba(0,0,0,0.3), inset 0 0 20px rgba(139,69,19,0.2)",
-        }}
+        className={`relative mx-auto rounded-lg ${isMobile && isPortrait ? "p-2" : "p-4"}`}
+        style={
+          isMobile && isPortrait
+            ? {
+                // Simple background for mobile portrait
+                background: "transparent",
+              }
+            : {
+                // Book-like background for desktop/landscape
+                background:
+                  "linear-gradient(to right, #8B4513 0%, #A0522D 2%, transparent 2%, transparent 98%, #A0522D 98%, #8B4513 100%)",
+                boxShadow:
+                  "0 10px 40px rgba(0,0,0,0.3), inset 0 0 20px rgba(139,69,19,0.2)",
+              }
+        }
       >
-        {/* Book spine effect */}
-        <div
-          className="absolute left-0 top-0 bottom-0 w-1"
-          style={{
-            background:
-              "linear-gradient(to right, rgba(0,0,0,0.3), transparent)",
-          }}
-        />
-        <div
-          className="absolute right-0 top-0 bottom-0 w-1"
-          style={{
-            background:
-              "linear-gradient(to left, rgba(0,0,0,0.3), transparent)",
-          }}
-        />
+        {/* Book spine effect - only show on desktop/landscape */}
+        {!(isMobile && isPortrait) && (
+          <>
+            <div
+              className="absolute left-0 top-0 bottom-0 w-1"
+              style={{
+                background:
+                  "linear-gradient(to right, rgba(0,0,0,0.3), transparent)",
+              }}
+            />
+            <div
+              className="absolute right-0 top-0 bottom-0 w-1"
+              style={{
+                background:
+                  "linear-gradient(to left, rgba(0,0,0,0.3), transparent)",
+              }}
+            />
+          </>
+        )}
 
         <HTMLFlipBook
           ref={bookRef}
           width={width}
           height={height}
-          size="stretch"
+          size={isMobile && isPortrait ? "fixed" : "stretch"}
           minWidth={Math.round(baseWidth * 0.6)}
           maxWidth={Math.round(baseWidth * 2)}
           minHeight={Math.round(baseHeight * 0.6)}
           maxHeight={Math.round(baseHeight * 2)}
           drawShadow={true}
           flippingTime={1000}
-          usePortrait={false}
+          usePortrait={isMobile && isPortrait}
           startZIndex={0}
-          autoSize={true}
+          autoSize={isMobile && isPortrait ? false : true}
           maxShadowOpacity={0.5}
           showCover={false}
           mobileScrollSupport={true}
@@ -265,7 +314,10 @@ export const FlipBookReader = ({
           onFlip={(event: { data: number }) => handleFlip(event.data)}
           className="mx-auto"
           style={{
-            boxShadow: "0 0 30px rgba(0,0,0,0.2)",
+            boxShadow:
+              isMobile && isPortrait
+                ? "0 0 20px rgba(0,0,0,0.15)"
+                : "0 0 30px rgba(0,0,0,0.2)",
           }}
         >
           {pageNumbers.map((pageNumber) => {

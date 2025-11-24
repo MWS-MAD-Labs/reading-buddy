@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -86,7 +87,14 @@ type MobileNavProps = {
 
 export const MobileNav = ({ userRole }: MobileNavProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
+
+  // Track when component is mounted for portal
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   // Filter links based on user role
   const visibleLinks = navLinks.filter((link) => {
@@ -111,36 +119,13 @@ export const MobileNav = ({ userRole }: MobileNavProps) => {
     };
   }, [isOpen]);
 
-  return (
+  // Portal content for drawer and backdrop
+  const drawerContent = (
     <>
-      {/* Hamburger Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border-4 border-purple-300 bg-purple-100 p-2 text-purple-600 transition-all hover:scale-105 active:scale-95 lg:hidden"
-        aria-label="Toggle menu"
-        aria-expanded={isOpen}
-      >
-        <svg
-          className="h-6 w-6"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          {isOpen ? (
-            <path d="M6 18L18 6M6 6l12 12" />
-          ) : (
-            <path d="M4 6h16M4 12h16M4 18h16" />
-          )}
-        </svg>
-      </button>
-
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm lg:hidden"
           onClick={() => setIsOpen(false)}
           aria-hidden="true"
         />
@@ -148,7 +133,7 @@ export const MobileNav = ({ userRole }: MobileNavProps) => {
 
       {/* Drawer */}
       <div
-        className={`fixed right-0 top-0 z-50 h-full w-80 max-w-[85vw] transform bg-gradient-to-br from-purple-50 via-pink-50 to-yellow-50 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden ${
+        className={`fixed right-0 top-0 z-[9999] h-full w-80 max-w-[85vw] transform bg-gradient-to-br from-purple-50 via-pink-50 to-yellow-50 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -180,7 +165,8 @@ export const MobileNav = ({ userRole }: MobileNavProps) => {
             <ul className="space-y-3">
               {visibleLinks.map((link) => {
                 const isActive =
-                  pathname === link.href || pathname.startsWith(`${link.href}/`);
+                  pathname === link.href ||
+                  pathname.startsWith(`${link.href}/`);
                 return (
                   <li key={link.href}>
                     <Link
@@ -204,6 +190,37 @@ export const MobileNav = ({ userRole }: MobileNavProps) => {
           </nav>
         </div>
       </div>
+    </>
+  );
+
+  return (
+    <>
+      {/* Hamburger Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border-4 border-purple-300 bg-purple-100 p-2 text-purple-600 transition-all hover:scale-105 active:scale-95 lg:hidden"
+        aria-label="Toggle menu"
+        aria-expanded={isOpen}
+      >
+        <svg
+          className="h-6 w-6"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          {isOpen ? (
+            <path d="M6 18L18 6M6 6l12 12" />
+          ) : (
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          )}
+        </svg>
+      </button>
+
+      {/* Portal the drawer and backdrop to document.body to escape stacking context */}
+      {mounted && createPortal(drawerContent, document.body)}
     </>
   );
 };
