@@ -215,7 +215,10 @@ export const BookUploadForm = ({
       if (validation.format === "pdf") {
         const detectedPages = await extractPageCount(file);
         setPageCount(detectedPages);
-      } else if (["epub", "mobi", "azw", "azw3"].includes(validation.format)) {
+      } else if (
+        validation.format &&
+        ["epub", "mobi", "azw", "azw3"].includes(validation.format)
+      ) {
         // For EPUB and MOBI/AZW formats, we'll get page count after conversion
         const formatName = validation.format.toUpperCase();
         setPdfDetectionMessage(
