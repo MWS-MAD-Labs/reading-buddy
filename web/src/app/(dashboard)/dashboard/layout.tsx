@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
+import { MobileNav } from '@/components/dashboard/MobileNav';
 import { SignOutButton } from '@/components/dashboard/SignOutButton';
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -30,17 +31,25 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-yellow-50 text-purple-900">
       <header className="border-b border-purple-200 bg-gradient-to-r from-purple-50 via-pink-50 to-yellow-50 px-4 py-3 shadow-sm backdrop-blur">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3 lg:gap-6">
+          {/* Logo and Role */}
+          <div className="flex items-center gap-2 lg:gap-3">
             <div className="inline-flex items-center gap-2 rounded-xl border border-yellow-200 bg-white/80 px-3 py-1 text-sm font-black uppercase tracking-wide text-yellow-700">
               📚 Reading Buddy
             </div>
-            <p className="text-xs font-semibold uppercase text-purple-500">{roleLabel}</p>
+            <p className="hidden text-xs font-semibold uppercase text-purple-500 sm:block">{roleLabel}</p>
           </div>
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+          {/* Desktop Navigation */}
+          <div className="hidden items-center gap-4 lg:flex">
             <DashboardNav userRole={profile?.role as 'ADMIN' | 'LIBRARIAN' | 'TEACHER' | 'STUDENT' | null} />
             <SignOutButton />
+          </div>
+
+          {/* Mobile Navigation */}
+          <div className="flex items-center gap-2 lg:hidden">
+            <SignOutButton />
+            <MobileNav userRole={profile?.role as 'ADMIN' | 'LIBRARIAN' | 'TEACHER' | 'STUDENT' | null} />
           </div>
         </div>
       </header>

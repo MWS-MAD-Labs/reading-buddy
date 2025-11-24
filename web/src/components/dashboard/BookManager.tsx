@@ -414,129 +414,236 @@ export const BookManager = ({
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-3xl border-4 border-blue-300 bg-white shadow-xl">
-          <table className="min-w-full divide-y-4 divide-blue-200 text-sm text-purple-900">
-            <thead className="bg-gradient-to-r from-blue-100 via-purple-100 to-pink-100">
-              <tr>
-                <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                  📖 Title
-                </th>
-                <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                  🔢 ISBN
-                </th>
-                <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                  ✍️ Author
-                </th>
-                <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                  🏢 Publisher
-                </th>
-                <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                  📅 Year
-                </th>
-                <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                  🎭 Genre
-                </th>
-                <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                  🌍 Language
-                </th>
-                <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                  👥 Access
-                </th>
-                <th className="px-4 py-3 text-right text-base font-black text-blue-600">
-                  ⚡ Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBooks.map((book) => (
-                <tr
-                  key={book.id}
-                  className="border-b-2 border-blue-100 bg-transparent hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50"
-                >
-                  <td className="px-4 py-3">
-                    <div className="font-bold text-purple-900">
+        <>
+          {/* Mobile Card View */}
+          <div className="space-y-4 lg:hidden">
+            {filteredBooks.map((book) => (
+              <div
+                key={book.id}
+                className="rounded-3xl border-4 border-blue-300 bg-white p-5 shadow-lg transition-all hover:shadow-xl"
+              >
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <h3 className="mb-1 text-lg font-black text-purple-900">
                       {book.title}
+                    </h3>
+                    <p className="text-sm font-semibold text-purple-600">
+                      ✍️ {book.author}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-4 space-y-2 text-sm">
+                  <div className="flex gap-2">
+                    <span className="font-black text-blue-600">🔢 ISBN:</span>
+                    <span className="text-purple-900">{book.isbn}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-black text-blue-600">🏢 Publisher:</span>
+                    <span className="text-purple-900">{book.publisher}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-black text-blue-600">📅 Year:</span>
+                    <span className="text-purple-900">{book.publicationYear}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-black text-blue-600">🎭 Genre:</span>
+                    <span className="text-purple-900">{book.genre}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-black text-blue-600">🌍 Language:</span>
+                    <span className="text-purple-900">{book.language}</span>
+                  </div>
+                </div>
+
+                {book.accessLevels.length > 0 && (
+                  <div className="mb-4">
+                    <p className="mb-2 text-sm font-black text-blue-600">
+                      👥 Access Levels:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {book.accessLevels.map((level) => {
+                        const badge = ACCESS_BADGES[level];
+                        return (
+                          <span
+                            key={`${book.id}-${level}`}
+                            className={clsx(
+                              "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
+                              badge?.color ??
+                                "bg-indigo-100 text-indigo-600 border-indigo-300",
+                            )}
+                          >
+                            {badge?.label ?? level.slice(0, 2)}
+                          </span>
+                        );
+                      })}
                     </div>
-                    <div className="text-xs font-semibold text-purple-600">
-                      {book.author}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">{book.isbn}</td>
-                  <td className="px-4 py-3">{book.author}</td>
-                  <td className="px-4 py-3">{book.publisher}</td>
-                  <td className="px-4 py-3">{book.publicationYear}</td>
-                  <td className="px-4 py-3">{book.genre}</td>
-                  <td className="px-4 py-3">{book.language}</td>
-                  <td className="px-4 py-3 text-xs">
-                    {book.accessLevels.length ? (
-                      <div className="flex flex-wrap gap-2">
-                        {book.accessLevels.map((level) => {
-                          const badge = ACCESS_BADGES[level];
-                          return (
-                            <span
-                              key={`${book.id}-${level}`}
-                              className={clsx(
-                                "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
-                                badge?.color ??
-                                  "bg-indigo-100 text-indigo-600 border-indigo-300",
-                              )}
-                            >
-                              {badge?.label ?? level.slice(0, 2)}
-                            </span>
-                          );
-                        })}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuizManagementBook(book)}
+                    className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-purple-300 bg-purple-100 px-4 py-2 text-sm font-black text-purple-600 transition hover:bg-purple-200 active:scale-95"
+                  >
+                    📝 Quizzes
+                  </button>
+                  {!book.pageImagesCount && (
+                    <button
+                      type="button"
+                      onClick={() => handleRender(book)}
+                      disabled={renderingBookId === book.id}
+                      className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-emerald-300 bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-600 transition hover:bg-emerald-200 active:scale-95 disabled:opacity-40"
+                    >
+                      {renderingBookId === book.id ? "⏳ Rendering" : "🎨 Render"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(book)}
+                    className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-indigo-300 bg-indigo-100 px-4 py-2 text-sm font-black text-indigo-600 transition hover:bg-indigo-200 active:scale-95"
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(book)}
+                    disabled={isDeleting && deletePendingId === book.id}
+                    className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-rose-300 bg-rose-100 px-4 py-2 text-sm font-black text-rose-600 transition hover:bg-rose-200 active:scale-95 disabled:opacity-40"
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden overflow-x-auto rounded-3xl border-4 border-blue-300 bg-white shadow-xl lg:block">
+            <table className="min-w-full divide-y-4 divide-blue-200 text-sm text-purple-900">
+              <thead className="bg-gradient-to-r from-blue-100 via-purple-100 to-pink-100">
+                <tr>
+                  <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                    📖 Title
+                  </th>
+                  <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                    🔢 ISBN
+                  </th>
+                  <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                    ✍️ Author
+                  </th>
+                  <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                    🏢 Publisher
+                  </th>
+                  <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                    📅 Year
+                  </th>
+                  <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                    🎭 Genre
+                  </th>
+                  <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                    🌍 Language
+                  </th>
+                  <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                    👥 Access
+                  </th>
+                  <th className="px-4 py-3 text-right text-base font-black text-blue-600">
+                    ⚡ Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBooks.map((book) => (
+                  <tr
+                    key={book.id}
+                    className="border-b-2 border-blue-100 bg-transparent hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-bold text-purple-900">
+                        {book.title}
                       </div>
-                    ) : (
-                      <span className="text-purple-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setQuizManagementBook(book)}
-                        className="rounded-full border border-purple-200 bg-white/80 p-2 text-purple-600 shadow-sm transition hover:bg-purple-50"
-                        aria-label="Manage quizzes"
-                        title="Manage quizzes"
-                      >
-                        📝
-                      </button>
-                      {!book.pageImagesCount && (
+                      <div className="text-xs font-semibold text-purple-600">
+                        {book.author}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">{book.isbn}</td>
+                    <td className="px-4 py-3">{book.author}</td>
+                    <td className="px-4 py-3">{book.publisher}</td>
+                    <td className="px-4 py-3">{book.publicationYear}</td>
+                    <td className="px-4 py-3">{book.genre}</td>
+                    <td className="px-4 py-3">{book.language}</td>
+                    <td className="px-4 py-3 text-xs">
+                      {book.accessLevels.length ? (
+                        <div className="flex flex-wrap gap-2">
+                          {book.accessLevels.map((level) => {
+                            const badge = ACCESS_BADGES[level];
+                            return (
+                              <span
+                                key={`${book.id}-${level}`}
+                                className={clsx(
+                                  "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
+                                  badge?.color ??
+                                    "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                )}
+                              >
+                                {badge?.label ?? level.slice(0, 2)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span className="text-purple-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
-                          onClick={() => handleRender(book)}
-                          disabled={renderingBookId === book.id}
-                          className="rounded-full border border-emerald-200 bg-white/80 p-2 text-emerald-600 shadow-sm transition hover:bg-emerald-50 disabled:opacity-40"
-                          aria-label="Render book images"
-                          title="Render book images"
+                          onClick={() => setQuizManagementBook(book)}
+                          className="min-h-[44px] min-w-[44px] rounded-full border border-purple-200 bg-white/80 p-2 text-purple-600 shadow-sm transition hover:bg-purple-50"
+                          aria-label="Manage quizzes"
+                          title="Manage quizzes"
                         >
-                          {renderingBookId === book.id ? "⏳" : "🎨"}
+                          📝
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleEdit(book)}
-                        className="rounded-full border border-indigo-200 bg-white/80 p-2 text-indigo-600 shadow-sm transition hover:bg-indigo-50"
-                        aria-label="Edit book"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(book)}
-                        disabled={isDeleting && deletePendingId === book.id}
-                        className="rounded-full border border-rose-200 bg-white/80 p-2 text-rose-500 shadow-sm transition hover:bg-rose-50 disabled:opacity-40"
-                        aria-label="Delete book"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        {!book.pageImagesCount && (
+                          <button
+                            type="button"
+                            onClick={() => handleRender(book)}
+                            disabled={renderingBookId === book.id}
+                            className="min-h-[44px] min-w-[44px] rounded-full border border-emerald-200 bg-white/80 p-2 text-emerald-600 shadow-sm transition hover:bg-emerald-50 disabled:opacity-40"
+                            aria-label="Render book images"
+                            title="Render book images"
+                          >
+                            {renderingBookId === book.id ? "⏳" : "🎨"}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(book)}
+                          className="min-h-[44px] min-w-[44px] rounded-full border border-indigo-200 bg-white/80 p-2 text-indigo-600 shadow-sm transition hover:bg-indigo-50"
+                          aria-label="Edit book"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(book)}
+                          disabled={isDeleting && deletePendingId === book.id}
+                          className="min-h-[44px] min-w-[44px] rounded-full border border-rose-200 bg-white/80 p-2 text-rose-500 shadow-sm transition hover:bg-rose-50 disabled:opacity-40"
+                          aria-label="Delete book"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Quiz Management Modal */}

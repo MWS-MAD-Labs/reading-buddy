@@ -477,3 +477,88 @@ select:focus {
     transform: scale(1.02);
     transition: all 0.2s ease;
 }
+
+/* ========================================
+   📱 MOBILE-FRIENDLY UTILITIES
+   ======================================== */
+
+/* Ensure minimum touch target sizes (44px × 44px per Apple guidelines) */
+.tap-target {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Touch-friendly button states */
+button,
+a[role="button"],
+[role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+}
+
+/* Active state for better touch feedback */
+button:active,
+a[role="button"]:active,
+[role="button"]:active {
+    opacity: 0.85;
+}
+
+/* Prevent text selection on interactive elements */
+button,
+.btn-3d,
+.btn-squish,
+.hover-bounce,
+.hover-wiggle {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Mobile-optimized spacing */
+@media (max-width: 768px) {
+    /* Reduce padding on mobile for space efficiency */
+    .mobile-compact {
+        padding: 1rem !important;
+    }
+
+    /* Ensure readable text on mobile */
+    body {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+
+    /* Full width on mobile */
+    .mobile-full {
+        width: 100% !important;
+    }
+
+    /* Stack on mobile */
+    .mobile-stack {
+        flex-direction: column !important;
+    }
+}
+
+/* Improve scrolling on touch devices */
+.mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+}
+
+/* Better input handling on mobile */
+@media (hover: none) and (pointer: coarse) {
+    /* Touch device detected - optimize for touch */
+    input,
+    textarea,
+    select,
+    button {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+
+    /* Larger tap targets on touch devices */
+    button,
+    a,
+    input[type="checkbox"],
+    input[type="radio"] {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}

@@ -118,9 +118,9 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
   ]);
 
   return (
-    <section className="space-y-6">
-      <div className="grid gap-4 rounded-2xl border-4 border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50 p-5 shadow-lg sm:grid-cols-3">
-        <label className="flex flex-col gap-2 sm:col-span-3">
+    <section className="space-y-4 md:space-y-6">
+      <div className="grid gap-4 rounded-2xl border-4 border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50 p-4 shadow-lg md:grid-cols-2 md:p-5 lg:grid-cols-3">
+        <label className="flex flex-col gap-2 md:col-span-2 lg:col-span-3">
           <span className="text-sm font-black uppercase tracking-wide text-purple-600">
             🔍 Search
           </span>
@@ -131,7 +131,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               setSearchTerm(event.target.value)
             }
-            className="rounded-2xl border-4 border-purple-300 bg-white px-4 py-2 font-semibold text-purple-900 outline-none transition-all"
+            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
           />
         </label>
         <label className="flex flex-col gap-2">
@@ -141,7 +141,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
           <select
             value={authorFilter}
             onChange={(event) => setAuthorFilter(event.target.value)}
-            className="rounded-2xl border-4 border-purple-300 bg-white px-4 py-2 font-semibold text-purple-900 outline-none transition-all"
+            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
           >
             <option value="ALL">All authors</option>
             {authorOptions.map((option) => (
@@ -158,7 +158,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
           <select
             value={publisherFilter}
             onChange={(event) => setPublisherFilter(event.target.value)}
-            className="rounded-2xl border-4 border-purple-300 bg-white px-4 py-2 font-semibold text-purple-900 outline-none transition-all"
+            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
           >
             <option value="ALL">All publishers</option>
             {publisherOptions.map((option) => (
@@ -175,7 +175,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
           <select
             value={genreFilter}
             onChange={(event) => setGenreFilter(event.target.value)}
-            className="rounded-2xl border-4 border-purple-300 bg-white px-4 py-2 font-semibold text-purple-900 outline-none transition-all"
+            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
           >
             <option value="ALL">All genres</option>
             {genreOptions.map((option) => (
@@ -192,7 +192,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
           <select
             value={languageFilter}
             onChange={(event) => setLanguageFilter(event.target.value)}
-            className="rounded-2xl border-4 border-purple-300 bg-white px-4 py-2 font-semibold text-purple-900 outline-none transition-all"
+            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
           >
             <option value="ALL">All languages</option>
             {languageOptions.map((option) => (
@@ -209,7 +209,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
           <select
             value={yearFilter}
             onChange={(event) => setYearFilter(event.target.value)}
-            className="rounded-2xl border-4 border-purple-300 bg-white px-4 py-2 font-semibold text-purple-900 outline-none transition-all"
+            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
           >
             <option value="ALL">All years</option>
             {yearOptions.map((option) => (
@@ -222,7 +222,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
       </div>
 
       {filteredBooks.length ? (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5 lg:grid-cols-3 xl:grid-cols-4">
           {filteredBooks.map((book) => (
             <li key={book.id} className="flex justify-center">
               <Link
