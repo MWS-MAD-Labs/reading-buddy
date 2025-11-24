@@ -2,7 +2,8 @@ services:
   reading-buddy:
     build:
       # Build directly from GitHub repository - always pulls latest code from main branch
-      context: https://github.com/faisalnh/reading-companion.git#main
+      # Using commit SHA to force fresh clone: 4066059
+      context: https://github.com/faisalnh/reading-companion.git#4066059
       # To build from local files instead, comment the line above and uncomment below:
       # context: .
       dockerfile: Dockerfile

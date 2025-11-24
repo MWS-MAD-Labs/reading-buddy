@@ -274,8 +274,6 @@ export function getFormatName(format: SupportedEbookFormat): string {
       return "AZW";
     case "azw3":
       return "AZW3";
-    default:
-      return format.toUpperCase();
   }
 }
 
