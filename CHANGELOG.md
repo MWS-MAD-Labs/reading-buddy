@@ -7,6 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2025-11-24
+
+### Added
+
+#### Responsive Mobile UI & Fullscreen Reading Mode
+- **Mobile-responsive layout** with automatic orientation detection
+- **Portrait mode optimization** - Single-page view on mobile devices in portrait orientation
+- **Landscape/desktop optimization** - Spread (two-page) view on landscape and desktop screens
+- **Hamburger menu** with React portal implementation to fix z-index stacking issues
+- **Immersive fullscreen reading mode** for distraction-free reading experience
+- **Floating exit button** as the only UI element in fullscreen mode
+- **Pure white background** in fullscreen with all decorative elements removed
+- **Auto-adaptive layout** - Automatically switches between single-page and spread views based on screen orientation
+- **Maximized screen usage** - 20px minimal padding in fullscreen mode
+- **3D page flip shadow effect** maintained in all viewing modes
+- **Dynamic page dimensions** calculated based on viewport size for optimal readability
+
+#### Mobile Reading Experience
+- Viewport orientation detection with automatic layout adjustments
+- Single-page view fills screen width in portrait mode
+- Properly sized pages with 1.4:1 aspect ratio for book pages
+- Dynamic key prop to force re-render on orientation changes
+- Preserved current page position when toggling between modes
+- Touch-friendly navigation controls (44px minimum tap targets)
+
+#### Fullscreen Features
+- Cross-browser fullscreen API support (webkit, moz, ms)
+- Hide all UI elements: navigation controls, settings panel, progress bar
+- Pure white page backgrounds (no amber/golden tones)
+- Minimal visual clutter for immersive reading
+- Portrait fullscreen: Single page maximizes full screen height
+- Landscape fullscreen: Spread view with both pages maximized
+- ESC key support to exit fullscreen
+
+### Changed
+- Refactored FlipBook reader dimensions for better responsiveness
+- Updated container styling to adapt based on viewing mode
+- Modified page background styling to be pure white in fullscreen
+- Improved z-index management using React portals for mobile menu
+
+### Fixed
+- **Mobile menu z-index issue** - Menu now appears above all page content using React portal
+- **Portrait mode spread view** - Correctly shows single page instead of cramped spread
+- **Non-fullscreen dimensions** - Restored proper page sizing in normal viewing mode
+- **Fullscreen screen usage** - Eliminated excessive blank space around pages
+- **Page flip effect in fullscreen** - Re-enabled 3D shadow effect for realistic book experience
+
+### Technical Details
+
+**Files Modified:**
+- `web/src/components/dashboard/FlipBookReader.tsx` - Complete responsive and fullscreen implementation
+- `web/src/components/dashboard/MobileNav.tsx` - Portal implementation for z-index fix
+
+**Key Features:**
+```typescript
+// Responsive dimension calculation
+- Portrait mobile: 300-500px width (viewport - 60px)
+- Landscape/desktop: 500x700px base dimensions
+- Fullscreen portrait: Maximizes height, width = height / 1.4
+- Fullscreen landscape: Both pages maximize height
+
+// Fullscreen API support
+- Standard: requestFullscreen / exitFullscreen
+- WebKit: webkitRequestFullscreen / webkitExitFullscreen
+- Mozilla: mozRequestFullScreen / mozCancelFullScreen
+- Microsoft: msRequestFullscreen / msExitFullscreen
+```
+
+**Component Structure:**
+```
+- Container with viewport detection hooks
+- Floating exit button (fullscreen only)
+- Navigation controls (hidden in fullscreen)
+- Settings panel (hidden in fullscreen)
+- FlipBook with dynamic dimensions
+- Progress bar (hidden in fullscreen)
+```
+
+### Performance
+- Orientation detection with resize and orientationchange event listeners
+- Fullscreen state tracking with multiple browser event listeners
+- Dynamic re-rendering only when orientation or fullscreen state changes
+- Preserved page position across mode transitions
+
+---
+
 ## [1.1.0] - 2025-11-24
 
 ### Added
@@ -328,6 +414,7 @@ This is the initial release. No migration required.
 
 | Version | Release Date | Milestone |
 |---------|--------------|-----------|
+| 1.2.0   | 2025-11-24   | 📱 Mobile Responsive UI & Immersive Fullscreen Reading |
 | 1.1.0   | 2025-11-24   | 📚 Multi-Format Support - MOBI/AZW/AZW3 |
 | 1.0.0   | 2025-11-20   | 🎉 MVP Complete - Initial Production Release |
 
