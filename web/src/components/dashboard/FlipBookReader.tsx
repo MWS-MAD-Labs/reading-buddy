@@ -35,6 +35,11 @@ export const FlipBookReader = ({
   const bookRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Update currentPage when initialPage changes (e.g., when returning to a book with saved progress)
+  useEffect(() => {
+    setCurrentPage(Math.max(initialPage, 1));
+  }, [initialPage]);
+
   // Detect screen orientation and size
   useEffect(() => {
     const checkOrientation = () => {
