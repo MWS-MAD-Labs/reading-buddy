@@ -524,17 +524,13 @@ export const FlipBookReader = ({
                 {/* Book page content */}
                 <div className="relative h-full w-full p-2">
                   {shouldLoad ? (
-                    <img
-                      src={imageUrl}
-                      alt={`Page ${pageNumber}`}
-                      className="h-full w-full object-contain"
-                      loading={isNearby ? "eager" : "lazy"}
-                      onError={(e) => {
-                        console.error(
-                          `Failed to load page ${pageNumber}:`,
-                          imageUrl,
-                        );
+                    <div
+                      className="h-full w-full bg-contain bg-center bg-no-repeat"
+                      style={{
+                        backgroundImage: `url("${imageUrl}")`,
                       }}
+                      role="img"
+                      aria-label={`Page ${pageNumber}`}
                     />
                   ) : (
                     // Placeholder for distant pages
