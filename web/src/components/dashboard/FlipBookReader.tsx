@@ -259,7 +259,7 @@ export const FlipBookReader = ({
 
   // Preload nearby pages when current page changes
   useEffect(() => {
-    const preloadRange = 5; // Preload 5 pages ahead and behind
+    const preloadRange = 2; // Reduced to 2 pages ahead and behind for faster loading
     const imagesToPreload: string[] = [];
 
     for (
@@ -271,11 +271,15 @@ export const FlipBookReader = ({
       imagesToPreload.push(imageUrl);
     }
 
-    // Preload images in background
-    imagesToPreload.forEach((url) => {
-      const img = new window.Image();
-      img.src = url;
-    });
+    // Preload images with slight delay to prioritize current page
+    const timeoutId = setTimeout(() => {
+      imagesToPreload.forEach((url) => {
+        const img = new window.Image();
+        img.src = url;
+      });
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [currentPage, pageImages.baseUrl, pageImages.count]);
 
   return (
@@ -492,12 +496,12 @@ export const FlipBookReader = ({
             // Calculate distance from current page for lazy loading
             const distanceFromCurrent = Math.abs(pageNumber - currentPage);
 
-            // Load strategy:
-            // - Current page and next/previous 3 pages: load eagerly
-            // - Pages 4-10 away: lazy load
-            // - Pages 10+ away: don't load yet (use placeholder)
-            const shouldLoad = distanceFromCurrent <= 10;
-            const isNearby = distanceFromCurrent <= 3;
+            // Optimized load strategy for better performance:
+            // - Current page and next/previous 2 pages: load eagerly
+            // - Pages 3-5 away: lazy load
+            // - Pages 5+ away: don't load yet (use placeholder)
+            const shouldLoad = distanceFromCurrent <= 5;
+            const isNearby = distanceFromCurrent <= 2;
 
             return (
               <article
