@@ -15,6 +15,7 @@ import type {
   QuizStatisticsWithBook,
   QuizQuestionsData,
 } from "@/types/database";
+import { checkRateLimit } from "@/lib/middleware/withRateLimit";
 
 export const checkCurrentUserRole = async () => {
   const supabase = await createSupabaseServerClient();
@@ -335,6 +336,18 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
     throw new Error("You must be signed in to generate a quiz.");
   }
 
+  // Rate limiting: 10 requests per hour per user
+  const rateLimitCheck = await checkRateLimit(
+    `user:${user.id}`,
+    "quizGeneration",
+  );
+  if (rateLimitCheck.exceeded) {
+    const resetTime = rateLimitCheck.reset
+      ? new Date(rateLimitCheck.reset).toLocaleTimeString()
+      : "soon";
+    throw new Error(`Rate limit exceeded. Please try again at ${resetTime}.`);
+  }
+
   const { data: book, error: bookError } = await supabase
     .from("books")
     .select("id, title, description")
@@ -435,6 +448,18 @@ export const generateQuizForBookWithContent = async (input: {
 
   if (!user) {
     throw new Error("You must be signed in to generate a quiz.");
+  }
+
+  // Rate limiting: 10 requests per hour per user
+  const rateLimitCheck = await checkRateLimit(
+    `user:${user.id}`,
+    "quizGeneration",
+  );
+  if (rateLimitCheck.exceeded) {
+    const resetTime = rateLimitCheck.reset
+      ? new Date(rateLimitCheck.reset).toLocaleTimeString()
+      : "soon";
+    throw new Error(`Rate limit exceeded. Please try again at ${resetTime}.`);
   }
 
   // Validate input

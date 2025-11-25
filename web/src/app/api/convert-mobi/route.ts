@@ -10,6 +10,7 @@ import {
   getObjectKeyFromPublicUrl,
   buildPublicObjectUrl,
 } from "@/lib/minioUtils";
+import { withRateLimit } from "@/lib/middleware/withRateLimit";
 import { writeFile, unlink } from "fs/promises";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -38,7 +39,7 @@ interface ConversionResponse {
  * POST /api/convert-mobi
  * Convert MOBI/AZW/AZW3 to PDF using Calibre
  */
-export async function POST(
+async function convertMobiHandler(
   request: NextRequest,
 ): Promise<NextResponse<ConversionResponse>> {
   try {
@@ -177,3 +178,8 @@ export async function POST(
     );
   }
 }
+
+// Export with rate limiting: 5 requests per 15 minutes per IP
+export const POST = withRateLimit(convertMobiHandler, {
+  type: "fileConversion",
+});
