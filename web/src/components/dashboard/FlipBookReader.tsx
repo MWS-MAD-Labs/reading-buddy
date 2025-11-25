@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import clsx from "clsx";
 
 type FlipBookProps = {
@@ -528,13 +529,16 @@ export const FlipBookReader = ({
                 {/* Book page content */}
                 <div className="relative h-full w-full p-2">
                   {shouldLoad ? (
-                    <div
-                      className="h-full w-full bg-contain bg-center bg-no-repeat"
-                      style={{
-                        backgroundImage: `url("${imageUrl}")`,
-                      }}
-                      role="img"
-                      aria-label={`Page ${pageNumber}`}
+                    <Image
+                      src={imageUrl}
+                      alt={`Page ${pageNumber}`}
+                      className="h-full w-full object-contain"
+                      width={width}
+                      height={height}
+                      priority={isNearby}
+                      loading={isNearby ? "eager" : "lazy"}
+                      placeholder="blur"
+                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWEREiMxUf/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
                     />
                   ) : (
                     // Placeholder for distant pages
