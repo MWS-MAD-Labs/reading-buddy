@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.2.0] - 2025-11-24
+## [Unreleased]
+
+### Planned for v1.3.0 - Polish & Stability
+
+#### Planned Features
+- Bug fixes based on user feedback
+- Address TypeScript `any` types flagged by ESLint
+- Implement automated testing (target: 60%+ coverage)
+- Security hardening (rate limiting, input validation)
+- Performance optimizations for large libraries
+- Enhanced error handling and user-friendly error messages
+- Code quality improvements and refactoring
+- CI/CD pipeline setup with GitHub Actions
+- Enhanced mobile reading experience improvements
+- Accessibility improvements (WCAG 2.1 AA compliance progress)
+- Reader enhancements (bookmarks, annotations)
+- Reading analytics and insights
+
+---
+
+## [1.2.0] - 2025-11-25
 
 ### Added
 
@@ -53,12 +73,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Non-fullscreen dimensions** - Restored proper page sizing in normal viewing mode
 - **Fullscreen screen usage** - Eliminated excessive blank space around pages
 - **Page flip effect in fullscreen** - Re-enabled 3D shadow effect for realistic book experience
+- **Reading progress restoration** - Fixed database query to correctly load saved reading position
+  - Removed non-existent `updated_at` column from query
+  - Added `useEffect` to sync `currentPage` state when `initialPage` prop changes
+  - Books now correctly resume from last read page when reopening
 
 ### Technical Details
 
 **Files Modified:**
-- `web/src/components/dashboard/FlipBookReader.tsx` - Complete responsive and fullscreen implementation
+- `web/src/components/dashboard/FlipBookReader.tsx` - Complete responsive and fullscreen implementation, spread view sizing fixes
 - `web/src/components/dashboard/MobileNav.tsx` - Portal implementation for z-index fix
+- `web/src/app/(dashboard)/dashboard/student/read/[bookId]/page.tsx` - Fixed progress query
+- `web/src/app/(dashboard)/dashboard/student/actions.ts` - Added revalidatePath for book pages
 
 **Key Features:**
 ```typescript
@@ -336,33 +362,7 @@ This is the initial release. No migration required.
 
 ---
 
-## [Unreleased]
-
-### Planned for v1.1.0 (Q1 2026) - Polish & Stability
-
-#### Planned
-- Bug fixes based on v1.0.0 user feedback
-- Address 19 TypeScript `any` types flagged by ESLint
-- Implement automated testing (target: 60%+ coverage with Jest)
-- Security hardening (rate limiting, CAPTCHA)
-- Performance optimizations
-- Improved error handling and user-friendly error messages
-- Code quality improvements
-- CI/CD pipeline setup with GitHub Actions
-
-### Planned for v1.2.0 (Q2 2026) - Enhanced UX & Gamification
-
-#### Planned
-- Migrate from legacy `achievements` to `badges` system
-- Enhanced student dashboard with XP, levels, and badges
-- Reading streak tracking (daily reading consistency)
-- Leaderboards (global, class, grade level)
-- Enhanced reader features (bookmarks, annotations)
-- Dark mode for PDF reader
-- WCAG 2.1 AA accessibility compliance
-- Mobile responsiveness improvements
-
-### Planned for v1.3.0 (Q3 2026) - AI Flexibility & Features
+### Planned for v1.4.0 - Enhanced UX & Gamification
 
 #### Planned
 - BYOAI (Bring Your Own AI) support
@@ -374,8 +374,13 @@ This is the initial release. No migration required.
 - Advanced badge types and tiers (Bronze, Silver, Gold, Platinum)
 - Reading challenges system
 - Enhanced leaderboard features
+- Migrate from legacy `achievements` to `badges` system
+- Enhanced student dashboard with XP, levels, and badges
+- Reading streak tracking (daily reading consistency)
+- Leaderboards (global, class, grade level)
+- Dark mode for reader
 
-### Planned for v1.4.0 (Q4 2026) - Content & Competition
+### Planned for v1.5.0 - Content & Competition
 
 #### Planned
 - Class vs class competitions
@@ -386,18 +391,17 @@ This is the initial release. No migration required.
 - Teacher analytics dashboard
 - Enhanced reporting features
 
-### Planned for v1.5.0 (Q1 2027) - Multi-Format Support
+### Planned for v1.6.0 - Advanced Features
 
 #### Planned
 - EPUB file support
-- MOBI/AZW (Kindle) format support
 - DOCX (Word document) support
 - CBZ/CBR (Comic book) format support
 - ODT (OpenDocument) support
-- Unified content storage in MinIO
-- Format conversion pipeline
+- Advanced search and filtering
+- Curated reading lists
 
-### Planned for v2.0.0 (Q3 2027) - Major Architecture Changes
+### Planned for v2.0.0 - Major Architecture Changes
 
 #### Planned
 - Image-only storage architecture (remove PDF storage requirement)
@@ -414,7 +418,7 @@ This is the initial release. No migration required.
 
 | Version | Release Date | Milestone |
 |---------|--------------|-----------|
-| 1.2.0   | 2025-11-24   | 📱 Mobile Responsive UI & Immersive Fullscreen Reading |
+| 1.2.0   | 2025-11-25   | 📱 Mobile Responsive UI & Immersive Fullscreen Reading + Progress Fixes |
 | 1.1.0   | 2025-11-24   | 📚 Multi-Format Support - MOBI/AZW/AZW3 |
 | 1.0.0   | 2025-11-20   | 🎉 MVP Complete - Initial Production Release |
 
@@ -439,4 +443,4 @@ For bug reports and feature requests, please open an issue on GitHub.
 ---
 
 **Maintainer:** Faisal Nur Hidayat  
-**Last Updated:** November 20, 2025
+**Last Updated:** November 25, 2025

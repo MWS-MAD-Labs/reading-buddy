@@ -1,7 +1,7 @@
 # Reading Buddy: Project Roadmap
 
-> **Current Version:** v1.0.0 ✅  
-> **Last Updated:** November 20, 2025  
+> **Current Version:** v1.2.0 ✅  
+> **Last Updated:** November 25, 2025  
 > **Maintainer:** Faisal Nur Hidayat
 
 ---
