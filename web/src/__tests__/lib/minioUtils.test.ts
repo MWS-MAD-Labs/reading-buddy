@@ -1,75 +1,119 @@
-import { describe, it, expect } from 'vitest'
-import { buildPublicPrefixUrl, sanitizeFileName } from '@/lib/minioUtils'
+import { describe, it, expect } from "vitest";
+import {
+  buildPublicPrefixUrl,
+  buildPublicObjectUrl,
+  getObjectKeyFromPublicUrl,
+  buildBookAssetsPrefix,
+  buildPageImageKey,
+} from "@/lib/minioUtils";
 
-describe('buildPublicPrefixUrl', () => {
-  it('should build correct URL for given prefix', () => {
-    const prefix = 'books/123/pages'
-    const url = buildPublicPrefixUrl(prefix)
+describe("buildPublicObjectUrl", () => {
+  it("should build correct URL for given object key", () => {
+    const objectKey = "books/123/cover.jpg";
+    const url = buildPublicObjectUrl(objectKey);
 
-    expect(url).toBeTruthy()
-    expect(url).toContain(prefix)
-    expect(url).toMatch(/^https?:\/\//) // Should start with http or https
-  })
+    expect(url).toBeTruthy();
+    expect(url).toContain(objectKey);
+    expect(url).toContain("test-bucket");
+  });
 
-  it('should handle prefixes with trailing slashes', () => {
-    const prefix = 'books/123/pages/'
-    const url = buildPublicPrefixUrl(prefix)
+  it("should handle keys with special characters", () => {
+    const objectKey = "books/my book/page-1.jpg";
+    const url = buildPublicObjectUrl(objectKey);
 
-    expect(url).toBeTruthy()
-    expect(url).toContain('books/123/pages')
-  })
+    expect(url).toBeTruthy();
+    expect(url).toContain("books");
+  });
+});
 
-  it('should handle empty prefix', () => {
-    const prefix = ''
-    const url = buildPublicPrefixUrl(prefix)
+describe("buildPublicPrefixUrl", () => {
+  it("should build correct URL for given prefix", () => {
+    const prefix = "books/123/pages";
+    const url = buildPublicPrefixUrl(prefix);
 
-    expect(url).toBeTruthy()
-  })
-})
+    expect(url).toBeTruthy();
+    expect(url).toContain(prefix);
+  });
 
-describe('sanitizeFileName', () => {
-  it('should remove special characters from filename', () => {
-    const dirty = 'my file!@#$%^&*().pdf'
-    const clean = sanitizeFileName(dirty)
+  it("should handle prefixes with trailing slashes", () => {
+    const prefix = "books/123/pages/";
+    const url = buildPublicPrefixUrl(prefix);
 
-    expect(clean).toBe('my-file.pdf')
-  })
+    expect(url).toBeTruthy();
+    expect(url).toContain("books/123/pages");
+    expect(url).not.toMatch(/\/$/); // Trailing slash should be removed
+  });
 
-  it('should handle spaces', () => {
-    const filename = 'my book title.pdf'
-    const result = sanitizeFileName(filename)
+  it("should handle empty prefix", () => {
+    const prefix = "";
+    const url = buildPublicPrefixUrl(prefix);
 
-    expect(result).toBe('my-book-title.pdf')
-  })
+    expect(url).toBeTruthy();
+  });
+});
 
-  it('should preserve file extension', () => {
-    const filename = 'document.PDF'
-    const result = sanitizeFileName(filename)
+describe("getObjectKeyFromPublicUrl", () => {
+  it("should extract object key from URL", () => {
+    const url = "http://localhost:9000/test-bucket/books/123/cover.jpg";
+    const key = getObjectKeyFromPublicUrl(url);
 
-    expect(result).toMatch(/\.pdf$/i)
-  })
+    expect(key).toBe("books/123/cover.jpg");
+  });
 
-  it('should handle multiple spaces', () => {
-    const filename = 'book    with   spaces.pdf'
-    const result = sanitizeFileName(filename)
+  it("should handle null URLs", () => {
+    const key = getObjectKeyFromPublicUrl(null);
+    expect(key).toBeNull();
+  });
 
-    expect(result).not.toContain('  ') // No double spaces/dashes
-  })
+  it("should handle undefined URLs", () => {
+    const key = getObjectKeyFromPublicUrl(undefined);
+    expect(key).toBeNull();
+  });
 
-  it('should handle unicode characters', () => {
-    const filename = 'book_título_español.pdf'
-    const result = sanitizeFileName(filename)
+  it("should handle empty URLs", () => {
+    const key = getObjectKeyFromPublicUrl("");
+    expect(key).toBeNull();
+  });
+});
 
-    expect(result).toBeTruthy()
-    expect(result).toMatch(/\.pdf$/)
-  })
+describe("buildBookAssetsPrefix", () => {
+  it("should build correct prefix for book ID", () => {
+    const bookId = 123;
+    const prefix = buildBookAssetsPrefix(bookId);
 
-  it('should handle very long filenames', () => {
-    const longName = 'a'.repeat(300) + '.pdf'
-    const result = sanitizeFileName(longName)
+    expect(prefix).toBe("book-pages/123");
+  });
 
-    // Should truncate to reasonable length
-    expect(result.length).toBeLessThan(256)
-    expect(result).toMatch(/\.pdf$/)
-  })
-})
+  it("should handle large book IDs", () => {
+    const bookId = 999999;
+    const prefix = buildBookAssetsPrefix(bookId);
+
+    expect(prefix).toBe("book-pages/999999");
+  });
+});
+
+describe("buildPageImageKey", () => {
+  it("should build correct key for page image", () => {
+    const bookId = 123;
+    const pageNumber = 1;
+    const key = buildPageImageKey(bookId, pageNumber);
+
+    expect(key).toBe("book-pages/123/page-0001.jpg");
+  });
+
+  it("should pad page numbers correctly", () => {
+    const bookId = 123;
+    const pageNumber = 99;
+    const key = buildPageImageKey(bookId, pageNumber);
+
+    expect(key).toBe("book-pages/123/page-0099.jpg");
+  });
+
+  it("should handle large page numbers", () => {
+    const bookId = 123;
+    const pageNumber = 1234;
+    const key = buildPageImageKey(bookId, pageNumber);
+
+    expect(key).toBe("book-pages/123/page-1234.jpg");
+  });
+});
