@@ -2,8 +2,7 @@ services:
   reading-buddy:
     build:
       # Build directly from GitHub repository - always pulls latest code from main branch
-      # Using commit SHA to force fresh clone: 89c7957
-      context: https://github.com/faisalnh/reading-companion.git#89c7957
+      context: https://github.com/faisalnh/reading-companion.git#main
       # To build from local files instead, comment the line above and uncomment below:
       # context: .
       dockerfile: Dockerfile
@@ -17,6 +16,7 @@ services:
         MINIO_ENDPOINT: ${MINIO_ENDPOINT:-placeholder.minio.com}
         MINIO_PORT: ${MINIO_PORT:-443}
         MINIO_USE_SSL: ${MINIO_USE_SSL:-true}
+    pull_policy: build
 
     container_name: reading-buddy
     image: reading-buddy:latest
