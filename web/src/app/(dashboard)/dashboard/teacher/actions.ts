@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { assertCanManageClass } from "@/lib/classrooms/permissions";
+import type { QuizAssignment } from "@/types/database";
 
 const revalidateClassroom = (classId: number) => {
   revalidatePath("/dashboard/teacher");

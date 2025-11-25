@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import type { Book } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -69,26 +70,26 @@ export default async function StudentClassroomPage({
     .order("assigned_at", { ascending: false });
 
   const assignedBooks =
-    assignedBookRows?.map((entry: any) => {
-      const bookData =
-        Array.isArray(entry.books) && entry.books.length > 0
-          ? entry.books[0]
-          : entry.books;
-      const book = bookData as {
-        id: number;
-        title: string;
-        author: string | null;
-        cover_url: string | null;
-      } | null;
-      return {
-        book_id: entry.book_id,
-        id: book?.id ?? entry.book_id,
-        title: book?.title ?? "Untitled",
-        author: book?.author ?? null,
-        cover_url: book?.cover_url ?? null,
-        assigned_at: entry.assigned_at ?? null,
-      };
-    }) ?? [];
+    assignedBookRows?.map(
+      (entry: { book_id: number; assigned_at: string; books: any }) => {
+        const bookData =
+          Array.isArray(entry.books) && entry.books.length > 0
+            ? entry.books[0]
+            : entry.books;
+        const book = bookData as Pick<
+          Book,
+          "id" | "title" | "author" | "cover_url"
+        > | null;
+        return {
+          book_id: entry.book_id,
+          id: book?.id ?? entry.book_id,
+          title: book?.title ?? "Untitled",
+          author: book?.author ?? null,
+          cover_url: book?.cover_url ?? null,
+          assigned_at: entry.assigned_at ?? null,
+        };
+      },
+    ) ?? [];
 
   // Get student's reading progress for these books
   const bookIds = assignedBooks.map((b) => b.book_id);
@@ -100,7 +101,7 @@ export default async function StudentClassroomPage({
       .eq("student_id", user.id)
       .in("book_id", bookIds);
 
-    progress?.forEach((p: any) => {
+    progress?.forEach((p: { book_id: number; current_page: number }) => {
       readingProgress.set(p.book_id, {
         current_page: p.current_page,
       });
@@ -116,26 +117,28 @@ export default async function StudentClassroomPage({
     .order("due_date", { ascending: true, nullsFirst: false });
 
   const assignedQuizzes =
-    quizAssignments?.map((item: any) => {
-      const quizData =
-        Array.isArray(item.quizzes) && item.quizzes.length > 0
-          ? item.quizzes[0]
-          : item.quizzes;
-      const bookData =
-        quizData?.books &&
-        Array.isArray(quizData.books) &&
-        quizData.books.length > 0
-          ? quizData.books[0]
-          : quizData?.books;
+    quizAssignments?.map(
+      (item: { quiz_id: number; due_date: string | null; quizzes: any }) => {
+        const quizData =
+          Array.isArray(item.quizzes) && item.quizzes.length > 0
+            ? item.quizzes[0]
+            : item.quizzes;
+        const bookData =
+          quizData?.books &&
+          Array.isArray(quizData.books) &&
+          quizData.books.length > 0
+            ? quizData.books[0]
+            : quizData?.books;
 
-      return {
-        id: quizData?.id ?? 0,
-        book_id: quizData?.book_id ?? 0,
-        quiz_type: quizData?.quiz_type ?? "classroom",
-        books: bookData ? { title: bookData.title } : null,
-        due_date: item.due_date as string | null,
-      };
-    }) ?? [];
+        return {
+          id: quizData?.id ?? 0,
+          book_id: quizData?.book_id ?? 0,
+          quiz_type: quizData?.quiz_type ?? "classroom",
+          books: bookData ? { title: bookData.title } : null,
+          due_date: item.due_date as string | null,
+        };
+      },
+    ) ?? [];
 
   // Get quiz attempts to check which quizzes have been taken
   const quizIds = assignedQuizzes.map((q) => q.id);
@@ -148,12 +151,14 @@ export default async function StudentClassroomPage({
       .eq("student_id", user.id)
       .in("quiz_id", quizIds);
 
-    attempts?.forEach((attempt: any) => {
-      quizAttempts.set(attempt.quiz_id, {
-        score: attempt.score,
-        submitted_at: attempt.submitted_at,
-      });
-    });
+    attempts?.forEach(
+      (attempt: { quiz_id: number; score: number; submitted_at: string }) => {
+        quizAttempts.set(attempt.quiz_id, {
+          score: attempt.score,
+          submitted_at: attempt.submitted_at,
+        });
+      },
+    );
   }
 
   const formatDate = (value: string | null) => {

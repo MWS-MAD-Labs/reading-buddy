@@ -90,7 +90,9 @@ export default async function AdminDashboardPage() {
   // Merge profile data with email
   const users =
     profiles?.map((profile) => {
-      const authUser = authData.users.find((u: any) => u.id === profile.id);
+      const authUser = authData.users.find(
+        (u: { id: string; email?: string }) => u.id === profile.id,
+      );
       return {
         ...profile,
         email: authUser?.email || null,

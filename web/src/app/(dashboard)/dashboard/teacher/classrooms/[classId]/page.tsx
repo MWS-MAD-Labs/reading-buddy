@@ -122,9 +122,15 @@ export default async function ManageClassroomPage({
           ? entry.books[0]
           : entry.books;
       return {
-        ...entry,
+        student_id: entry.student_id,
+        current_page: entry.current_page,
+        started_at: entry.started_at,
+        completed_at: entry.completed_at,
         profiles: profileData as { full_name: string | null } | null,
-        books: bookData as { title: string; page_count: number | null } | null,
+        books: bookData as {
+          title: string;
+          page_count: number | null;
+        } | null,
       };
     });
   }
@@ -151,33 +157,40 @@ export default async function ManageClassroomPage({
     }
 
     // Transform nested array relationships (profiles, quizzes.books) to single objects
-    quizAttempts = (quizData ?? []).map((entry: any) => {
-      const profileData =
-        Array.isArray(entry.profiles) && entry.profiles.length > 0
-          ? entry.profiles[0]
-          : entry.profiles;
+    quizAttempts = (quizData ?? []).map(
+      (entry: {
+        score: number;
+        submitted_at: string | null;
+        profiles: any;
+        quizzes: any;
+      }) => {
+        const profileData =
+          Array.isArray(entry.profiles) && entry.profiles.length > 0
+            ? entry.profiles[0]
+            : entry.profiles;
 
-      const quizData =
-        Array.isArray(entry.quizzes) && entry.quizzes.length > 0
-          ? entry.quizzes[0]
-          : entry.quizzes;
-      const quiz = quizData as { id?: number; books?: any } | null;
+        const quizData =
+          Array.isArray(entry.quizzes) && entry.quizzes.length > 0
+            ? entry.quizzes[0]
+            : entry.quizzes;
+        const quiz = quizData as { id?: number; books?: any } | null;
 
-      const bookData =
-        quiz && Array.isArray(quiz.books) && quiz.books.length > 0
-          ? quiz.books[0]
-          : quiz?.books;
+        const bookData =
+          quiz && Array.isArray(quiz.books) && quiz.books.length > 0
+            ? quiz.books[0]
+            : quiz?.books;
 
-      return {
-        ...entry,
-        profiles: profileData as { full_name: string | null } | null,
-        quizzes: quiz
-          ? {
-              books: bookData as { title: string | null } | null,
-            }
-          : null,
-      };
-    });
+        return {
+          ...entry,
+          profiles: profileData as { full_name: string | null } | null,
+          quizzes: quiz
+            ? {
+                books: bookData as { title: string | null } | null,
+              }
+            : null,
+        };
+      },
+    );
   }
 
   const { data: studentDirectory, error: studentDirectoryError } =

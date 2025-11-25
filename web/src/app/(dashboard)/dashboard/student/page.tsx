@@ -51,13 +51,15 @@ export default async function StudentDashboardPage() {
       .in("class_id", classIds)
       .in("book_id", assignedBookIds);
 
-    classBookData?.forEach((item: any) => {
-      const className = item.classes?.name ?? "Unknown class";
-      if (!bookClassrooms.has(item.book_id)) {
-        bookClassrooms.set(item.book_id, []);
-      }
-      bookClassrooms.get(item.book_id)?.push(className);
-    });
+    classBookData?.forEach(
+      (item: { book_id: number; class_id: number; classes: any }) => {
+        const className = item.classes?.name ?? "Unknown class";
+        if (!bookClassrooms.has(item.book_id)) {
+          bookClassrooms.set(item.book_id, []);
+        }
+        bookClassrooms.get(item.book_id)?.push(className);
+      },
+    );
   }
 
   // Get classroom details for the student
@@ -74,19 +76,27 @@ export default async function StudentDashboardPage() {
       .in("id", classIds);
 
     classrooms =
-      classRows?.map((entry: any) => {
-        const profileData =
-          Array.isArray(entry.profiles) && entry.profiles.length > 0
-            ? entry.profiles[0]
-            : entry.profiles;
-        const profile = profileData as { full_name: string | null } | null;
+      classRows?.map(
+        (entry: {
+          id: number;
+          name: string;
+          profiles:
+            | { full_name: string | null }
+            | { full_name: string | null }[];
+        }) => {
+          const profileData =
+            Array.isArray(entry.profiles) && entry.profiles.length > 0
+              ? entry.profiles[0]
+              : entry.profiles;
+          const profile = profileData as { full_name: string | null } | null;
 
-        return {
-          id: entry.id,
-          name: entry.name,
-          teacher_name: profile?.full_name ?? "Unknown teacher",
-        };
-      }) ?? [];
+          return {
+            id: entry.id,
+            name: entry.name,
+            teacher_name: profile?.full_name ?? "Unknown teacher",
+          };
+        },
+      ) ?? [];
   }
 
   const { data: achievements } = await supabase

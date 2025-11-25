@@ -11,6 +11,10 @@ import {
   getObjectKeyFromPublicUrl,
 } from "@/lib/minioUtils";
 import type { AccessLevelValue } from "@/constants/accessLevels";
+import type {
+  QuizStatisticsWithBook,
+  QuizQuestionsData,
+} from "@/types/database";
 
 export const checkCurrentUserRole = async () => {
   const supabase = await createSupabaseServerClient();
@@ -752,8 +756,8 @@ export const getAllQuizzesGroupedByBook = async () => {
   }
 
   // Group by book
-  const grouped: Record<number, any[]> = {};
-  quizzes?.forEach((quiz: any) => {
+  const grouped: Record<number, QuizStatisticsWithBook[]> = {};
+  quizzes?.forEach((quiz) => {
     const bookId = quiz.book_id;
     if (!grouped[bookId]) {
       grouped[bookId] = [];
@@ -916,8 +920,9 @@ export const updateQuizMetadata = async (input: {
     throw new Error("Quiz not found.");
   }
 
-  const quizData = quiz.questions as any;
-  const updateData: any = { questions: quizData };
+  const quizData = quiz.questions as QuizQuestionsData;
+  const updateData: Partial<{ questions: QuizQuestionsData; tags: string[] }> =
+    { questions: quizData };
 
   // Update title in the questions JSONB if provided
   if (input.title !== undefined) {

@@ -3,7 +3,8 @@ import { detectFileType } from "@/lib/file-type-detector";
 
 // Helper to create a File object from buffer
 function createMockFile(buffer: Buffer, filename: string): File {
-  const blob = new Blob([buffer]);
+  const uint8Array = new Uint8Array(buffer);
+  const blob = new Blob([uint8Array]);
   return new File([blob], filename);
 }
 
