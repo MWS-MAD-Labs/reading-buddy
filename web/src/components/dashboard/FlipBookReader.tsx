@@ -228,7 +228,11 @@ export const FlipBookReader = ({
         baseHeight: Math.min(availableWidth * 1.4, 700), // Maintain aspect ratio
       };
     }
-    return { baseWidth: 500, baseHeight: 700 };
+
+    // Non-fullscreen landscape/desktop spread view
+    // With autoSize=true and size="stretch", the component will auto-expand
+    // So we just provide reasonable base dimensions as a starting point
+    return { baseWidth: 450, baseHeight: 630 };
   };
 
   const { baseWidth, baseHeight } = getResponsiveDimensions();
@@ -458,7 +462,7 @@ export const FlipBookReader = ({
               : isMobile && isPortrait
           }
           startZIndex={0}
-          autoSize={false}
+          autoSize={isFullscreen || (isMobile && isPortrait) ? false : true}
           maxShadowOpacity={isFullscreen ? 0.5 : 0.5}
           showCover={false}
           mobileScrollSupport={true}
