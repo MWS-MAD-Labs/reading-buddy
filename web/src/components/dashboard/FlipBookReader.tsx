@@ -531,6 +531,7 @@ export const FlipBookReader = ({
                       className="h-full w-full object-contain"
                       width={width}
                       height={height}
+                      unoptimized={true}
                       priority={isNearby}
                       loading={isNearby ? "eager" : "lazy"}
                       placeholder="blur"
