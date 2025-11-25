@@ -52,8 +52,6 @@ export default async function StudentReadPage({
     .select("current_page")
     .eq("student_id", user.id)
     .eq("book_id", bookId)
-    .order("updated_at", { ascending: false, nullsFirst: false })
-    .limit(1)
     .maybeSingle();
 
   const requestedPage = awaitedSearchParams?.page

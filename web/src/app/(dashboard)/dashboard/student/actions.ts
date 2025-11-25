@@ -44,6 +44,7 @@ export const recordReadingProgress = async (input: {
 
   console.log("✅ Progress saved successfully");
   revalidatePath("/dashboard/student");
+  revalidatePath(`/dashboard/student/read/${input.bookId}`);
 };
 
 export const evaluateAchievements = async () => {
