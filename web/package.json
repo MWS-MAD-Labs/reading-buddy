@@ -7,6 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "test:watch": "vitest --watch",
     "render:book-images": "tsx scripts/render-book-images.ts",
     "extract:book-text": "tsx scripts/extract-book-text.ts",
     "list-books": "tsx scripts/list-books.ts",
@@ -36,15 +40,21 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/jszip": "^3.4.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.1",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.1",
+    "happy-dom": "^20.0.10",
     "tailwindcss": "^4",
     "tsx": "^4.7.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.13"
   }
 }
