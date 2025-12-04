@@ -39,13 +39,18 @@ export default async function StudentQuizPage({
     notFound();
   }
 
-  const { data: quiz } = await supabase
+  const { data: quiz, error: quizError } = await supabase
     .from("quizzes")
     .select("id, book_id, questions, books(title)")
     .eq("id", quizId)
     .single();
 
+  if (quizError) {
+    console.error("Quiz query error:", quizError);
+  }
+
   if (!quiz) {
+    console.error("Quiz not found:", quizId);
     notFound();
   }
 
