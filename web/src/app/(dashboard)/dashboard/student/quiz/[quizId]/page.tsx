@@ -39,7 +39,23 @@ export default async function StudentQuizPage({
     notFound();
   }
 
-  const { data: quiz, error: quizError } = await supabase
+  // Check user role to determine which client to use
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  // Use admin client for ADMIN and LIBRARIAN to bypass RLS issues
+  const isAdminOrLibrarian =
+    profile?.role === "ADMIN" || profile?.role === "LIBRARIAN";
+
+  // Import admin client if needed
+  const queryClient = isAdminOrLibrarian
+    ? (await import("@/lib/supabase/admin")).getSupabaseAdminClient()
+    : supabase;
+
+  const { data: quiz, error: quizError } = await queryClient
     .from("quizzes")
     .select("id, book_id, questions")
     .eq("id", quizId)
@@ -55,7 +71,7 @@ export default async function StudentQuizPage({
   }
 
   // Fetch book title separately to avoid RLS issues with joins
-  const { data: bookData } = await supabase
+  const { data: bookData } = await queryClient
     .from("books")
     .select("title")
     .eq("id", quiz.book_id)
