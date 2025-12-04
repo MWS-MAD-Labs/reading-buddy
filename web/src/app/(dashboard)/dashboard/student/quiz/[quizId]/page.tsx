@@ -41,7 +41,7 @@ export default async function StudentQuizPage({
 
   const { data: quiz, error: quizError } = await supabase
     .from("quizzes")
-    .select("id, book_id, questions, books(title)")
+    .select("id, book_id, questions")
     .eq("id", quizId)
     .single();
 
@@ -53,6 +53,15 @@ export default async function StudentQuizPage({
     console.error("Quiz not found:", quizId);
     notFound();
   }
+
+  // Fetch book title separately to avoid RLS issues with joins
+  const { data: bookData } = await supabase
+    .from("books")
+    .select("title")
+    .eq("id", quiz.book_id)
+    .single();
+
+  const book = bookData as { title: string } | null;
 
   // Find which classroom this quiz belongs to (for redirect after completion)
   // Note: class_quiz_assignments table may not exist, handle gracefully
@@ -69,13 +78,6 @@ export default async function StudentQuizPage({
     // Table doesn't exist or query failed, continue without class assignment
     console.warn("Could not fetch quiz assignment:", error);
   }
-
-  // Extract book data from array if it exists
-  const bookData =
-    Array.isArray(quiz.books) && quiz.books.length > 0
-      ? quiz.books[0]
-      : quiz.books;
-  const book = bookData as { title: string } | null;
 
   const quizData = quiz.questions as QuizPayload;
 
