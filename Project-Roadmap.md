@@ -1,7 +1,7 @@
 # Reading Buddy: Project Roadmap
 
-> **Current Version:** v1.2.0 ✅  
-> **Last Updated:** November 25, 2025  
+> **Current Version:** v1.3.0 ✅  
+> **Last Updated:** December 4, 2025  
 > **Maintainer:** Faisal Nur Hidayat
 
 ---
@@ -729,13 +729,26 @@ CREATE TABLE xp_transactions (
 - ✅ React portal fix for mobile menu z-index
 - ✅ Dynamic page dimensions for optimal readability
 
-### v1.3.0 (Q1 2026) - Polish & Stability
-- Bug fixes from v1.0.0 and v1.1.0 feedback
-- Address ESLint warnings (19 `any` types)
-- Add basic test coverage (60%+)
-- Security hardening (rate limiting, CAPTCHA)
+### ✅ v1.3.0 (Completed December 4, 2025) - Testing Infrastructure
+- ✅ Vitest setup for unit and integration testing
+- ✅ @vitest/coverage-v8 for code coverage reporting
+- ✅ Playwright setup for E2E testing
+- ✅ Comprehensive test suite (92 tests passing)
+- ✅ Test coverage: 72.41% overall
+  - ✅ rate-limit.ts: 82.35% coverage (25 tests)
+  - ✅ roleCheck.ts: 100% coverage (11 tests)
+  - ✅ pdf-extractor.ts: 57.69% coverage (19 tests)
+  - ✅ file-type-detector.ts: 80.48% coverage
+  - ✅ minioUtils.ts: 68.08% coverage
+- ✅ E2E test examples (homepage, auth, dashboard)
+- ✅ Complete TESTING.md documentation
+- ✅ npm scripts for all test types
+
+**Next Steps for v1.4.0:**
+- Address remaining ESLint warnings (19 `any` types)
+- Security hardening (rate limiting already implemented, add CAPTCHA)
 - Performance optimizations
-- Better error messages
+- Enhanced error messages
 
 ### v1.4.0 (Q2 2026) - Enhanced UX & Gamification
 - Badge system integration (migrate from achievements)
