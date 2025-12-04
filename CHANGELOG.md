@@ -9,18 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned for v1.3.0 - Polish & Stability
+### Planned for v1.4.0 - Enhanced UX & Gamification
 
 #### Planned Features
-- Address TypeScript `any` types flagged by ESLint
-- Implement automated testing (target: 60%+ coverage)
-- Security hardening (rate limiting, input validation)
-- Performance optimizations for large libraries
-- CI/CD pipeline setup with GitHub Actions
-- Enhanced mobile reading experience improvements
-- Accessibility improvements (WCAG 2.1 AA compliance progress)
-- Reader enhancements (bookmarks, annotations)
-- Reading analytics and insights
+- Gamified UX: badge system, XP/levels, and reading streak tracking surfaced in dashboards
+- Reader enhancements: bookmarks/annotations, better resume cues, and dark mode for the reader
+- Accessibility/performance: WCAG 2.1 AA audit, keyboard/focus polish, and reduced layout shift
+- Quality gates: push coverage toward 80% (pdf-extractor/minio/file helpers), add server-action integration tests, authenticated E2E, and visual regression baselines
+- CI/CD: automated Vitest + Playwright runs with coverage gating and dashboards
+
+---
+
+## [1.3.0] - 2025-12-04
+
+### Added
+- Comprehensive testing infrastructure with Vitest 4, Playwright 1.57, @vitest/coverage-v8, happy-dom, and Testing Library for component tests
+- 92 unit/integration tests (72.41% coverage) across rate limiting, auth role checks, PDF extraction, file type detection/helpers, and MinIO utilities
+- 11 Playwright E2E tests covering Google OAuth entry points, role-based dashboard redirects, and homepage responsiveness
+- Testing documentation: `web/TESTING.md` (full guide) and `web/TEST-RESULTS.md` (latest results and coverage)
+
+### Changed
+- Added npm scripts for unit tests, watch/UI modes, coverage, E2E variants (headed/UI/debug/report), and combined `test:all` runner
+- Configured `web/vitest.config.ts` and `web/vitest.setup.ts` for React test setup, coverage reporting, and E2E exclusions
+- Configured `web/playwright.config.ts` with dev-server integration and installed Chromium, Firefox, and WebKit for local/CI runs
 
 ---
 

@@ -745,18 +745,18 @@ CREATE TABLE xp_transactions (
 - ✅ npm scripts for all test types
 
 **Next Steps for v1.4.0:**
-- Address remaining ESLint warnings (19 `any` types)
-- Security hardening (rate limiting already implemented, add CAPTCHA)
-- Performance optimizations
-- Enhanced error messages
+- Gamification: badges/XP/levels plus reading streak tracking surfaced in dashboards
+- Reader UX: bookmarks/annotations, improved resume cues, and dark mode
+- Accessibility/performance: WCAG 2.1 AA keyboard/focus/contrast polish and reduced layout shift
+- Quality gates: push coverage toward 80% (pdf-extractor, minio utils, file helpers) with server-action integration tests, authenticated E2E, and visual regression baselines
+- CI/CD: automated Vitest + Playwright pipelines with coverage gating and reporting
 
 ### v1.4.0 (Q2 2026) - Enhanced UX & Gamification
-- Badge system integration (migrate from achievements)
-- Student dashboard with badges, XP, levels
-- Reading streak tracking
-- Enhanced reader features (bookmarks, annotations)
-- Dark mode for reader
-- Accessibility improvements (WCAG 2.1 AA)
+- Badge/XP/level system with reading streak tracking on student dashboard
+- Reader enhancements: bookmarks, annotations, and better resume cues
+- Dark mode for reader and dashboard polish
+- Accessibility upgrades toward WCAG 2.1 AA (keyboard/focus/contrast)
+- Quality gates and CI: coverage toward 80%, server-action integration tests, authenticated E2E, visual regression baselines, and automated Vitest/Playwright pipelines
 
 ### v1.5.0 (Q3 2026) - AI Flexibility & Features
 - BYOAI support (OpenAI, Anthropic, Ollama)
