@@ -2,8 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getMinioBucketName, getMinioClient } from "@/lib/minio";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -50,23 +48,8 @@ export const checkCurrentUserRole = async () => {
 };
 
 const ensureLibrarianOrAdmin = async () => {
-  // Use cookies() directly to avoid the cookie modification error
-  const cookieStore = await cookies();
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll() {
-          // No-op for read-only operations
-        },
-      },
-    },
-  );
-
+  // Get user from server client (this won't modify cookies in server actions)
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -75,7 +58,7 @@ const ensureLibrarianOrAdmin = async () => {
     throw new Error("You must be signed in to manage books.");
   }
 
-  // Use admin client to check role
+  // Use admin client to check role to avoid RLS issues
   const adminClient = getSupabaseAdminClient();
   const { data: profiles, error: profileError } = await adminClient
     .from("profiles")
