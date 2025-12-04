@@ -50,12 +50,20 @@ export default async function StudentQuizPage({
   }
 
   // Find which classroom this quiz belongs to (for redirect after completion)
-  const { data: quizAssignment } = await supabase
-    .from("class_quiz_assignments")
-    .select("class_id")
-    .eq("quiz_id", quizId)
-    .eq("is_active", true)
-    .maybeSingle();
+  // Note: class_quiz_assignments table may not exist, handle gracefully
+  let quizAssignment: { class_id: number } | null = null;
+  try {
+    const { data } = await supabase
+      .from("class_quiz_assignments")
+      .select("class_id")
+      .eq("quiz_id", quizId)
+      .eq("is_active", true)
+      .maybeSingle();
+    quizAssignment = data;
+  } catch (error) {
+    // Table doesn't exist or query failed, continue without class assignment
+    console.warn("Could not fetch quiz assignment:", error);
+  }
 
   // Extract book data from array if it exists
   const bookData =
