@@ -1145,20 +1145,39 @@ export const extractBookText = async (bookId: number) => {
   // Get book URL and format
   const { data: book, error: bookError } = await supabase
     .from("books")
-    .select("id, title, pdf_url, file_format, original_file_url")
+    .select(
+      "id, title, pdf_url, file_format, original_file_url, text_extraction_attempts",
+    )
     .eq("id", bookId)
     .single();
 
   if (bookError || !book) {
-    return { success: false, message: "Book not found" };
+    return {
+      success: false,
+      message: "Book not found",
+      errorType: "not_found",
+    };
   }
 
   const fileUrl = book.original_file_url || book.pdf_url;
   if (!fileUrl) {
-    return { success: false, message: "Book has no file URL" };
+    return {
+      success: false,
+      message: "Book has no file URL",
+      errorType: "missing_file",
+    };
   }
 
   const fileFormat = book.file_format || "pdf";
+
+  // Update attempt tracking before processing
+  await supabase
+    .from("books")
+    .update({
+      text_extraction_attempts: (book.text_extraction_attempts || 0) + 1,
+      last_extraction_attempt_at: new Date().toISOString(),
+    })
+    .eq("id", bookId);
 
   try {
     let textContent;
@@ -1170,9 +1189,18 @@ export const extractBookText = async (bookId: number) => {
       const convertedPdfUrl = book.pdf_url;
 
       if (!convertedPdfUrl) {
+        const errorMsg = `${fileFormat.toUpperCase()} file has not been converted to PDF yet. Please render the book first.`;
+
+        // Store error in database
+        await supabase
+          .from("books")
+          .update({ text_extraction_error: errorMsg })
+          .eq("id", bookId);
+
         return {
           success: false,
-          message: `${fileFormat.toUpperCase()} file has not been converted to PDF yet. Please render the book first.`,
+          message: errorMsg,
+          errorType: "conversion_required",
         };
       }
 
@@ -1183,7 +1211,25 @@ export const extractBookText = async (bookId: number) => {
     const { extractTextFromPDF } = await import("@/lib/pdf-extractor");
     textContent = await extractTextFromPDF(pdfUrlToExtract);
 
-    // Save to database
+    // Check if meaningful text was extracted
+    if (textContent.totalWords < 10) {
+      const errorMsg =
+        "PDF appears to be image-based with no extractable text. OCR support coming soon.";
+
+      await supabase
+        .from("books")
+        .update({ text_extraction_error: errorMsg })
+        .eq("id", bookId);
+
+      return {
+        success: false,
+        message: errorMsg,
+        errorType: "insufficient_text",
+        totalWords: textContent.totalWords,
+      };
+    }
+
+    // Save to database - clear any previous errors
     const { error: updateError } = await supabase
       .from("books")
       .update({
@@ -1195,11 +1241,22 @@ export const extractBookText = async (bookId: number) => {
         },
         text_extracted_at: new Date().toISOString(),
         text_extraction_method: textContent.extractionMethod,
+        text_extraction_error: null, // Clear previous errors on success
       })
       .eq("id", bookId);
 
     if (updateError) {
-      return { success: false, message: updateError.message };
+      // Store database error
+      await supabase
+        .from("books")
+        .update({ text_extraction_error: updateError.message })
+        .eq("id", bookId);
+
+      return {
+        success: false,
+        message: updateError.message,
+        errorType: "database_error",
+      };
     }
 
     return {
@@ -1207,10 +1264,24 @@ export const extractBookText = async (bookId: number) => {
       message: `Text extracted: ${textContent.totalPages} pages, ${textContent.totalWords} words`,
       totalPages: textContent.totalPages,
       totalWords: textContent.totalWords,
+      extractionMethod: textContent.extractionMethod,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    return { success: false, message: `Text extraction failed: ${message}` };
+    const errorMsg = `Text extraction failed: ${message}`;
+
+    // Store error in database
+    await supabase
+      .from("books")
+      .update({ text_extraction_error: errorMsg })
+      .eq("id", bookId);
+
+    return {
+      success: false,
+      message: errorMsg,
+      errorType: "extraction_error",
+      details: message,
+    };
   }
 };
 

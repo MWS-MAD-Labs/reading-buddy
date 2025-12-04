@@ -6,6 +6,7 @@ import clsx from "clsx";
 import {
   deleteBook,
   renderBookImages,
+  extractBookText,
 } from "@/app/(dashboard)/dashboard/librarian/actions";
 import {
   ACCESS_LEVEL_OPTIONS,
@@ -31,6 +32,9 @@ export type ManagedBookRecord = {
   pageImagesCount?: number | null;
   pageImagesRenderedAt?: string | null;
   textExtractedAt?: string | null;
+  textExtractionError?: string | null;
+  textExtractionAttempts?: number;
+  lastExtractionAttemptAt?: string | null;
 };
 
 const ACCESS_BADGES: Record<
@@ -62,6 +66,36 @@ const ACCESS_BADGES: Record<
     color:
       "bg-gradient-to-r from-amber-400 to-orange-400 text-white border-amber-300",
   },
+};
+
+const getContentStatusBadge = (book: ManagedBookRecord) => {
+  if (book.textExtractedAt) {
+    return (
+      <span
+        className="rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700"
+        title="Text extracted successfully"
+      >
+        ✓ Extracted
+      </span>
+    );
+  }
+
+  if (book.textExtractionError) {
+    return (
+      <span
+        className="cursor-help rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700"
+        title={book.textExtractionError}
+      >
+        ✗ Failed
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-bold text-yellow-700">
+      ⚠ Pending
+    </span>
+  );
 };
 
 type BookManagerProps = {
@@ -100,6 +134,7 @@ export const BookManager = ({
   );
   const [isDeleting, startDeleteTransition] = useTransition();
   const [renderingBookId, setRenderingBookId] = useState<number | null>(null);
+  const [extractingBookId, setExtractingBookId] = useState<number | null>(null);
 
   const sortedBooks = useMemo(
     () =>
@@ -242,6 +277,30 @@ export const BookManager = ({
       setFeedback({ type: "error", message });
     } finally {
       setRenderingBookId(null);
+    }
+  };
+
+  const handleExtractText = async (book: ManagedBookRecord) => {
+    setExtractingBookId(book.id);
+    setFeedback(null);
+
+    try {
+      const result = await extractBookText(book.id);
+      if (result.success) {
+        setFeedback({
+          type: "success",
+          message: `${result.totalWords} words extracted from "${book.title}"`,
+        });
+        router.refresh();
+      } else {
+        setFeedback({ type: "error", message: result.message });
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to extract text.";
+      setFeedback({ type: "error", message });
+    } finally {
+      setExtractingBookId(null);
     }
   };
 
@@ -439,20 +498,32 @@ export const BookManager = ({
                     <span className="text-purple-900">{book.isbn}</span>
                   </div>
                   <div className="flex gap-2">
-                    <span className="font-black text-blue-600">🏢 Publisher:</span>
+                    <span className="font-black text-blue-600">
+                      🏢 Publisher:
+                    </span>
                     <span className="text-purple-900">{book.publisher}</span>
                   </div>
                   <div className="flex gap-2">
                     <span className="font-black text-blue-600">📅 Year:</span>
-                    <span className="text-purple-900">{book.publicationYear}</span>
+                    <span className="text-purple-900">
+                      {book.publicationYear}
+                    </span>
                   </div>
                   <div className="flex gap-2">
                     <span className="font-black text-blue-600">🎭 Genre:</span>
                     <span className="text-purple-900">{book.genre}</span>
                   </div>
                   <div className="flex gap-2">
-                    <span className="font-black text-blue-600">🌍 Language:</span>
+                    <span className="font-black text-blue-600">
+                      🌍 Language:
+                    </span>
                     <span className="text-purple-900">{book.language}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-black text-blue-600">
+                      📄 Content:
+                    </span>
+                    {getContentStatusBadge(book)}
                   </div>
                 </div>
 
@@ -496,7 +567,21 @@ export const BookManager = ({
                       disabled={renderingBookId === book.id}
                       className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-emerald-300 bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-600 transition hover:bg-emerald-200 active:scale-95 disabled:opacity-40"
                     >
-                      {renderingBookId === book.id ? "⏳ Rendering" : "🎨 Render"}
+                      {renderingBookId === book.id
+                        ? "⏳ Rendering"
+                        : "🎨 Render"}
+                    </button>
+                  )}
+                  {!book.textExtractedAt && (
+                    <button
+                      type="button"
+                      onClick={() => handleExtractText(book)}
+                      disabled={extractingBookId === book.id}
+                      className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-amber-300 bg-amber-100 px-4 py-2 text-sm font-black text-amber-700 transition hover:bg-amber-200 active:scale-95 disabled:opacity-40"
+                    >
+                      {extractingBookId === book.id
+                        ? "⏳ Extracting"
+                        : "📝 Extract Text"}
                     </button>
                   )}
                   <button
@@ -546,6 +631,9 @@ export const BookManager = ({
                     🌍 Language
                   </th>
                   <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                    📄 Content
+                  </th>
+                  <th className="px-4 py-3 text-left text-base font-black text-blue-600">
                     👥 Access
                   </th>
                   <th className="px-4 py-3 text-right text-base font-black text-blue-600">
@@ -573,6 +661,7 @@ export const BookManager = ({
                     <td className="px-4 py-3">{book.publicationYear}</td>
                     <td className="px-4 py-3">{book.genre}</td>
                     <td className="px-4 py-3">{book.language}</td>
+                    <td className="px-4 py-3">{getContentStatusBadge(book)}</td>
                     <td className="px-4 py-3 text-xs">
                       {book.accessLevels.length ? (
                         <div className="flex flex-wrap gap-2">
@@ -617,6 +706,18 @@ export const BookManager = ({
                             title="Render book images"
                           >
                             {renderingBookId === book.id ? "⏳" : "🎨"}
+                          </button>
+                        )}
+                        {!book.textExtractedAt && (
+                          <button
+                            type="button"
+                            onClick={() => handleExtractText(book)}
+                            disabled={extractingBookId === book.id}
+                            className="min-h-[44px] min-w-[44px] rounded-full border border-amber-200 bg-white/80 p-2 text-amber-600 shadow-sm transition hover:bg-amber-50 disabled:opacity-40"
+                            aria-label="Extract text from book"
+                            title="Extract text from book"
+                          >
+                            {extractingBookId === book.id ? "⏳" : "📝"}
                           </button>
                         )}
                         <button

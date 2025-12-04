@@ -493,11 +493,23 @@ export const BookUploadForm = ({
           );
         } else {
           console.warn("Text extraction failed:", extractResult.message);
-          setRenderingProgress("Text extraction failed, but book is uploaded.");
+          setRenderingProgress(
+            `⚠️ Text extraction failed: ${extractResult.message}`,
+          );
+          setError(
+            `Book uploaded but text extraction failed: ${extractResult.message}. You can retry manually from the book list.`,
+          );
         }
       } catch (extractErr) {
         console.warn("Text extraction error:", extractErr);
-        // Don't fail the whole upload if text extraction fails
+        const errorMessage =
+          extractErr instanceof Error
+            ? extractErr.message
+            : "Unknown error occurred";
+        setRenderingProgress(`⚠️ Text extraction failed: ${errorMessage}`);
+        setError(
+          `Book uploaded but text extraction failed: ${errorMessage}. You can retry manually from the book list.`,
+        );
       }
 
       setSuccess(
