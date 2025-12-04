@@ -12,18 +12,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned for v1.3.0 - Polish & Stability
 
 #### Planned Features
-- Bug fixes based on user feedback
 - Address TypeScript `any` types flagged by ESLint
 - Implement automated testing (target: 60%+ coverage)
 - Security hardening (rate limiting, input validation)
 - Performance optimizations for large libraries
-- Enhanced error handling and user-friendly error messages
-- Code quality improvements and refactoring
 - CI/CD pipeline setup with GitHub Actions
 - Enhanced mobile reading experience improvements
 - Accessibility improvements (WCAG 2.1 AA compliance progress)
 - Reader enhancements (bookmarks, annotations)
 - Reading analytics and insights
+
+---
+
+## [1.2.1] - 2025-12-04
+
+### Fixed
+
+#### Text Extraction System Improvements
+- **Manual text extraction button** - Added "📝 Extract Text" button in book list for failed/pending extractions
+- **Extraction status visibility** - Added status column showing Extracted (✓ green), Failed (✗ red), or Pending (⚠ yellow) badges
+- **Error tracking and reporting** - Enhanced server action with comprehensive error handling and categorized error types
+- **Database error tracking** - Added `text_extraction_error`, `text_extraction_attempts`, and `last_extraction_attempt_at` columns
+- **Error tooltips** - Failed badge shows specific error message on hover
+- **Enhanced quiz warning** - Replaced simple warning with actionable panel including "Extract Text Now" button
+- **Better upload feedback** - Specific error messages during upload with guidance for manual retry
+- **PDF.js worker configuration** - Fixed worker path for Next.js server-side rendering
+
+#### Quiz Creation & Preview Fixes
+- **RLS recursion error** - Fixed "infinite recursion in policy for relation classes" by using admin client for quiz generation
+- **Cookie modification error** - Fixed authentication flow to prevent cookie modification errors in server actions
+- **Missing table handling** - Gracefully handle missing `class_quiz_assignments` table
+- **Admin/Librarian access** - Use admin client bypass for ADMIN/LIBRARIAN roles to prevent RLS blocking
+- **Separate queries** - Split quiz and book queries to avoid RLS join conflicts
+- **Authentication flow** - Fixed `ensureLibrarianOrAdmin()` to properly return user object
+
+### Added
+- Database migration script: `add_text_extraction_error_tracking.sql`
+- Error type categorization: `not_found`, `missing_file`, `conversion_required`, `insufficient_text`, `database_error`, `extraction_error`
+- Status badge helper function for consistent UI display
+- Manual extraction handler with loading states and success feedback
+
+### Changed
+- Quiz generation now uses `getSupabaseAdminClient()` instead of `createSupabaseServerClient()`
+- Student quiz page checks user role and uses admin client for librarians/admins
+- Extraction button only appears when `textExtractedAt` is null
+- Quiz queries split into separate operations to avoid RLS policy conflicts
+
+### Technical Details
+
+**Files Modified:**
+- `database-setup.sql` - Added error tracking columns and index
+- `web/src/app/(dashboard)/dashboard/librarian/actions.ts` - Enhanced extractBookText() with error handling
+- `web/src/components/dashboard/BookManager.tsx` - Added status column and extract button
+- `web/src/app/(dashboard)/dashboard/librarian/page.tsx` - Updated data fetching for new columns
+- `web/src/components/dashboard/BookQuizManagement.tsx` - Enhanced warning panel
+- `web/src/components/dashboard/BookUploadForm.tsx` - Better error messages
+- `web/src/lib/pdf-extractor.ts` - Fixed PDF.js worker configuration
+- `web/src/app/(dashboard)/dashboard/student/quiz/[quizId]/page.tsx` - RLS bypass for admins
+
+**Error Types Handled:**
+```typescript
+- not_found: Book doesn't exist
+- missing_file: No PDF URL
+- conversion_required: EPUB/MOBI needs rendering first
+- insufficient_text: Image-based PDF (< 10 words extracted)
+- database_error: Failed to save results
+- extraction_error: PDF processing failed
+```
+
+### Migration Required
+
+Run this SQL in Supabase to add error tracking:
+```sql
+ALTER TABLE books 
+ADD COLUMN IF NOT EXISTS text_extraction_error TEXT,
+ADD COLUMN IF NOT EXISTS text_extraction_attempts INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS last_extraction_attempt_at TIMESTAMP WITH TIME ZONE;
+
+CREATE INDEX IF NOT EXISTS idx_books_extraction_failed 
+ON books(text_extraction_error) 
+WHERE text_extraction_error IS NOT NULL;
+```
 
 ---
 
@@ -418,6 +487,7 @@ This is the initial release. No migration required.
 
 | Version | Release Date | Milestone |
 |---------|--------------|-----------|
+| 1.2.1   | 2025-12-04   | 🔧 Text Extraction & Quiz System Fixes |
 | 1.2.0   | 2025-11-25   | 📱 Mobile Responsive UI & Immersive Fullscreen Reading + Progress Fixes |
 | 1.1.0   | 2025-11-24   | 📚 Multi-Format Support - MOBI/AZW/AZW3 |
 | 1.0.0   | 2025-11-20   | 🎉 MVP Complete - Initial Production Release |
@@ -443,4 +513,4 @@ For bug reports and feature requests, please open an issue on GitHub.
 ---
 
 **Maintainer:** Faisal Nur Hidayat  
-**Last Updated:** November 25, 2025
+**Last Updated:** December 4, 2025
