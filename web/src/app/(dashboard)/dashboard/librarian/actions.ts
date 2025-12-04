@@ -87,6 +87,8 @@ const ensureLibrarianOrAdmin = async () => {
       `Insufficient permissions. Your current role is: ${profile?.role || "unknown"}. Only LIBRARIAN or ADMIN users can manage books.`,
     );
   }
+
+  return user;
 };
 
 const sanitizeFilename = (filename: string) =>
