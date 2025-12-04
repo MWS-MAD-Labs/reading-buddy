@@ -441,14 +441,10 @@ export const generateQuizForBookWithContent = async (input: {
   checkpointPage?: number;
   questionCount?: number;
 }) => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Use admin client to bypass RLS policy recursion issues
+  const user = await ensureLibrarianOrAdmin();
 
-  if (!user) {
-    throw new Error("You must be signed in to generate a quiz.");
-  }
+  const supabase = getSupabaseAdminClient();
 
   // Rate limiting: 10 requests per hour per user
   const rateLimitCheck = await checkRateLimit(
