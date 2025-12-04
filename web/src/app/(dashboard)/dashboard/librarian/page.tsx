@@ -16,7 +16,7 @@ export default async function LibrarianPage() {
   const { data: bookRows } = await supabase
     .from("books")
     .select(
-      "id, isbn, title, author, publisher, publication_year, genre, language, description, page_count, pdf_url, cover_url, created_at, page_images_count, page_images_rendered_at, text_extracted_at, book_access(access_level)",
+      "id, isbn, title, author, publisher, publication_year, genre, language, description, page_count, pdf_url, cover_url, created_at, page_images_count, page_images_rendered_at, text_extracted_at, text_extraction_error, text_extraction_attempts, last_extraction_attempt_at, book_access(access_level)",
     )
     .order("created_at", { ascending: false });
 
@@ -47,6 +47,9 @@ export default async function LibrarianPage() {
       pageImagesCount: book.page_images_count ?? null,
       pageImagesRenderedAt: book.page_images_rendered_at ?? null,
       textExtractedAt: book.text_extracted_at ?? null,
+      textExtractionError: book.text_extraction_error ?? null,
+      textExtractionAttempts: book.text_extraction_attempts ?? 0,
+      lastExtractionAttemptAt: book.last_extraction_attempt_at ?? null,
     })) ?? [];
 
   const genreOptions = Array.from(

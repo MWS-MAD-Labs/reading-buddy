@@ -1,6 +1,21 @@
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { getMinioClient, getMinioBucketName } from "@/lib/minio";
 import { getObjectKeyFromPublicUrl } from "@/lib/minioUtils";
+import path from "path";
+
+// Configure PDF.js worker for Next.js server-side environment
+if (typeof window === "undefined") {
+  // Server-side: Use absolute path to worker file in node_modules
+  const workerPath = path.join(
+    process.cwd(),
+    "node_modules",
+    "pdfjs-dist",
+    "legacy",
+    "build",
+    "pdf.worker.min.mjs",
+  );
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
+}
 
 export interface PageText {
   pageNumber: number;
@@ -50,6 +65,9 @@ export async function extractTextFromPDF(
     const loadingTask = pdfjsLib.getDocument({
       data: new Uint8Array(pdfBuffer),
       useSystemFonts: true,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      disableWorker: true,
     });
 
     const pdfDocument = await loadingTask.promise;

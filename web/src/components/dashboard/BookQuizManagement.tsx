@@ -10,6 +10,7 @@ import {
   deleteQuiz,
   getQuizzesForBook,
   generateQuizForBookWithContent,
+  extractBookText,
 } from "@/app/(dashboard)/dashboard/librarian/actions";
 
 type Quiz = {
@@ -60,6 +61,7 @@ export const BookQuizManagement = ({
   );
   const [questionCount, setQuestionCount] = useState(5);
   const [creating, setCreating] = useState(false);
+  const [extracting, setExtracting] = useState(false);
 
   useEffect(() => {
     loadQuizzes();
@@ -150,6 +152,23 @@ export const BookQuizManagement = ({
       setError(err instanceof Error ? err.message : "Failed to create quiz");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleExtractForQuiz = async () => {
+    setExtracting(true);
+    setError(null);
+    try {
+      const result = await extractBookText(bookId);
+      if (result.success) {
+        router.refresh();
+      } else {
+        setError(result.message || "Failed to extract text");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to extract text");
+    } finally {
+      setExtracting(false);
     }
   };
 
@@ -335,9 +354,22 @@ export const BookQuizManagement = ({
           </button>
 
           {!hasExtractedText && (
-            <p className="text-xs font-semibold text-orange-600">
-              ⚠️ Text not extracted - quiz will use description only
-            </p>
+            <div className="space-y-2 rounded-lg border-2 border-orange-300 bg-orange-50 p-3">
+              <p className="text-sm font-bold text-orange-700">
+                ⚠️ Text not extracted
+              </p>
+              <p className="text-xs text-orange-600">
+                Extract text from the book PDF to generate better, more accurate
+                quizzes based on actual content.
+              </p>
+              <button
+                onClick={handleExtractForQuiz}
+                disabled={extracting}
+                className="w-full rounded-lg border-2 border-orange-400 bg-orange-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-orange-600 disabled:opacity-50"
+              >
+                {extracting ? "⏳ Extracting..." : "📝 Extract Text Now"}
+              </button>
+            </div>
           )}
         </div>
       )}
