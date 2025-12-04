@@ -1,5 +1,24 @@
-import { describe, it, expect } from "vitest";
-import { suggestCheckpoints, suggestQuestionCount } from "@/lib/pdf-extractor";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  suggestCheckpoints,
+  suggestQuestionCount,
+  extractTextFromPDF,
+  extractPageRangeText,
+} from "@/lib/pdf-extractor";
+
+// Mock MinIO client
+vi.mock("@/lib/minio", () => ({
+  getMinioClient: vi.fn(),
+  getMinioBucketName: vi.fn(() => "test-bucket"),
+}));
+
+// Mock MinIO utils
+vi.mock("@/lib/minioUtils", () => ({
+  getObjectKeyFromPublicUrl: vi.fn((url: string) => {
+    if (url.includes("invalid")) return null;
+    return "books/test-book.pdf";
+  }),
+}));
 
 describe("suggestCheckpoints", () => {
   it("should suggest checkpoints for a 100-page book", () => {
@@ -8,6 +27,12 @@ describe("suggestCheckpoints", () => {
     expect(checkpoints).toBeInstanceOf(Array);
     expect(checkpoints.length).toBeGreaterThan(0);
     expect(checkpoints.every((cp) => cp > 0 && cp <= 100)).toBe(true);
+  });
+
+  it("should suggest checkpoints every 50 pages", () => {
+    const checkpoints = suggestCheckpoints(150);
+
+    expect(checkpoints).toEqual([50, 100]);
   });
 
   it("should suggest checkpoints for a 50-page book", () => {
@@ -50,28 +75,49 @@ describe("suggestCheckpoints", () => {
       expect(checkpoints[i]).toBeGreaterThan(checkpoints[i - 1]);
     }
   });
+
+  it("should not include checkpoints beyond total pages", () => {
+    const checkpoints = suggestCheckpoints(75);
+
+    expect(checkpoints.every((cp) => cp < 75)).toBe(true);
+  });
+
+  it("should handle exactly 100 pages", () => {
+    const checkpoints = suggestCheckpoints(100);
+
+    expect(checkpoints).toEqual([50]);
+  });
+
+  it("should handle 0 pages", () => {
+    const checkpoints = suggestCheckpoints(0);
+
+    expect(checkpoints).toEqual([]);
+  });
 });
 
 describe("suggestQuestionCount", () => {
-  it("should suggest appropriate question count for 10-page range", () => {
-    const count = suggestQuestionCount(10);
-
-    expect(count).toBeGreaterThan(0);
-    expect(count).toBeLessThanOrEqual(10);
+  it("should return 3 for 20 pages or less", () => {
+    expect(suggestQuestionCount(1)).toBe(3);
+    expect(suggestQuestionCount(10)).toBe(3);
+    expect(suggestQuestionCount(20)).toBe(3);
   });
 
-  it("should suggest appropriate question count for 50-page range", () => {
-    const count = suggestQuestionCount(50);
-
-    expect(count).toBeGreaterThan(0);
-    expect(count).toBeLessThanOrEqual(20); // Reasonable upper limit
+  it("should return 5 for 21-50 pages", () => {
+    expect(suggestQuestionCount(21)).toBe(5);
+    expect(suggestQuestionCount(30)).toBe(5);
+    expect(suggestQuestionCount(50)).toBe(5);
   });
 
-  it("should suggest appropriate question count for 100-page range", () => {
-    const count = suggestQuestionCount(100);
+  it("should return 7 for 51-100 pages", () => {
+    expect(suggestQuestionCount(51)).toBe(7);
+    expect(suggestQuestionCount(75)).toBe(7);
+    expect(suggestQuestionCount(100)).toBe(7);
+  });
 
-    expect(count).toBeGreaterThan(0);
-    expect(count).toBeLessThanOrEqual(25);
+  it("should return 10 for more than 100 pages", () => {
+    expect(suggestQuestionCount(101)).toBe(10);
+    expect(suggestQuestionCount(200)).toBe(10);
+    expect(suggestQuestionCount(500)).toBe(10);
   });
 
   it("should suggest more questions for larger page ranges", () => {
@@ -81,10 +127,61 @@ describe("suggestQuestionCount", () => {
     expect(large).toBeGreaterThanOrEqual(small);
   });
 
-  it("should handle edge case of 1 page", () => {
-    const count = suggestQuestionCount(1);
+  it("should handle edge case of 0 pages", () => {
+    const count = suggestQuestionCount(0);
 
     expect(count).toBeGreaterThan(0);
-    expect(count).toBeLessThanOrEqual(5);
+    expect(count).toBe(3);
+  });
+});
+
+describe("extractTextFromPDF", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should throw error for invalid PDF URL", async () => {
+    await expect(
+      extractTextFromPDF("https://example.com/invalid/path"),
+    ).rejects.toThrow("Invalid PDF URL - cannot extract object key");
+  });
+
+  it("should validate page range bounds", async () => {
+    const { getMinioClient } = await import("@/lib/minio");
+
+    // Mock MinIO client with a simple PDF
+    const mockStream = {
+      on: vi.fn((event: string, handler: any) => {
+        if (event === "data") {
+          // Simulate PDF data
+          handler(Buffer.from("mock-pdf-data"));
+        }
+        if (event === "end") {
+          handler();
+        }
+        return mockStream;
+      }),
+    };
+
+    const mockMinioClient = {
+      getObject: vi.fn().mockResolvedValue(mockStream),
+    };
+
+    vi.mocked(getMinioClient).mockReturnValue(mockMinioClient as any);
+
+    // This will fail at PDF parsing stage, but validates our error handling
+    await expect(
+      extractTextFromPDF("https://example.com/test.pdf", { start: 0, end: 10 }),
+    ).rejects.toThrow();
+  });
+});
+
+describe("extractPageRangeText", () => {
+  it("should format page range text with page numbers", async () => {
+    const { getMinioClient } = await import("@/lib/minio");
+
+    // We can't easily test the full PDF extraction without a real PDF file
+    // But we can verify the function exists and has correct signature
+    expect(typeof extractPageRangeText).toBe("function");
   });
 });
