@@ -274,3 +274,81 @@ export const getPendingCheckpointForPage = async (input: {
     checkpointPage: checkpoint.page_number,
   };
 };
+
+export const markBookAsCompleted = async (input: {
+  bookId: number;
+}): Promise<{
+  success: boolean;
+  newBadges: Badge[];
+  xpAwarded: number;
+  leveledUp: boolean;
+  newLevel?: number;
+}> => {
+  const supabase = await createSupabaseServerClient();
+  const supabaseAdmin = getSupabaseAdminClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("You must be signed in to mark a book as completed.");
+  }
+
+  // Get the book's page count
+  const { data: book, error: bookError } = await supabase
+    .from("books")
+    .select("page_count")
+    .eq("id", input.bookId)
+    .single();
+
+  if (bookError || !book) {
+    throw new Error("Book not found.");
+  }
+
+  // Update student_books to mark as completed
+  const { error: updateError } = await supabase.from("student_books").upsert(
+    {
+      student_id: user.id,
+      book_id: input.bookId,
+      current_page: book.page_count ?? 1,
+      completed: true,
+      completed_at: new Date().toISOString(),
+    },
+    { onConflict: "student_id,book_id" },
+  );
+
+  if (updateError) {
+    console.error("Failed to mark book as completed:", updateError);
+    throw new Error("Failed to mark book as completed.");
+  }
+
+  // Trigger book completion rewards
+  const result = await onBookCompleted(supabaseAdmin, user.id, input.bookId);
+
+  // Get updated profile for level info
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("level, xp")
+    .eq("id", user.id)
+    .single();
+
+  const currentLevel = profile?.level ?? 1;
+  const previousXp = (profile?.xp ?? 0) - result.totalXpAwarded;
+  const previousLevel = Math.min(
+    Math.floor(Math.sqrt(previousXp / 50)) + 1,
+    100,
+  );
+  const leveledUp = currentLevel > previousLevel;
+
+  revalidatePath("/dashboard/student");
+  revalidatePath("/dashboard/student/badges");
+  revalidatePath(`/dashboard/student/read/${input.bookId}`);
+
+  return {
+    success: true,
+    newBadges: result.newBadges,
+    xpAwarded: result.totalXpAwarded,
+    leveledUp,
+    newLevel: leveledUp ? currentLevel : undefined,
+  };
+};

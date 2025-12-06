@@ -77,6 +77,7 @@ export default async function StudentReadPage({
         initialPage={initialPage}
         expectedPages={book.page_count}
         pageImages={pageImages}
+        bookTitle={book.title}
       />
     </div>
   );
