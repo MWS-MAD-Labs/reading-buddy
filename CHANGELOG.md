@@ -12,11 +12,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned for v1.4.0 - Enhanced UX & Gamification
 
 #### Planned Features
-- Gamified UX: badge system, XP/levels, and reading streak tracking surfaced in dashboards
 - Reader enhancements: bookmarks/annotations, better resume cues, and dark mode for the reader
 - Accessibility/performance: WCAG 2.1 AA audit, keyboard/focus polish, and reduced layout shift
 - Quality gates: push coverage toward 80% (pdf-extractor/minio/file helpers), add server-action integration tests, authenticated E2E, and visual regression baselines
 - CI/CD: automated Vitest + Playwright runs with coverage gating and dashboards
+
+---
+
+## [1.4.0] - 2025-12-06
+
+### Added
+
+#### Complete Gamification System
+- **XP & Leveling System** - Students earn XP for reading pages, completing books, and passing quizzes
+  - Level calculation using square root formula (Level = sqrt(XP/50) + 1)
+  - XP rewards: 1 XP per page, 100 XP per book, 50-150 XP per quiz (based on score)
+  - Level titles from "Beginner Reader" to "Reading Legend"
+- **Reading Streak Tracking** - Track consecutive days of reading
+  - Daily streak bonuses (+10 XP)
+  - Milestone bonuses: 7-day (+50 XP), 30-day (+200 XP)
+  - Longest streak record tracking
+- **Enhanced Badge System** - 25+ badges across 6 categories
+  - Categories: Reading, Quiz, Streak, Milestone, Special, General
+  - Tiers: Bronze, Silver, Gold, Platinum, Special
+  - Each badge awards XP upon earning
+  - Progress tracking for unearned badges
+- **XP Transaction Audit Trail** - Complete history of all XP earned
+- **Reading Challenges** - Database support for time-limited reading challenges
+
+#### New UI Components
+- **XP Progress Card** - Visual display of current level, XP, and progress to next level
+- **Streak Card** - Weekly calendar view showing reading streak
+- **Stats Grid** - Quick stats overview (streak, books, pages, quizzes)
+- **Badge Cards** - Tiered badge display with progress bars
+- **Badge Unlock Notifications** - Animated modal when badges are earned
+- **XP/Level/Streak Toasts** - Real-time notifications for XP gains and milestones
+
+#### Dashboard Enhancements
+- Redesigned student dashboard with gamification section
+- New `/dashboard/student/badges` page showing all badges with progress
+- Recent badges section on main dashboard
+- Real-time XP and badge updates during reading and quiz completion
+
+### Changed
+- `evaluateAchievements()` now uses the new badge system instead of legacy achievements
+- `recordReadingProgress()` now awards XP and updates streaks
+- `submitQuizAttempt()` now awards XP and evaluates quiz-related badges
+- Migrated from `student_achievements` table to `student_badges` table
+
+### Technical Details
+
+**New Files:**
+- `migrations/add-gamification-system.sql` - Database migration for gamification
+- `web/src/lib/gamification.ts` - Core gamification engine
+- `web/src/components/dashboard/gamification/` - UI components
+  - `XPProgressCard.tsx` - Level and XP display
+  - `StatsGrid.tsx` - Statistics and streak display
+  - `BadgeCard.tsx` - Badge display with progress
+  - `BadgeUnlockNotification.tsx` - Badge unlock modal
+  - `XPToast.tsx` - XP/level/streak toasts
+- `web/src/app/(dashboard)/dashboard/student/badges/page.tsx` - Badge collection page
+
+**Database Changes:**
+```sql
+-- Profile gamification fields
+ALTER TABLE profiles ADD COLUMN xp INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN level INTEGER DEFAULT 1;
+ALTER TABLE profiles ADD COLUMN reading_streak INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN longest_streak INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN last_read_date DATE;
+ALTER TABLE profiles ADD COLUMN total_books_completed INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN total_pages_read INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN total_quizzes_completed INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN total_perfect_quizzes INTEGER DEFAULT 0;
+
+-- Badge enhancements
+ALTER TABLE badges ADD COLUMN tier VARCHAR(20) DEFAULT 'bronze';
+ALTER TABLE badges ADD COLUMN xp_reward INTEGER DEFAULT 50;
+ALTER TABLE badges ADD COLUMN category VARCHAR(50) DEFAULT 'general';
+
+-- New tables
+CREATE TABLE xp_transactions (...);
+CREATE TABLE reading_challenges (...);
+CREATE TABLE student_challenge_progress (...);
+```
+
+### Migration Required
+
+Run `migrations/add-gamification-system.sql` in Supabase SQL Editor to enable the gamification system.
 
 ---
 

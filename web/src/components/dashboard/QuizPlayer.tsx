@@ -73,7 +73,8 @@ export const QuizPlayer = ({
       await submitQuizAttempt({
         quizId,
         answers: selectedAnswers.map((answer) => Number(answer)),
-        score: computedScore,
+        score: correctAnswers,
+        totalQuestions: quizData.questions.length,
       });
       setScore(computedScore);
       setStatus("completed");

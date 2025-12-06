@@ -3,12 +3,29 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  updateReadingStreak,
+  awardXP,
+  evaluateBadges,
+  onBookCompleted,
+  XP_REWARDS,
+} from "@/lib/gamification";
+import type { Badge } from "@/types/database";
+
+// Track last page read to avoid duplicate XP awards
+const lastPageReadCache = new Map<string, number>();
 
 export const recordReadingProgress = async (input: {
   bookId: number;
   currentPage: number;
-}) => {
+}): Promise<{
+  success: boolean;
+  streakUpdated?: boolean;
+  currentStreak?: number;
+  xpAwarded?: number;
+}> => {
   const supabase = await createSupabaseServerClient();
+  const supabaseAdmin = getSupabaseAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -16,6 +33,9 @@ export const recordReadingProgress = async (input: {
   if (!user) {
     throw new Error("You must be signed in to save progress.");
   }
+
+  const cacheKey = `${user.id}-${input.bookId}`;
+  const lastPage = lastPageReadCache.get(cacheKey) ?? 0;
 
   console.log("📖 Recording progress:", {
     student_id: user.id,
@@ -42,13 +62,82 @@ export const recordReadingProgress = async (input: {
     throw error;
   }
 
+  let xpAwarded = 0;
+  let streakResult = { currentStreak: 0, isNewStreak: false };
+
+  // Award XP for new pages read (avoid duplicates)
+  if (input.currentPage > lastPage) {
+    const newPagesRead = input.currentPage - lastPage;
+
+    // Update streak (once per day)
+    try {
+      streakResult = await updateReadingStreak(supabaseAdmin, user.id);
+    } catch (err) {
+      console.error("Failed to update streak:", err);
+    }
+
+    // Award page XP
+    try {
+      const pageXp = newPagesRead * XP_REWARDS.PAGE_READ;
+      await awardXP(
+        supabaseAdmin,
+        user.id,
+        pageXp,
+        "page_read",
+        `${input.bookId}-${input.currentPage}`,
+        `Read ${newPagesRead} page(s)`,
+      );
+      xpAwarded += pageXp;
+
+      // Update total pages read
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("total_pages_read")
+        .eq("id", user.id)
+        .single();
+
+      await supabaseAdmin
+        .from("profiles")
+        .update({
+          total_pages_read: (profile?.total_pages_read ?? 0) + newPagesRead,
+        })
+        .eq("id", user.id);
+    } catch (err) {
+      console.error("Failed to award page XP:", err);
+    }
+
+    // Evaluate page-based badges
+    try {
+      await evaluateBadges(supabaseAdmin, user.id, { bookId: input.bookId });
+    } catch (err) {
+      console.error("Failed to evaluate badges:", err);
+    }
+
+    lastPageReadCache.set(cacheKey, input.currentPage);
+  }
+
   console.log("✅ Progress saved successfully");
   revalidatePath("/dashboard/student");
   revalidatePath(`/dashboard/student/read/${input.bookId}`);
+
+  return {
+    success: true,
+    streakUpdated: streakResult.isNewStreak,
+    currentStreak: streakResult.currentStreak,
+    xpAwarded,
+  };
 };
 
-export const evaluateAchievements = async () => {
+export const evaluateAchievements = async (
+  bookId?: number,
+): Promise<{
+  awarded: number;
+  newBadges: Badge[];
+  xpAwarded: number;
+  leveledUp: boolean;
+}> => {
   const supabase = await createSupabaseServerClient();
+  const supabaseAdmin = getSupabaseAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -57,66 +146,62 @@ export const evaluateAchievements = async () => {
     throw new Error("You must be signed in to evaluate achievements.");
   }
 
-  const { data: completions } = await supabase
-    .from("student_books")
-    .select("current_page, books(page_count)")
-    .eq("student_id", user.id);
+  // Check if this is a book completion
+  let isBookCompletion = false;
+  if (bookId) {
+    const { data: studentBook } = await supabase
+      .from("student_books")
+      .select("current_page, books(page_count)")
+      .eq("student_id", user.id)
+      .eq("book_id", bookId)
+      .single();
 
-  const finishedCount =
-    completions?.filter((entry) => {
-      // Extract book data from array if it exists
+    if (studentBook) {
       const bookData =
-        Array.isArray(entry.books) && entry.books.length > 0
-          ? entry.books[0]
-          : entry.books;
+        Array.isArray(studentBook.books) && studentBook.books.length > 0
+          ? studentBook.books[0]
+          : studentBook.books;
       const book = bookData as { page_count?: number } | null;
       const pageCount = book?.page_count ?? 0;
-      const current = entry.current_page ?? 0;
-      return pageCount > 0 && current >= pageCount;
-    }).length ?? 0;
-
-  const { data: achievements } = await supabase
-    .from("achievements")
-    .select("*");
-  const { data: earned } = await supabase
-    .from("student_achievements")
-    .select("achievement_id")
-    .eq("student_id", user.id);
-
-  const earnedIds = new Set(
-    (earned ?? []).map((record) => record.achievement_id),
-  );
-
-  const toAward =
-    achievements?.filter((achievement) => {
-      if (earnedIds.has(achievement.id)) {
-        return false;
-      }
-      const criteria =
-        (achievement.criteria as { type?: string; count?: number } | null) ??
-        {};
-      if (
-        criteria.type === "books_read" &&
-        typeof criteria.count === "number"
-      ) {
-        return finishedCount >= criteria.count;
-      }
-      return false;
-    }) ?? [];
-
-  if (!toAward.length) {
-    return { awarded: 0 };
+      const currentPage = studentBook.current_page ?? 0;
+      isBookCompletion = pageCount > 0 && currentPage >= pageCount;
+    }
   }
 
-  await supabase.from("student_achievements").insert(
-    toAward.map((achievement) => ({
-      student_id: user.id,
-      achievement_id: achievement.id,
-    })),
+  let result = { newBadges: [] as Badge[], totalXpAwarded: 0 };
+
+  // If book was completed, use the book completion handler
+  if (isBookCompletion && bookId) {
+    result = await onBookCompleted(supabaseAdmin, user.id, bookId);
+  } else {
+    // Otherwise, just evaluate badges
+    result = await evaluateBadges(supabaseAdmin, user.id, { bookId });
+  }
+
+  // Check if leveled up
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("level, xp")
+    .eq("id", user.id)
+    .single();
+
+  const currentLevel = profile?.level ?? 1;
+  const previousXp = (profile?.xp ?? 0) - result.totalXpAwarded;
+  const previousLevel = Math.min(
+    Math.floor(Math.sqrt(previousXp / 50)) + 1,
+    100,
   );
+  const leveledUp = currentLevel > previousLevel;
 
   revalidatePath("/dashboard/student");
-  return { awarded: toAward.length };
+  revalidatePath("/dashboard/student/badges");
+
+  return {
+    awarded: result.newBadges.length,
+    newBadges: result.newBadges,
+    xpAwarded: result.totalXpAwarded,
+    leveledUp,
+  };
 };
 
 export const getPendingCheckpointForPage = async (input: {
