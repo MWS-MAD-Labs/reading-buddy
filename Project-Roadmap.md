@@ -1,7 +1,7 @@
 # Reading Buddy: Project Roadmap
 
-> **Current Version:** v1.3.0 ✅  
-> **Last Updated:** December 4, 2025  
+> **Current Version:** v1.4.0 ✅  
+> **Last Updated:** December 7, 2025  
 > **Maintainer:** Faisal Nur Hidayat
 
 ---
@@ -105,6 +105,12 @@ A web-based e-library for K-12 students (Reading Buddy) with role-based access f
 - Classroom management UI
 - Admin user and role management
 
+### ✅ Phase 7: Enhanced Gamification (v1.4.0)
+- Complete XP & Leveling system
+- Streak tracking & rewards
+- Enhanced badge system with progress tracking
+- Gamification UI components (Toasts, Cards)
+
 ---
 
 ## 4. MVP Success Criteria - All Met! ✅
@@ -128,12 +134,12 @@ A web-based e-library for K-12 students (Reading Buddy) with role-based access f
 | v1.0.0 | Nov 2025 | MVP Launch | ✅ Complete |
 | v1.1.0 | Nov 2025 | MOBI/AZW Format Support | ✅ Complete |
 | v1.2.0 | Nov 2025 | Mobile Responsive UI & Fullscreen | ✅ Complete |
-| v1.3.0 | Q1 2026 | Polish & Stability | 📋 Planned |
-| v1.4.0 | Q2 2026 | UX & Gamification | 📋 Planned |
-| v1.5.0 | Q3 2026 | AI Flexibility | 📋 Planned |
-| v1.6.0 | Q4 2026 | Content & Competition | 📋 Planned |
-| v1.7.0 | Q1 2027 | Additional Formats (CBZ/DOCX) | 📋 Planned |
-| v2.0.0 | Q3 2027 | Major Architecture Changes | 💡 Proposed |
+| v1.3.0 | Dec 2025 | Polish & Stability | ✅ Complete |
+| v1.4.0 | Dec 2025 | Gamification | ✅ Complete |
+| v1.5.0 | Q1 2026 | UX & AI Flexibility | 📋 Planned |
+| v1.6.0 | Q2 2026 | Content & Competition | 📋 Planned |
+| v1.7.0 | Q3 2026 | Additional Formats (CBZ/DOCX) | 📋 Planned |
+| v2.0.0 | Q4 2026 | Major Architecture Changes | 💡 Proposed |
 
 ---
 
@@ -343,108 +349,26 @@ const aiProvider = AIProviderFactory.create(process.env.AI_PROVIDER)
 ### 6.4 Gamification & Engagement
 
 #### Enhanced Badges & Gamification System
-**Priority:** High | **Target:** v1.2.0
+**Priority:** High | **Status:** ✅ Complete (v1.4.0)
 
 **Current State:**
-- Basic badges table with 6 default badges
-- Not fully integrated into student dashboard
-- Uses legacy `achievements` table
-- No progression tracking or leaderboards
+- Complete XP & Leveling system with square root formula
+- Streak tracking (Daily, Weekly, Monthly)
+- Enhanced badge system with progress tracking
+- Gamification UI (Toasts, Cards, Notifications)
 
-**Expanded Badge Types:**
-
-1. **Reading Badges:** Books Read, Pages Read, Reading Streak, Speed Reader, Night Owl, Early Bird, Weekend Warrior
-2. **Quiz Badges:** Quiz Master, Perfect Score, Quiz Streak, Checkpoint Champion, Quick Thinker
-3. **Subject/Genre Badges:** Science Explorer, History Buff, Fantasy Fan, Biography Reader, Poetry Lover
-4. **Achievement Badges:** First Book, Book Finisher, Diverse Reader, Grade Challenger, Helpful Student
-5. **Special Event Badges:** Summer Reading Challenge, Read-a-thon Participant, Book Fair Champion
-
-**Badge Levels/Tiers:**
-- Bronze, Silver, Gold, Platinum
-- Progressive unlocking
-- Visual distinction in UI
-
-**Points & Leveling System:**
-
-**XP Sources:**
-- Complete a page: +1 XP
-- Complete a chapter: +10 XP
-- Finish a book: +100 XP
-- Pass a quiz: +50 XP (+ bonus for high scores)
-- Perfect quiz score: +100 XP bonus
-- Daily reading streak: +25 XP/day
-- Complete checkpoint: +75 XP
-
-**Titles & Ranks:**
-- Level 1-5: "Beginner Reader"
-- Level 6-10: "Book Explorer"
-- Level 11-20: "Avid Reader"
-- Level 21-30: "Master Reader"
-- Level 31+: "Reading Legend"
-
-**Leaderboard Types:**
-1. Global - All students, sorted by XP
-2. Class - Same classroom competition
-3. Grade Level - Fair peer comparison
-4. Reading Streak - Longest current streak
-5. Quiz Masters - Quiz performance based
-
-**Database Schema Updates:**
-```sql
--- Add XP and level to profiles
-ALTER TABLE profiles
-ADD COLUMN xp INTEGER DEFAULT 0,
-ADD COLUMN level INTEGER DEFAULT 1,
-ADD COLUMN reading_streak INTEGER DEFAULT 0,
-ADD COLUMN last_read_date DATE;
-
--- Add badge tiers
-ALTER TABLE badges
-ADD COLUMN tier VARCHAR(20),
-ADD COLUMN xp_reward INTEGER DEFAULT 0,
-ADD COLUMN display_order INTEGER;
-
--- Reading challenges
-CREATE TABLE reading_challenges (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-  challenge_type VARCHAR(50),
-  start_date TIMESTAMP WITH TIME ZONE,
-  end_date TIMESTAMP WITH TIME ZONE,
-  goal_criteria JSONB,
-  reward_badge_id UUID REFERENCES badges(id),
-  created_by_id UUID REFERENCES profiles(id),
-  is_active BOOLEAN DEFAULT true
-);
-
--- Student challenge progress
-CREATE TABLE student_challenge_progress (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  student_id UUID REFERENCES profiles(id),
-  challenge_id UUID REFERENCES reading_challenges(id),
-  progress JSONB,
-  completed BOOLEAN DEFAULT false,
-  completed_at TIMESTAMP WITH TIME ZONE
-);
-
--- XP audit trail
-CREATE TABLE xp_transactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  student_id UUID REFERENCES profiles(id),
-  amount INTEGER NOT NULL,
-  source VARCHAR(100),
-  reference_id VARCHAR(255),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
+**Features Implemented:**
+- **XP Sources:** Page reads (+1), Books (+100), Quizzes (+50-100), Streaks (+10-200)
+- **Levels:** "Beginner Reader" to "Reading Legend"
+- **Streak Tracking:** Daily streaks with milestone bonuses
+- **Badge System:** Tiered badges with progress bars
 
 ---
 
 ### 6.5 Enhanced Reading Experience
 
 #### Reader Improvements
-**Priority:** Medium | **Target:** v1.2.0+
+**Priority:** Medium | **Target:** v1.5.0
 
 - Audio narration (Text-to-speech or uploaded audio)
 - Annotations & highlights (Student markup)
@@ -459,7 +383,7 @@ CREATE TABLE xp_transactions (
 ### 6.6 Advanced AI Features
 
 #### AI-Powered Learning
-**Priority:** Medium | **Target:** v1.3.0+
+**Priority:** Medium | **Target:** v1.5.0
 
 - Personalized quiz difficulty (Adapt based on past performance)
 - Auto-generated summaries (Per chapter/section)
@@ -475,7 +399,7 @@ CREATE TABLE xp_transactions (
 ### 6.7 Content Management
 
 #### Librarian Tools
-**Priority:** Medium | **Target:** v1.4.0+
+**Priority:** Medium | **Target:** v1.6.0+
 
 - Bulk upload (Multiple books via ZIP)
 - Series management (Link related books, reading order)
@@ -512,7 +436,7 @@ CREATE TABLE xp_transactions (
 ### 6.9 Analytics & Reporting
 
 #### Data & Insights
-**Priority:** Medium | **Target:** v1.5.0+
+**Priority:** Medium | **Target:** v1.6.0+
 
 **Librarian Dashboard:**
 - Popular books, usage stats, genre trends
@@ -567,7 +491,7 @@ CREATE TABLE xp_transactions (
 ### 6.11 Performance & Scalability
 
 #### Infrastructure Optimization
-**Priority:** High | **Target:** v1.1.0+
+**Priority:** High | **Target:** v1.3.0+
 
 **Content Delivery:**
 - CDN integration (Cloudflare, CloudFront)
@@ -607,7 +531,7 @@ CREATE TABLE xp_transactions (
 ### 6.12 Technical Debt & Code Quality
 
 #### Refactoring & Testing
-**Priority:** High | **Target:** v1.1.0+
+**Priority:** High | **Target:** v1.3.0+
 
 **Testing:**
 - Unit tests (Jest) - 80%+ coverage
@@ -640,7 +564,7 @@ CREATE TABLE xp_transactions (
 ### 6.13 Security & Compliance
 
 #### Security Hardening
-**Priority:** High | **Target:** v1.1.0+
+**Priority:** High | **Target:** v1.3.0+
 
 **Application Security:**
 - Security audit & penetration testing
@@ -668,7 +592,7 @@ CREATE TABLE xp_transactions (
 ### 6.14 Accessibility
 
 #### WCAG Compliance
-**Priority:** High | **Target:** v1.2.0+
+**Priority:** High | **Target:** v1.5.0
 
 **Compliance Targets:**
 - WCAG 2.1 AA
@@ -744,29 +668,21 @@ CREATE TABLE xp_transactions (
 - ✅ Complete TESTING.md documentation
 - ✅ npm scripts for all test types
 
-**Next Steps for v1.4.0:**
-- Gamification: badges/XP/levels plus reading streak tracking surfaced in dashboards
-- Reader UX: bookmarks/annotations, improved resume cues, and dark mode
-- Accessibility/performance: WCAG 2.1 AA keyboard/focus/contrast polish and reduced layout shift
-- Quality gates: push coverage toward 80% (pdf-extractor, minio utils, file helpers) with server-action integration tests, authenticated E2E, and visual regression baselines
-- CI/CD: automated Vitest + Playwright pipelines with coverage gating and reporting
+### ✅ v1.4.0 (Completed December 6, 2025) - Gamification
+- ✅ XP & Leveling system (Square root progression)
+- ✅ Reading Streak tracking (Daily, Weekly, Monthly)
+- ✅ Enhanced Badge System (Tiered badges, 25+ types)
+- ✅ Gamification UI (Toast notifications, Progress cards)
+- ✅ Badge collection page with progress bars
+- ✅ Real-time XP updates on reading/quiz completion
 
-### v1.4.0 (Q2 2026) - Enhanced UX & Gamification
-- Badge/XP/level system with reading streak tracking on student dashboard
-- Reader enhancements: bookmarks, annotations, and better resume cues
-- Dark mode for reader and dashboard polish
-- Accessibility upgrades toward WCAG 2.1 AA (keyboard/focus/contrast)
-- Quality gates and CI: coverage toward 80%, server-action integration tests, authenticated E2E, visual regression baselines, and automated Vitest/Playwright pipelines
+### v1.5.0 (Q1 2026) - UX & AI Flexibility
+- **Reader Enhancements:** Bookmarks, Dark mode, Better resume
+- **AI Flexibility:** BYOAI (OpenAI, Anthropic, Ollama)
+- **Accessibility:** WCAG 2.1 AA audit
+- **Quality Gates:** 80% coverage, visual regression tests
 
-### v1.5.0 (Q3 2026) - AI Flexibility & Features
-- BYOAI support (OpenAI, Anthropic, Ollama)
-- Leaderboards (global, class, grade)
-- Personalized quiz difficulty
-- AI-generated summaries
-- Advanced badge types
-- Reading challenges system
-
-### v1.6.0 (Q4 2026) - Content & Competition
+### v1.6.0 (Q2 2026) - Content & Competition
 - Class vs class competitions
 - Bulk book upload
 - Book series management
@@ -774,17 +690,14 @@ CREATE TABLE xp_transactions (
 - Reading lists/collections
 - Analytics dashboard for teachers
 
-### v1.7.0 (Q1 2027) - Additional Format Support
-- ✅ EPUB support (completed in v1.0.0)
-- ✅ MOBI/AZW/AZW3 support (completed in v1.1.0)
-- ✅ Mobile responsive UI (completed in v1.2.0)
+### v1.7.0 (Q3 2026) - Additional Format Support
 - CBZ/CBR comic book format support
 - DOCX Word document support
 - ODT OpenDocument support
 - Enhanced upload workflow for bulk operations
 - Improved text extraction for complex layouts
 
-### v2.0.0 (Q3 2027) - Major Architectural Changes
+### v2.0.0 (Q4 2026) - Major Architectural Changes
 - Image-only storage (remove PDF requirement)
 - Full self-hosted option (replace Supabase)
 - Mobile apps (iOS & Android)
