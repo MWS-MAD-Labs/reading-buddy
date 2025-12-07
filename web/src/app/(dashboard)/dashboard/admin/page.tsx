@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AdminUserTable } from "@/components/dashboard/AdminUserTable";
 import { requireRole } from "@/lib/auth/roleCheck";
@@ -77,6 +78,14 @@ export default async function AdminDashboardPage() {
           <p className="text-base font-semibold text-violet-700">
             Manage users, roles, and access levels for the entire system.
           </p>
+          <div className="mt-4 flex gap-3">
+            <Link
+              href="/dashboard/admin/badges"
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105"
+            >
+              🏅 Manage Badges
+            </Link>
+          </div>
         </header>
 
         <AdminUserTable users={users} />
@@ -111,6 +120,14 @@ export default async function AdminDashboardPage() {
         <p className="text-base font-semibold text-violet-700">
           Manage users, roles, and access levels for the entire system.
         </p>
+        <div className="mt-4 flex gap-3">
+          <Link
+            href="/dashboard/admin/badges"
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105"
+          >
+            🏅 Manage Badges
+          </Link>
+        </div>
       </header>
 
       <AdminUserTable users={users} />

@@ -243,6 +243,7 @@ export type BadgeType =
   | "checkpoint"
   | "quiz_mastery"
   | "book_completion"
+  | "book_completion_specific"
   | "streak"
   | "custom";
 export type BadgeTier = "bronze" | "silver" | "gold" | "platinum" | "special";
@@ -266,6 +267,8 @@ export interface Badge {
   category: BadgeCategory;
   display_order: number;
   is_active: boolean;
+  book_id: number | null;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -278,6 +281,7 @@ export interface BadgeCriteria {
   quizCount?: number;
   before?: string;
   after?: string;
+  book_id?: number;
 }
 
 export interface StudentBadge {

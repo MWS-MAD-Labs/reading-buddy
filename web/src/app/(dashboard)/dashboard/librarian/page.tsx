@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BookManagementSection } from "@/components/dashboard/BookManagementSection";
 import type { ManagedBookRecord } from "@/components/dashboard/BookManager";
@@ -70,6 +71,21 @@ export default async function LibrarianPage() {
 
   return (
     <div className="space-y-8">
+      {/* Quick Actions */}
+      <div className="rounded-[28px] border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(147,118,255,0.18)]">
+        <h2 className="mb-4 text-xl font-bold text-indigo-950">
+          Quick Actions
+        </h2>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/dashboard/admin/badges"
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105"
+          >
+            <span>🏅</span> Manage Book Badges
+          </Link>
+        </div>
+      </div>
+
       <BookManagementSection
         books={managedBooks}
         genreOptions={genreOptions}
