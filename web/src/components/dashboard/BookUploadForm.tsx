@@ -139,31 +139,66 @@ export const BookUploadForm = ({
   };
 
   const handleGenerateDescription = async () => {
+    console.log("🤖 Generate AI Description clicked");
     setGeneratingDescription(true);
     setError(null);
 
     try {
       const form = formRef.current;
-      if (!form) return;
+      if (!form) {
+        console.error("Form ref not found");
+        return;
+      }
 
       const formData = new FormData(form);
       const title = String(formData.get("title") ?? "").trim();
       const author = String(formData.get("author") ?? "").trim();
       const genre = String(formData.get("genre") ?? "").trim();
+      const pdfFile = formData.get("pdfFile") as File | null;
+
+      console.log("📋 Form data:", {
+        title,
+        author,
+        genre,
+        hasPdfFile: !!pdfFile,
+      });
 
       if (!title || !author) {
         setError("Title and author are required to generate description");
         return;
       }
 
-      const result = await generateBookDescription({
-        title,
-        author,
-        genre: genre || undefined,
-        pageCount: pageCount || undefined,
+      if (!pdfFile || pdfFile.size === 0) {
+        setError("Please upload a PDF file first");
+        return;
+      }
+
+      // Call RAG API directly from the client
+      const ragApiUrl =
+        process.env.NEXT_PUBLIC_RAG_API_URL || "http://172.16.0.65:8000";
+      console.log("🌐 RAG API URL:", ragApiUrl);
+
+      const ragFormData = new FormData();
+      ragFormData.append("file", pdfFile);
+
+      console.log("📤 Sending request to RAG API...");
+      const response = await fetch(`${ragApiUrl}/generate-description`, {
+        method: "POST",
+        body: ragFormData,
       });
 
-      if (result.success && result.description) {
+      console.log("📥 Response status:", response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ RAG API error:", errorText);
+        throw new Error(`RAG API error: ${response.statusText} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log("✅ RAG API result:", result);
+
+      if (result.description) {
         // Set the description in the textarea
         const descriptionTextarea = form.querySelector<HTMLTextAreaElement>(
           'textarea[name="description"]',
@@ -173,9 +208,10 @@ export const BookUploadForm = ({
         }
         setSuccess("AI description generated successfully!");
       } else {
-        setError(result.message || "Failed to generate description");
+        setError("Failed to generate description - no description returned");
       }
     } catch (err) {
+      console.error("💥 Generate description error:", err);
       const message =
         err instanceof Error ? err.message : "Failed to generate description";
       setError(message);

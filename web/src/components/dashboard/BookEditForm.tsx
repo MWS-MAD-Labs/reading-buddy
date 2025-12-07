@@ -189,6 +189,8 @@ export const BookEditForm = ({
         author,
         genre,
         pageCount,
+        pdfUrl: book.pdfUrl,
+        bookRecord: book,
       });
 
       if (!title || !author) {
@@ -202,6 +204,7 @@ export const BookEditForm = ({
         author,
         genre: genre || undefined,
         pageCount: pageCount || undefined,
+        pdfUrl: book.pdfUrl, // Pass the existing PDF URL from MinIO
       });
 
       console.log("Generation result:", result);

@@ -1085,47 +1085,101 @@ export const generateBookDescription = async (input: {
   genre?: string;
   pageCount?: number;
   textPreview?: string;
+  pdfUrl?: string;
 }) => {
   "use server";
 
   await ensureLibrarianOrAdmin();
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return { success: false, message: "Gemini API key not configured" };
-  }
+  console.log("🔍 generateBookDescription input:", {
+    title: input.title,
+    author: input.author,
+    hasPdfUrl: !!input.pdfUrl,
+    pdfUrl: input.pdfUrl,
+  });
+
+  const ragApiUrl = process.env.RAG_API_URL || "http://172.16.0.65:8000";
+  console.log("🌐 RAG API URL (server):", ragApiUrl);
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // If pdfUrl is provided, download the PDF and send it to RAG API
+    if (input.pdfUrl) {
+      console.log("📥 Fetching PDF from:", input.pdfUrl);
 
-    const prompt = `Generate a compelling and intriguing book description for the following book:
+      // Fetch the PDF file
+      let pdfResponse;
+      try {
+        pdfResponse = await fetch(input.pdfUrl);
+      } catch (fetchError) {
+        console.error("❌ Failed to fetch PDF:", fetchError);
+        throw new Error(
+          `Failed to fetch PDF from MinIO: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`,
+        );
+      }
 
-Title: ${input.title}
-Author: ${input.author}
-${input.genre ? `Genre: ${input.genre}` : ""}
-${input.pageCount ? `Page Count: ${input.pageCount}` : ""}
-${input.textPreview ? `\nText Preview (first 500 words):\n${input.textPreview}` : ""}
+      if (!pdfResponse.ok) {
+        console.error(
+          "❌ PDF fetch failed with status:",
+          pdfResponse.status,
+          pdfResponse.statusText,
+        );
+        throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
+      }
 
-Please write a SHORT, punchy description that:
-1. Hooks readers with an intriguing opening line
-2. Creates mystery or excitement without revealing too much
-3. Is appropriate for a library catalog
-4. Avoids spoilers but teases the story
-5. Is MAXIMUM 50 words (approximately 250-300 characters)
-6. Uses vivid, engaging language that makes people want to read the book
+      const pdfBlob = await pdfResponse.blob();
+      console.log("📦 PDF fetched, size:", pdfBlob.size, "bytes");
 
-IMPORTANT: Keep it under 50 words. Be concise and impactful.
-Write in an exciting, cinematic style. Think movie trailer tagline, not full summary.
+      // Create form data with the PDF file
+      const formData = new FormData();
+      formData.append("file", pdfBlob, "ebook.pdf");
 
-Return ONLY the description text, without any preamble or additional commentary.`;
+      // Call RAG API
+      const ragUrl = `${ragApiUrl}/generate-description`;
+      console.log("📤 Calling RAG API:", ragUrl);
 
-    const result = await model.generateContent(prompt);
-    const description = result.response.text().trim();
+      let ragResponse;
+      try {
+        ragResponse = await fetch(ragUrl, {
+          method: "POST",
+          body: formData,
+        });
+      } catch (ragFetchError) {
+        console.error("❌ Failed to connect to RAG API:", ragFetchError);
+        throw new Error(
+          `Failed to connect to RAG API at ${ragUrl}: ${ragFetchError instanceof Error ? ragFetchError.message : "Unknown error"}`,
+        );
+      }
 
+      console.log(
+        "📥 RAG API response status:",
+        ragResponse.status,
+        ragResponse.statusText,
+      );
+
+      if (!ragResponse.ok) {
+        const errorText = await ragResponse.text();
+        console.error("❌ RAG API error response:", errorText);
+        throw new Error(
+          `RAG API error: ${ragResponse.statusText} - ${errorText}`,
+        );
+      }
+
+      const result = await ragResponse.json();
+
+      if (result.description) {
+        return {
+          success: true,
+          description: result.description,
+        };
+      } else {
+        throw new Error("RAG API did not return a description");
+      }
+    }
+
+    // Fallback: If no PDF URL, return a basic description
     return {
-      success: true,
-      description,
+      success: false,
+      message: "No PDF file available for description generation",
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
