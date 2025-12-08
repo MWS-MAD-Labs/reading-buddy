@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getMinioBucketName, getMinioClient } from "@/lib/minio";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -355,7 +354,9 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
 
   const { data: book, error: bookError } = await supabase
     .from("books")
-    .select("id, title, description")
+    .select(
+      "id, title, author, genre, description, pdf_url, original_file_url, page_text_content, text_extracted_at",
+    )
     .eq("id", input.bookId)
     .single();
 
@@ -363,62 +364,141 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
     throw new Error("Book not found.");
   }
 
-  if (!book.description) {
-    throw new Error("Add a summary/description before generating a quiz.");
-  }
+  const ragApiUrl = process.env.RAG_API_URL || "http://172.16.0.65:8000";
+  const ragQuizPath = process.env.RAG_QUIZ_PATH || "/generate-quiz";
+  const ragQuizAltPath = process.env.RAG_QUIZ_ALT_PATH || "/generate_quiz";
+  const quizQuestionCount = 5;
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured.");
-  }
+  // Prefer extracted text if available
+  const textContent =
+    book.text_extracted_at && book.page_text_content
+      ? (book.page_text_content as {
+          pages: { pageNumber: number; text: string }[];
+          totalWords: number;
+        })
+      : null;
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    generationConfig: {
-      responseMimeType: "application/json",
-      temperature: 0.4,
-    },
-  });
+  if (textContent && Array.isArray(textContent.pages)) {
+    const jsonBody = JSON.stringify({
+      title: book.title,
+      author: book.author,
+      genre: book.genre,
+      quizType: "classroom",
+      questionCount: quizQuestionCount,
+      pages: textContent.pages,
+      totalWords: textContent.totalWords,
+      description: book.description,
+    });
 
-  const prompt = `
-    You are an assistant who writes engaging multiple-choice quizzes for students aged 10-16.
-    Based on the following book summary, write 5 multiple-choice questions.
-    Each question must contain 4 answer options and a correct answer index.
+    const jsonHeaders = { "Content-Type": "application/json" };
 
-    Return JSON with this shape:
-    {
-      "title": "${book.title} Quiz",
-      "questions": [
-        {
-          "question": "string",
-          "options": ["A", "B", "C", "D"],
-          "answerIndex": 1,
-          "explanation": "Optional explanation"
-        }
-      ]
+    const tryJson = async (path: string) =>
+      fetch(`${ragApiUrl}${path}`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: jsonBody,
+      });
+
+    let ragResponse = await tryJson(ragQuizPath);
+
+    if (!ragResponse.ok && ragResponse.status === 404) {
+      console.warn(
+        `RAG API path ${ragQuizPath} returned 404, retrying ${ragQuizAltPath}`,
+      );
+      ragResponse = await tryJson(ragQuizAltPath);
     }
 
-    Summary:
-    """${book.description}"""
-  `;
+    if (!ragResponse.ok) {
+      const errorText = await ragResponse.text();
+      throw new Error(
+        `RAG API error: ${ragResponse.statusText} - ${errorText}`,
+      );
+    }
 
-  const result = await model.generateContent(prompt);
-  const response = result.response;
-  const text = response.text();
+    const result = await ragResponse.json();
+    if (result?.questions) {
+      const quizPayload = result;
+      const { data: inserted, error: quizError } = await supabase
+        .from("quizzes")
+        .insert({
+          book_id: book.id,
+          created_by_id: user.id,
+          questions: quizPayload,
+        })
+        .select("id")
+        .single();
 
-  if (!text) {
-    throw new Error("Gemini did not return any content.");
+      if (quizError || !inserted) {
+        throw quizError ?? new Error("Failed to save quiz.");
+      }
+
+      revalidatePath("/dashboard/library");
+      return { quizId: inserted.id, quiz: quizPayload };
+    }
   }
 
-  let quizPayload: unknown;
+  // Fallback: send PDF to RAG API
+  const pdfUrl = book.original_file_url || book.pdf_url;
+  if (!pdfUrl) {
+    throw new Error("No extracted text or PDF available for quiz generation.");
+  }
+
+  let pdfResponse;
   try {
-    quizPayload = JSON.parse(text);
-  } catch (err) {
+    pdfResponse = await fetch(pdfUrl);
+  } catch (fetchError) {
+    console.error("❌ Failed to fetch PDF:", fetchError);
     throw new Error(
-      `Gemini returned invalid JSON: ${err instanceof Error ? err.message : "unknown error"}`,
+      `Failed to fetch PDF from storage: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`,
     );
   }
+
+  if (!pdfResponse.ok) {
+    throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
+  }
+
+  const pdfBlob = await pdfResponse.blob();
+  const buildFormData = () => {
+    const formData = new FormData();
+    formData.append("file", pdfBlob, "ebook.pdf");
+    formData.append("title", book.title ?? "Untitled");
+    if (book.author) formData.append("author", book.author);
+    if (book.genre) formData.append("genre", book.genre);
+    formData.append("quizType", "classroom");
+    formData.append("questionCount", String(quizQuestionCount));
+    if (book.description) formData.append("description", book.description);
+    return formData;
+  };
+
+  let ragResponse = await fetch(`${ragApiUrl}${ragQuizPath}`, {
+    method: "POST",
+    body: buildFormData(),
+  });
+
+  if (!ragResponse.ok && ragResponse.status === 404) {
+    console.warn(
+      `RAG API path ${ragQuizPath} returned 404, retrying ${ragQuizAltPath}`,
+    );
+    ragResponse = await fetch(`${ragApiUrl}${ragQuizAltPath}`, {
+      method: "POST",
+      body: buildFormData(),
+    });
+  }
+
+  if (!ragResponse.ok) {
+    const errorText = await ragResponse.text();
+    throw new Error(
+      `RAG API error (PDF path): ${ragResponse.statusText} - ${errorText}`,
+    );
+  }
+
+  const result = await ragResponse.json();
+
+  if (!result?.questions) {
+    throw new Error("RAG API did not return quiz questions.");
+  }
+
+  const quizPayload = result;
 
   const { data: inserted, error: quizError } = await supabase
     .from("quizzes")
@@ -472,7 +552,7 @@ export const generateQuizForBookWithContent = async (input: {
   const { data: book, error: bookError } = await supabase
     .from("books")
     .select(
-      "id, title, author, genre, description, page_count, page_text_content, text_extracted_at",
+      "id, title, author, genre, description, page_count, page_text_content, text_extracted_at, pdf_url, original_file_url",
     )
     .eq("id", input.bookId)
     .single();
@@ -525,84 +605,233 @@ export const generateQuizForBookWithContent = async (input: {
 
   // Determine question count
   const questionCount = input.questionCount ?? 5;
+  const ragApiUrl = process.env.RAG_API_URL || "http://172.16.0.65:8000";
+  const ragQuizPath = process.env.RAG_QUIZ_PATH || "/generate-quiz";
+  const ragQuizAltPath = process.env.RAG_QUIZ_ALT_PATH || "/generate_quiz";
 
-  // Generate quiz with Gemini
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured.");
-  }
+  // Build page payload for RAG
+  let pagesPayload:
+    | { pageNumber: number; text: string; wordCount?: number }[]
+    | null = null;
+  let totalWords = 0;
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    generationConfig: {
-      responseMimeType: "application/json",
-      temperature: 0.4,
-    },
-  });
+  if (hasExtractedText && book.page_text_content) {
+    const textContent = book.page_text_content as {
+      pages: { pageNumber: number; text: string; wordCount?: number }[];
+      totalPages: number;
+      totalWords: number;
+    };
 
-  const quizTypeDescription =
-    input.quizType === "checkpoint"
-      ? `a checkpoint quiz that students must complete while reading`
-      : `a classroom quiz for assessment`;
+    const startPage = input.pageRangeStart ?? 1;
+    const endPage = input.pageRangeEnd ?? textContent.totalPages;
 
-  const pageRangeInfo =
-    input.pageRangeStart && input.pageRangeEnd
-      ? `Content: Pages ${input.pageRangeStart}-${input.pageRangeEnd}`
-      : "Content: Full book";
+    const pagesInRange = textContent.pages.filter(
+      (p) => p.pageNumber >= startPage && p.pageNumber <= endPage,
+    );
 
-  const prompt = `
-You are an educational assistant creating ${quizTypeDescription} for students aged 10-16.
+    pagesPayload = pagesInRange.map((p) => ({
+      pageNumber: p.pageNumber,
+      text: p.text,
+      wordCount: p.wordCount,
+    }));
 
-Book: "${book.title}" by ${book.author}
-${pageRangeInfo}
-Genre: ${book.genre || "General"}
+    totalWords =
+      pagesInRange.reduce(
+        (sum, p) => sum + (p.wordCount || p.text.split(/\s+/).length),
+        0,
+      ) || textContent.totalWords;
 
-Below is the actual content from the book:
-"""
-${bookContent}
-"""
+    contentSource = `pages ${startPage}-${endPage}`;
 
-Generate ${questionCount} multiple-choice questions that:
-1. Test comprehension of key concepts and plot points from the provided content
-2. Are appropriate for the target age group (10-16 years old)
-3. Include varied difficulty levels (mix of easy, medium, and hard)
-4. Focus on important themes, character development, and story elements
-5. Have clear, unambiguous correct answers
-
-Return JSON with this exact structure:
-{
-  "title": "${book.title} Quiz - ${contentSource}",
-  "questions": [
-    {
-      "question": "Question text here",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "answerIndex": 0,
-      "difficulty": "easy|medium|hard",
-      "explanation": "Brief explanation of why this answer is correct"
+    // Fallback to description if no text content in range
+    if (
+      !pagesPayload.length ||
+      pagesPayload.every((p) => !p.text || p.text.trim().length < 1)
+    ) {
+      pagesPayload = null;
+      totalWords = 0;
+      bookContent = book.description || "";
+      contentSource = "description (fallback - insufficient text extracted)";
     }
-  ]
-}
-
-Important: answerIndex should be 0-3 (zero-based index of the correct option).
-`;
-
-  const result = await model.generateContent(prompt);
-  const response = result.response;
-  const text = response.text();
-
-  if (!text) {
-    throw new Error("Gemini did not return any content.");
   }
 
-  let quizPayload: unknown;
-  try {
-    quizPayload = JSON.parse(text);
-  } catch (err) {
+  if (!pagesPayload && bookContent) {
+    // Package description or other fallback content as a single pseudo-page
+    pagesPayload = [
+      {
+        pageNumber: 0,
+        text: bookContent,
+        wordCount: bookContent.split(/\s+/).length,
+      },
+    ];
+    totalWords = bookContent.split(/\s+/).length;
+  }
+
+  // First try RAG with text payload
+  if (pagesPayload && pagesPayload.length) {
+    const jsonBody = JSON.stringify({
+      title: book.title,
+      author: book.author,
+      genre: book.genre,
+      quizType: input.quizType,
+      questionCount,
+      pageRangeStart: input.pageRangeStart,
+      pageRangeEnd: input.pageRangeEnd,
+      checkpointPage: input.checkpointPage,
+      pages: pagesPayload,
+      totalWords,
+      description: book.description,
+      contentSource,
+    });
+
+    const jsonHeaders = { "Content-Type": "application/json" };
+
+    const tryJson = async (path: string) =>
+      fetch(`${ragApiUrl}${path}`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: jsonBody,
+      });
+
+    let ragResponse = await tryJson(ragQuizPath);
+
+    if (!ragResponse.ok && ragResponse.status === 404) {
+      console.warn(
+        `RAG API path ${ragQuizPath} returned 404, retrying ${ragQuizAltPath}`,
+      );
+      ragResponse = await tryJson(ragQuizAltPath);
+    }
+
+    if (ragResponse.ok) {
+      const result = await ragResponse.json();
+      if (result?.questions) {
+        const quizPayload = result;
+        // Save quiz to database
+        const { data: inserted, error: quizError } = await supabase
+          .from("quizzes")
+          .insert({
+            book_id: book.id,
+            created_by_id: user.id,
+            questions: quizPayload,
+            quiz_type: input.quizType,
+            page_range_start: input.pageRangeStart,
+            page_range_end: input.pageRangeEnd,
+            checkpoint_page: input.checkpointPage,
+          })
+          .select("id")
+          .single();
+
+        if (quizError || !inserted) {
+          throw quizError ?? new Error("Failed to save quiz.");
+        }
+
+        // If this is a checkpoint quiz, create the checkpoint record
+        if (input.quizType === "checkpoint" && input.checkpointPage) {
+          const { error: checkpointError } = await supabase
+            .from("quiz_checkpoints")
+            .insert({
+              book_id: book.id,
+              page_number: input.checkpointPage,
+              quiz_id: inserted.id,
+              is_required: true,
+              created_by_id: user.id,
+            });
+
+          if (checkpointError) {
+            console.error(
+              "Failed to create checkpoint record:",
+              checkpointError,
+            );
+            // Don't fail the whole operation, just log the error
+          }
+        }
+
+        revalidatePath("/dashboard/library");
+        revalidatePath("/dashboard/librarian");
+
+        return {
+          quizId: inserted.id,
+          quiz: quizPayload,
+          contentSource,
+          questionCount,
+        };
+      }
+    } else {
+      const errorText = await ragResponse.text();
+      console.warn("RAG API error (text path):", errorText);
+    }
+  }
+
+  // Fallback to PDF upload if available
+  const pdfUrl = book.original_file_url || book.pdf_url;
+  if (!pdfUrl) {
     throw new Error(
-      `Gemini returned invalid JSON: ${err instanceof Error ? err.message : "unknown error"}`,
+      "No extracted text or PDF available. Please render/extract the book first.",
     );
   }
+
+  let pdfResponse;
+  try {
+    pdfResponse = await fetch(pdfUrl);
+  } catch (fetchError) {
+    console.error("❌ Failed to fetch PDF:", fetchError);
+    throw new Error(
+      `Failed to fetch PDF from storage: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`,
+    );
+  }
+
+  if (!pdfResponse.ok) {
+    throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
+  }
+
+  const pdfBlob = await pdfResponse.blob();
+  const buildFormData = () => {
+    const formData = new FormData();
+    formData.append("file", pdfBlob, "ebook.pdf");
+    formData.append("title", book.title ?? "Untitled");
+    if (book.author) formData.append("author", book.author);
+    if (book.genre) formData.append("genre", book.genre);
+    formData.append("quizType", input.quizType);
+    formData.append("questionCount", String(questionCount));
+    if (input.pageRangeStart)
+      formData.append("pageRangeStart", String(input.pageRangeStart));
+    if (input.pageRangeEnd)
+      formData.append("pageRangeEnd", String(input.pageRangeEnd));
+    if (input.checkpointPage)
+      formData.append("checkpointPage", String(input.checkpointPage));
+    if (book.description) formData.append("description", book.description);
+    return formData;
+  };
+
+  let ragResponse = await fetch(`${ragApiUrl}${ragQuizPath}`, {
+    method: "POST",
+    body: buildFormData(),
+  });
+
+  if (!ragResponse.ok && ragResponse.status === 404) {
+    console.warn(
+      `RAG API path ${ragQuizPath} returned 404, retrying ${ragQuizAltPath}`,
+    );
+    ragResponse = await fetch(`${ragApiUrl}${ragQuizAltPath}`, {
+      method: "POST",
+      body: buildFormData(),
+    });
+  }
+
+  if (!ragResponse.ok) {
+    const errorText = await ragResponse.text();
+    throw new Error(
+      `RAG API error (PDF path): ${ragResponse.statusText} - ${errorText}`,
+    );
+  }
+
+  const result = await ragResponse.json();
+
+  if (!result?.questions) {
+    throw new Error("RAG API did not return quiz questions.");
+  }
+
+  const quizPayload = result;
 
   // Save quiz to database
   const { data: inserted, error: quizError } = await supabase
