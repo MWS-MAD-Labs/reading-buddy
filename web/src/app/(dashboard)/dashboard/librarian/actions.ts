@@ -1079,6 +1079,22 @@ export const checkRenderStatus = async (bookId: number) => {
   };
 };
 
+/*
+  Ollama prompt (reference only, currently not used because the RAG API yields better descriptions):
+
+  You are an editorial copywriter. Use the provided book content to craft an enticing teaser in English.
+
+  Rules:
+  - 2-3 sentences, 40-60 words total.
+  - Start immediately with the hook—no preamble, labels, or framing (e.g., "Here is", "This is", "Rewritten description").
+  - Include one vivid detail (character, setting, conflict, or fact) to prove you've read it.
+  - Use active, sensory language and hint at the stakes; make it feel urgent and inviting without spoilers.
+  - Finish with a hook that leaves tension or a question in the reader's mind.
+  - Avoid filler like "this book" or "the author" unless you naturally name them.
+  - Keep it inviting and spoiler-light; avoid repeating the title/author unless it fits naturally.
+  - Output only the finished description text—no markdown or labels.
+*/
+
 export const generateBookDescription = async (input: {
   title: string;
   author: string;
@@ -1086,6 +1102,7 @@ export const generateBookDescription = async (input: {
   pageCount?: number;
   textPreview?: string;
   pdfUrl?: string;
+  bookId?: number;
 }) => {
   "use server";
 
@@ -1095,21 +1112,97 @@ export const generateBookDescription = async (input: {
     title: input.title,
     author: input.author,
     hasPdfUrl: !!input.pdfUrl,
-    pdfUrl: input.pdfUrl,
+    hasBookId: !!input.bookId,
   });
 
   const ragApiUrl = process.env.RAG_API_URL || "http://172.16.0.65:8000";
   console.log("🌐 RAG API URL (server):", ragApiUrl);
 
   try {
-    // If pdfUrl is provided, download the PDF and send it to RAG API
-    if (input.pdfUrl) {
-      console.log("📥 Fetching PDF from:", input.pdfUrl);
+    const supabase = getSupabaseAdminClient();
+    let bookRecord: {
+      title: string | null;
+      pdf_url: string | null;
+      original_file_url: string | null;
+      page_text_content: any;
+      text_extracted_at: string | null;
+    } | null = null;
+
+    if (input.bookId) {
+      console.log("📚 Fetching book record for book ID:", input.bookId);
+      const { data: book, error } = await supabase
+        .from("books")
+        .select(
+          "title, pdf_url, original_file_url, page_text_content, text_extracted_at",
+        )
+        .eq("id", input.bookId)
+        .single();
+
+      if (error) {
+        throw new Error(`Book lookup failed: ${error.message}`);
+      }
+
+      bookRecord = book;
+    }
+
+    // Strategy 1: Use extracted text stored in the database (if available)
+    const textContent =
+      bookRecord?.text_extracted_at && bookRecord.page_text_content
+        ? (bookRecord.page_text_content as {
+            pages: { pageNumber: number; text: string }[];
+            totalWords: number;
+          })
+        : null;
+
+    if (textContent && Array.isArray(textContent.pages)) {
+      const ragUrl = `${ragApiUrl}/generate-description`;
+      console.log("📤 Calling RAG API with extracted text:", ragUrl);
+
+      const ragResponse = await fetch(ragUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: input.title || bookRecord?.title,
+          author: input.author,
+          pages: textContent.pages,
+          totalWords: textContent.totalWords,
+        }),
+      });
+
+      if (!ragResponse.ok) {
+        const errorText = await ragResponse.text();
+        console.error("❌ RAG API error (text path):", errorText);
+        throw new Error(
+          `RAG API error: ${ragResponse.statusText} - ${errorText}`,
+        );
+      }
+
+      const result = await ragResponse.json();
+      if (result.description) {
+        return {
+          success: true,
+          description: result.description,
+        };
+      }
+
+      console.warn(
+        "⚠️ RAG API did not return a description from text path, falling back to PDF path",
+      );
+    }
+
+    // Strategy 2: Download PDF and send to RAG API (fallback)
+    let pdfUrl = input.pdfUrl;
+    if (!pdfUrl && bookRecord) {
+      pdfUrl = bookRecord.original_file_url || bookRecord.pdf_url || null;
+    }
+
+    if (pdfUrl) {
+      console.log("📥 Fetching PDF from:", pdfUrl);
 
       // Fetch the PDF file
       let pdfResponse;
       try {
-        pdfResponse = await fetch(input.pdfUrl);
+        pdfResponse = await fetch(pdfUrl);
       } catch (fetchError) {
         console.error("❌ Failed to fetch PDF:", fetchError);
         throw new Error(
@@ -1179,7 +1272,8 @@ export const generateBookDescription = async (input: {
     // Fallback: If no PDF URL, return a basic description
     return {
       success: false,
-      message: "No PDF file available for description generation",
+      message:
+        "No extracted text or PDF file available for description generation",
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
