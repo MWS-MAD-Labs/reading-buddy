@@ -5,6 +5,8 @@
 .env.production
 .env.development
 
+# Note: .env.example is NOT ignored - it's a template with placeholder values
+
 # Docker
 docker-compose.override.yml
 

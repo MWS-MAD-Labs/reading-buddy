@@ -580,6 +580,194 @@ export async function uploadBadgeIcon(
 }
 
 // ============================================================================
+// Generate Badge Icon with AI
+// ============================================================================
+
+export async function generateBadgeIconWithAI(input: {
+  badgeName: string;
+  description?: string;
+  tier?: string;
+  category?: string;
+}): Promise<{ url: string }> {
+  await requireAdminOrLibrarian();
+
+  const diffuserApiUrl =
+    process.env.DIFFUSER_API_URL || "http://172.16.0.165:8000";
+  const endpoint = "/generate-badge-image";
+
+  // Build a descriptive prompt for the AI
+  const tierDescriptions: Record<string, string> = {
+    bronze: "bronze colored, beginner level",
+    silver: "silver colored, intermediate level",
+    gold: "gold colored, advanced level",
+    platinum: "platinum colored, expert level",
+    special: "special colorful design",
+  };
+
+  const categoryEmojis: Record<string, string> = {
+    reading: "📖 book",
+    quiz: "📝 quiz",
+    streak: "🔥 fire",
+    milestone: "🏆 trophy",
+    special: "⭐ star",
+    general: "🎯 target",
+  };
+
+  const tierDesc = tierDescriptions[input.tier || "bronze"] || "colorful";
+  const categoryIcon =
+    categoryEmojis[input.category || "general"] || "achievement";
+  const description = input.description || input.badgeName;
+
+  // Build detailed positive prompt for Diffuser API
+  const prompt = `professional app icon, single ${tierDesc} achievement badge, circular medal shape, centered composition, ${categoryIcon} book symbol in middle, flat vector illustration style, bright vibrant gradient colors, clean modern design, white background, high quality, detailed, polished, glossy finish, mobile game UI badge, Duolingo style achievement`;
+
+  // Build negative prompt to avoid unwanted elements
+  const negativePrompt = `multiple objects, multiple badges, grid layout, collage, text, letters, words, numbers, watermark, signature, realistic photo, photograph, blurry, low quality, bad quality, dark background, colored background, gradient background, character, person, human, animal face, cartoon character, mascot, ornate, medieval, complex patterns, runes, symbols, shadow, 3d render, depth, perspective, frame, border, multiple icons, duplicate, copy`;
+  console.log("🎨 Generating badge icon with AI:", {
+    badgeName: input.badgeName,
+    prompt: prompt,
+    negativePrompt: negativePrompt,
+    settings: { width: 512, height: 512, steps: 40, guidance: 11 },
+    apiUrl: diffuserApiUrl,
+  });
+
+  try {
+    // Call Diffuser API
+    const response = await fetch(`${diffuserApiUrl}${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt: prompt,
+        negative_prompt: negativePrompt,
+        width: 512,
+        height: 512,
+        num_inference_steps: 40,
+        guidance_scale: 11,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ Diffuser API error:", errorText);
+      throw new Error(
+        `Failed to generate image: ${response.statusText} - ${errorText}`,
+      );
+    }
+
+    const result = await response.json();
+    console.log("📦 Diffuser API response keys:", Object.keys(result));
+
+    // Check for base64 encoded image first
+    const base64Image =
+      result.image_base64 ||
+      result.base64 ||
+      result.imageBase64 ||
+      result.image_data ||
+      result.data;
+
+    let imageBuffer: Buffer;
+
+    if (base64Image) {
+      console.log("📥 Processing base64 image from response");
+
+      // Remove data:image/png;base64, prefix if present
+      const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+
+      // Convert base64 to buffer
+      imageBuffer = Buffer.from(base64Data, "base64");
+      console.log("📊 Decoded base64 image size:", imageBuffer.length, "bytes");
+    } else {
+      // Check for URL/path to download
+      const imagePath =
+        result.image_url ||
+        result.url ||
+        result.imageUrl ||
+        result.image ||
+        result.output_url ||
+        result.output ||
+        result.image_path ||
+        result.path;
+
+      if (!imagePath) {
+        console.error("❌ No image data found in response:", result);
+        throw new Error(
+          `Diffuser API did not return an image. Response: ${JSON.stringify(result).substring(0, 200)}`,
+        );
+      }
+
+      console.log("📥 Downloading generated image from:", imagePath);
+
+      // Download the generated image from Diffuser API
+      let imageResponse: Response;
+      try {
+        // If it's a relative path, prepend the API URL
+        const imageUrl = imagePath.startsWith("http")
+          ? imagePath
+          : `${diffuserApiUrl}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
+
+        imageResponse = await fetch(imageUrl);
+
+        if (!imageResponse.ok) {
+          throw new Error(
+            `Failed to download image: ${imageResponse.statusText}`,
+          );
+        }
+      } catch (downloadError) {
+        console.error("❌ Failed to download generated image:", downloadError);
+        throw new Error(
+          `Failed to download generated image: ${downloadError instanceof Error ? downloadError.message : "Unknown error"}`,
+        );
+      }
+
+      // Convert to buffer
+      imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+      console.log("📊 Downloaded image size:", imageBuffer.length, "bytes");
+    }
+
+    // Generate unique filename for MinIO
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substring(2, 8);
+    const fileName = `badge-ai-${timestamp}-${randomId}.png`;
+    const objectKey = `badge-icons/${fileName}`;
+
+    // Upload to MinIO
+    const minioClient = getMinioClient();
+    const bucketName = getMinioBucketName();
+
+    console.log("📤 Uploading to MinIO:", objectKey);
+
+    try {
+      await minioClient.putObject(
+        bucketName,
+        objectKey,
+        imageBuffer,
+        imageBuffer.length,
+        {
+          "Content-Type": "image/png",
+        },
+      );
+    } catch (uploadError) {
+      console.error("❌ Failed to upload to MinIO:", uploadError);
+      throw new Error(
+        `Failed to upload image to storage: ${uploadError instanceof Error ? uploadError.message : "Unknown error"}`,
+      );
+    }
+
+    // Build public URL
+    const publicUrl = buildPublicObjectUrl(objectKey);
+    console.log("✅ Badge icon saved to MinIO:", publicUrl);
+
+    return { url: publicUrl };
+  } catch (error) {
+    console.error("❌ Failed to generate badge icon with AI:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    throw new Error(`AI generation failed: ${message}`);
+  }
+}
+
+// ============================================================================
 // Delete Badge Icon
 // ============================================================================
 

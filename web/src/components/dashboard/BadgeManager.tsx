@@ -15,6 +15,7 @@ import {
   toggleBadgeActive,
   createBookCompletionBadge,
   uploadBadgeIcon,
+  generateBadgeIconWithAI,
   type BadgeWithBook,
   type CreateBadgeInput,
   type UpdateBadgeInput,
@@ -560,10 +561,8 @@ function BadgeFormModal({
   );
 
   // Icon upload state
-  const [iconInputMode, setIconInputMode] = useState<"upload" | "url">(
-    badge?.icon_url ? "url" : "upload",
-  );
   const [isUploadingIcon, setIsUploadingIcon] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Handle icon file upload
@@ -588,6 +587,35 @@ function BadgeFormModal({
       setIsUploadingIcon(false);
       // Reset the input so the same file can be selected again
       e.target.value = "";
+    }
+  };
+
+  // Handle AI icon generation
+  const handleGenerateAI = async () => {
+    if (!formData.name) {
+      setUploadError("Please enter a badge name first.");
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    setUploadError(null);
+
+    try {
+      const result = await generateBadgeIconWithAI({
+        badgeName: formData.name,
+        description: formData.description,
+        tier: formData.tier,
+        category: formData.category,
+      });
+      setFormData((prev) => ({ ...prev, icon_url: result.url }));
+    } catch (error) {
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : "Failed to generate image with AI.",
+      );
+    } finally {
+      setIsGeneratingAI(false);
     }
   };
 
@@ -911,116 +939,105 @@ function BadgeFormModal({
               </div>
             )}
 
-            {/* Upload or URL tabs */}
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIconInputMode("upload")}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                    iconInputMode === "upload"
-                      ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  Upload Image
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIconInputMode("url")}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                    iconInputMode === "url"
-                      ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  Enter URL
-                </button>
-              </div>
-
-              {iconInputMode === "upload" ? (
-                <div>
-                  <label
-                    className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition ${
-                      isUploadingIcon
-                        ? "border-indigo-300 bg-indigo-50"
-                        : "border-gray-300 hover:border-indigo-400 hover:bg-gray-50"
-                    }`}
-                  >
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml"
-                      onChange={handleIconUpload}
-                      disabled={isUploadingIcon}
-                      className="hidden"
+            {/* AI Generation Button */}
+            <button
+              type="button"
+              onClick={handleGenerateAI}
+              disabled={isGeneratingAI || !formData.name}
+              className="w-full rounded-lg border-2 border-purple-300 bg-gradient-to-r from-purple-500 to-indigo-500 px-4 py-3 font-bold text-white transition hover:from-purple-600 hover:to-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isGeneratingAI ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
                     />
-                    {isUploadingIcon ? (
-                      <div className="flex items-center gap-2 text-indigo-600">
-                        <svg
-                          className="h-5 w-5 animate-spin"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                            fill="none"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
-                        <span className="text-sm font-medium">
-                          Uploading...
-                        </span>
-                      </div>
-                    ) : (
-                      <>
-                        <svg
-                          className="mb-2 h-8 w-8 text-gray-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                        <span className="text-sm font-medium text-gray-600">
-                          Click to upload image
-                        </span>
-                        <span className="mt-1 text-xs text-gray-400">
-                          PNG, JPG, GIF, WebP or SVG (max 2MB)
-                        </span>
-                      </>
-                    )}
-                  </label>
-                  {uploadError && (
-                    <p className="mt-2 text-sm text-red-500">{uploadError}</p>
-                  )}
-                </div>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Generating with AI...
+                </span>
               ) : (
-                <input
-                  type="url"
-                  value={formData.icon_url}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      icon_url: e.target.value,
-                    }))
-                  }
-                  placeholder="https://example.com/badge-icon.png"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
-                />
+                <span className="flex items-center justify-center gap-2">
+                  ✨ Generate Icon with AI
+                </span>
               )}
+            </button>
+
+            {/* Upload Image Section */}
+            <div className="space-y-3">
+              <div>
+                <label
+                  className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition ${
+                    isUploadingIcon
+                      ? "border-indigo-300 bg-indigo-50"
+                      : "border-gray-300 hover:border-indigo-400 hover:bg-gray-50"
+                  }`}
+                >
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml"
+                    onChange={handleIconUpload}
+                    disabled={isUploadingIcon}
+                    className="hidden"
+                  />
+                  {isUploadingIcon ? (
+                    <div className="flex items-center gap-2 text-indigo-600">
+                      <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24">
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          fill="none"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      <span className="text-sm font-medium">Uploading...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <svg
+                        className="mb-2 h-8 w-8 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-600">
+                        Click to upload image
+                      </span>
+                      <span className="mt-1 text-xs text-gray-400">
+                        PNG, JPG, GIF, WebP or SVG (max 2MB)
+                      </span>
+                    </>
+                  )}
+                </label>
+                {uploadError && (
+                  <p className="mt-2 text-sm text-red-500">{uploadError}</p>
+                )}
+              </div>
             </div>
           </div>
 
