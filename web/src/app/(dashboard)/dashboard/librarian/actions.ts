@@ -15,6 +15,7 @@ import type {
   QuizQuestionsData,
 } from "@/types/database";
 import { checkRateLimit } from "@/lib/middleware/withRateLimit";
+import { AIService } from "@/lib/ai";
 
 export const checkCurrentUserRole = async () => {
   const supabase = await createSupabaseServerClient();
@@ -364,141 +365,49 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
     throw new Error("Book not found.");
   }
 
-  const ragApiUrl = process.env.RAG_API_URL || "http://172.16.0.65:8000";
-  const ragQuizPath = process.env.RAG_QUIZ_PATH || "/generate-quiz";
-  const ragQuizAltPath = process.env.RAG_QUIZ_ALT_PATH || "/generate_quiz";
   const quizQuestionCount = 5;
 
-  // Prefer extracted text if available
   const textContent =
     book.text_extracted_at && book.page_text_content
       ? (book.page_text_content as {
-          pages: { pageNumber: number; text: string }[];
+          pages: {
+            pageNumber: number;
+            text: string;
+            wordCount?: number;
+          }[];
           totalWords: number;
         })
       : null;
 
-  if (textContent && Array.isArray(textContent.pages)) {
-    const jsonBody = JSON.stringify({
-      title: book.title,
-      author: book.author,
-      genre: book.genre,
-      quizType: "classroom",
-      questionCount: quizQuestionCount,
-      pages: textContent.pages,
-      totalWords: textContent.totalWords,
-      description: book.description,
-    });
+  const pages =
+    textContent?.pages?.map((page) => ({
+      pageNumber: page.pageNumber,
+      text: page.text,
+      wordCount: page.wordCount,
+    })) || [];
 
-    const jsonHeaders = { "Content-Type": "application/json" };
+  const pdfUrl = book.original_file_url || book.pdf_url || undefined;
 
-    const tryJson = async (path: string) =>
-      fetch(`${ragApiUrl}${path}`, {
-        method: "POST",
-        headers: jsonHeaders,
-        body: jsonBody,
-      });
-
-    let ragResponse = await tryJson(ragQuizPath);
-
-    if (!ragResponse.ok && ragResponse.status === 404) {
-      console.warn(
-        `RAG API path ${ragQuizPath} returned 404, retrying ${ragQuizAltPath}`,
-      );
-      ragResponse = await tryJson(ragQuizAltPath);
-    }
-
-    if (!ragResponse.ok) {
-      const errorText = await ragResponse.text();
-      throw new Error(
-        `RAG API error: ${ragResponse.statusText} - ${errorText}`,
-      );
-    }
-
-    const result = await ragResponse.json();
-    if (result?.questions) {
-      const quizPayload = result;
-      const { data: inserted, error: quizError } = await supabase
-        .from("quizzes")
-        .insert({
-          book_id: book.id,
-          created_by_id: user.id,
-          questions: quizPayload,
-        })
-        .select("id")
-        .single();
-
-      if (quizError || !inserted) {
-        throw quizError ?? new Error("Failed to save quiz.");
-      }
-
-      revalidatePath("/dashboard/library");
-      return { quizId: inserted.id, quiz: quizPayload };
-    }
-  }
-
-  // Fallback: send PDF to RAG API
-  const pdfUrl = book.original_file_url || book.pdf_url;
-  if (!pdfUrl) {
-    throw new Error("No extracted text or PDF available for quiz generation.");
-  }
-
-  let pdfResponse;
-  try {
-    pdfResponse = await fetch(pdfUrl);
-  } catch (fetchError) {
-    console.error("❌ Failed to fetch PDF:", fetchError);
+  if (!pages.length && !pdfUrl) {
     throw new Error(
-      `Failed to fetch PDF from storage: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`,
+      "No extracted text or PDF available for quiz generation.",
     );
   }
 
-  if (!pdfResponse.ok) {
-    throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
-  }
-
-  const pdfBlob = await pdfResponse.blob();
-  const buildFormData = () => {
-    const formData = new FormData();
-    formData.append("file", pdfBlob, "ebook.pdf");
-    formData.append("title", book.title ?? "Untitled");
-    if (book.author) formData.append("author", book.author);
-    if (book.genre) formData.append("genre", book.genre);
-    formData.append("quizType", "classroom");
-    formData.append("questionCount", String(quizQuestionCount));
-    if (book.description) formData.append("description", book.description);
-    return formData;
-  };
-
-  let ragResponse = await fetch(`${ragApiUrl}${ragQuizPath}`, {
-    method: "POST",
-    body: buildFormData(),
+  const aiResult = await AIService.generateQuiz({
+    title: book.title ?? "Untitled",
+    author: book.author ?? undefined,
+    genre: book.genre ?? undefined,
+    description: book.description ?? undefined,
+    quizType: "classroom",
+    questionCount: quizQuestionCount,
+    pages: pages.length ? pages : undefined,
+    totalWords: textContent?.totalWords,
+    pdfUrl,
+    contentSource: pages.length ? "extracted_text" : pdfUrl ? "pdf" : undefined,
   });
 
-  if (!ragResponse.ok && ragResponse.status === 404) {
-    console.warn(
-      `RAG API path ${ragQuizPath} returned 404, retrying ${ragQuizAltPath}`,
-    );
-    ragResponse = await fetch(`${ragApiUrl}${ragQuizAltPath}`, {
-      method: "POST",
-      body: buildFormData(),
-    });
-  }
-
-  if (!ragResponse.ok) {
-    const errorText = await ragResponse.text();
-    throw new Error(
-      `RAG API error (PDF path): ${ragResponse.statusText} - ${errorText}`,
-    );
-  }
-
-  const result = await ragResponse.json();
-
-  if (!result?.questions) {
-    throw new Error("RAG API did not return quiz questions.");
-  }
-
-  const quizPayload = result;
+  const quizPayload = aiResult.quiz;
 
   const { data: inserted, error: quizError } = await supabase
     .from("quizzes")
@@ -561,67 +470,23 @@ export const generateQuizForBookWithContent = async (input: {
     throw new Error("Book not found.");
   }
 
-  // Check if text has been extracted
-  const hasExtractedText = book.text_extracted_at && book.page_text_content;
+  const textContent =
+    book.text_extracted_at && book.page_text_content
+      ? (book.page_text_content as {
+          pages: { pageNumber: number; text: string; wordCount?: number }[];
+          totalPages: number;
+          totalWords: number;
+        })
+      : null;
 
-  let bookContent = "";
-  let contentSource = "description";
-
-  if (hasExtractedText && book.page_text_content) {
-    const textContent = book.page_text_content as {
-      pages: { pageNumber: number; text: string; wordCount: number }[];
-      totalPages: number;
-      totalWords: number;
-    };
-
-    // Extract text from specified page range or full book
-    const startPage = input.pageRangeStart ?? 1;
-    const endPage = input.pageRangeEnd ?? textContent.totalPages;
-
-    const pagesInRange = textContent.pages.filter(
-      (p) => p.pageNumber >= startPage && p.pageNumber <= endPage,
-    );
-
-    bookContent = pagesInRange
-      .map((p) => `[Page ${p.pageNumber}]\n${p.text}`)
-      .join("\n\n");
-
-    contentSource = `pages ${startPage}-${endPage}`;
-
-    // Fallback to description if no text content in range
-    if (!bookContent.trim() || bookContent.split(" ").length < 50) {
-      bookContent = book.description || "";
-      contentSource = "description (fallback - insufficient text extracted)";
-    }
-  } else {
-    // Use description if no extracted text
-    bookContent = book.description || "";
-    if (!bookContent) {
-      throw new Error(
-        "No book content available. Please add a description or extract text from the PDF.",
-      );
-    }
-  }
-
-  // Determine question count
   const questionCount = input.questionCount ?? 5;
-  const ragApiUrl = process.env.RAG_API_URL || "http://172.16.0.65:8000";
-  const ragQuizPath = process.env.RAG_QUIZ_PATH || "/generate-quiz";
-  const ragQuizAltPath = process.env.RAG_QUIZ_ALT_PATH || "/generate_quiz";
-
-  // Build page payload for RAG
   let pagesPayload:
     | { pageNumber: number; text: string; wordCount?: number }[]
     | null = null;
   let totalWords = 0;
+  let contentSource = "description";
 
-  if (hasExtractedText && book.page_text_content) {
-    const textContent = book.page_text_content as {
-      pages: { pageNumber: number; text: string; wordCount?: number }[];
-      totalPages: number;
-      totalWords: number;
-    };
-
+  if (textContent) {
     const startPage = input.pageRangeStart ?? 1;
     const endPage = input.pageRangeEnd ?? textContent.totalPages;
 
@@ -629,211 +494,65 @@ export const generateQuizForBookWithContent = async (input: {
       (p) => p.pageNumber >= startPage && p.pageNumber <= endPage,
     );
 
-    pagesPayload = pagesInRange.map((p) => ({
-      pageNumber: p.pageNumber,
-      text: p.text,
-      wordCount: p.wordCount,
-    }));
+    const filteredPages = pagesInRange.filter(
+      (page) => page.text && page.text.trim().length > 0,
+    );
 
-    totalWords =
-      pagesInRange.reduce(
-        (sum, p) => sum + (p.wordCount || p.text.split(/\s+/).length),
-        0,
-      ) || textContent.totalWords;
-
-    contentSource = `pages ${startPage}-${endPage}`;
-
-    // Fallback to description if no text content in range
-    if (
-      !pagesPayload.length ||
-      pagesPayload.every((p) => !p.text || p.text.trim().length < 1)
-    ) {
-      pagesPayload = null;
-      totalWords = 0;
-      bookContent = book.description || "";
-      contentSource = "description (fallback - insufficient text extracted)";
+    if (filteredPages.length) {
+      pagesPayload = filteredPages;
+      totalWords =
+        filteredPages.reduce(
+          (sum, page) =>
+            sum + (page.wordCount ?? page.text.split(/\s+/).length),
+          0,
+        ) || textContent.totalWords;
+      contentSource = `pages ${startPage}-${endPage}`;
     }
   }
 
-  if (!pagesPayload && bookContent) {
-    // Package description or other fallback content as a single pseudo-page
+  if (!pagesPayload) {
+    const fallbackText = book.description || "";
+    if (!fallbackText) {
+      throw new Error(
+        "No book content available. Please add a description or extract text from the PDF.",
+      );
+    }
+
+    const wordCount = fallbackText.split(/\s+/).length;
     pagesPayload = [
       {
         pageNumber: 0,
-        text: bookContent,
-        wordCount: bookContent.split(/\s+/).length,
+        text: fallbackText,
+        wordCount,
       },
     ];
-    totalWords = bookContent.split(/\s+/).length;
+    totalWords = wordCount;
+    contentSource =
+      textContent && textContent.pages.length
+        ? "description (fallback - insufficient text extracted)"
+        : "description";
   }
 
-  // First try RAG with text payload
-  if (pagesPayload && pagesPayload.length) {
-    const jsonBody = JSON.stringify({
-      title: book.title,
-      author: book.author,
-      genre: book.genre,
-      quizType: input.quizType,
-      questionCount,
-      pageRangeStart: input.pageRangeStart,
-      pageRangeEnd: input.pageRangeEnd,
-      checkpointPage: input.checkpointPage,
-      pages: pagesPayload,
-      totalWords,
-      description: book.description,
-      contentSource,
-    });
+  const pdfUrl = book.original_file_url || book.pdf_url || undefined;
 
-    const jsonHeaders = { "Content-Type": "application/json" };
-
-    const tryJson = async (path: string) =>
-      fetch(`${ragApiUrl}${path}`, {
-        method: "POST",
-        headers: jsonHeaders,
-        body: jsonBody,
-      });
-
-    let ragResponse = await tryJson(ragQuizPath);
-
-    if (!ragResponse.ok && ragResponse.status === 404) {
-      console.warn(
-        `RAG API path ${ragQuizPath} returned 404, retrying ${ragQuizAltPath}`,
-      );
-      ragResponse = await tryJson(ragQuizAltPath);
-    }
-
-    if (ragResponse.ok) {
-      const result = await ragResponse.json();
-      if (result?.questions) {
-        const quizPayload = result;
-        // Save quiz to database
-        const { data: inserted, error: quizError } = await supabase
-          .from("quizzes")
-          .insert({
-            book_id: book.id,
-            created_by_id: user.id,
-            questions: quizPayload,
-            quiz_type: input.quizType,
-            page_range_start: input.pageRangeStart,
-            page_range_end: input.pageRangeEnd,
-            checkpoint_page: input.checkpointPage,
-          })
-          .select("id")
-          .single();
-
-        if (quizError || !inserted) {
-          throw quizError ?? new Error("Failed to save quiz.");
-        }
-
-        // If this is a checkpoint quiz, create the checkpoint record
-        if (input.quizType === "checkpoint" && input.checkpointPage) {
-          const { error: checkpointError } = await supabase
-            .from("quiz_checkpoints")
-            .insert({
-              book_id: book.id,
-              page_number: input.checkpointPage,
-              quiz_id: inserted.id,
-              is_required: true,
-              created_by_id: user.id,
-            });
-
-          if (checkpointError) {
-            console.error(
-              "Failed to create checkpoint record:",
-              checkpointError,
-            );
-            // Don't fail the whole operation, just log the error
-          }
-        }
-
-        revalidatePath("/dashboard/library");
-        revalidatePath("/dashboard/librarian");
-
-        return {
-          quizId: inserted.id,
-          quiz: quizPayload,
-          contentSource,
-          questionCount,
-        };
-      }
-    } else {
-      const errorText = await ragResponse.text();
-      console.warn("RAG API error (text path):", errorText);
-    }
-  }
-
-  // Fallback to PDF upload if available
-  const pdfUrl = book.original_file_url || book.pdf_url;
-  if (!pdfUrl) {
-    throw new Error(
-      "No extracted text or PDF available. Please render/extract the book first.",
-    );
-  }
-
-  let pdfResponse;
-  try {
-    pdfResponse = await fetch(pdfUrl);
-  } catch (fetchError) {
-    console.error("❌ Failed to fetch PDF:", fetchError);
-    throw new Error(
-      `Failed to fetch PDF from storage: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`,
-    );
-  }
-
-  if (!pdfResponse.ok) {
-    throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
-  }
-
-  const pdfBlob = await pdfResponse.blob();
-  const buildFormData = () => {
-    const formData = new FormData();
-    formData.append("file", pdfBlob, "ebook.pdf");
-    formData.append("title", book.title ?? "Untitled");
-    if (book.author) formData.append("author", book.author);
-    if (book.genre) formData.append("genre", book.genre);
-    formData.append("quizType", input.quizType);
-    formData.append("questionCount", String(questionCount));
-    if (input.pageRangeStart)
-      formData.append("pageRangeStart", String(input.pageRangeStart));
-    if (input.pageRangeEnd)
-      formData.append("pageRangeEnd", String(input.pageRangeEnd));
-    if (input.checkpointPage)
-      formData.append("checkpointPage", String(input.checkpointPage));
-    if (book.description) formData.append("description", book.description);
-    return formData;
-  };
-
-  let ragResponse = await fetch(`${ragApiUrl}${ragQuizPath}`, {
-    method: "POST",
-    body: buildFormData(),
+  const aiResult = await AIService.generateQuiz({
+    title: book.title ?? "Untitled",
+    author: book.author ?? undefined,
+    genre: book.genre ?? undefined,
+    description: book.description ?? undefined,
+    quizType: input.quizType,
+    questionCount,
+    checkpointPage: input.checkpointPage,
+    pageRangeStart: input.pageRangeStart,
+    pageRangeEnd: input.pageRangeEnd,
+    pages: pagesPayload,
+    totalWords,
+    pdfUrl,
+    contentSource,
   });
 
-  if (!ragResponse.ok && ragResponse.status === 404) {
-    console.warn(
-      `RAG API path ${ragQuizPath} returned 404, retrying ${ragQuizAltPath}`,
-    );
-    ragResponse = await fetch(`${ragApiUrl}${ragQuizAltPath}`, {
-      method: "POST",
-      body: buildFormData(),
-    });
-  }
+  const quizPayload = aiResult.quiz;
 
-  if (!ragResponse.ok) {
-    const errorText = await ragResponse.text();
-    throw new Error(
-      `RAG API error (PDF path): ${ragResponse.statusText} - ${errorText}`,
-    );
-  }
-
-  const result = await ragResponse.json();
-
-  if (!result?.questions) {
-    throw new Error("RAG API did not return quiz questions.");
-  }
-
-  const quizPayload = result;
-
-  // Save quiz to database
   const { data: inserted, error: quizError } = await supabase
     .from("quizzes")
     .insert({
@@ -852,7 +571,6 @@ export const generateQuizForBookWithContent = async (input: {
     throw quizError ?? new Error("Failed to save quiz.");
   }
 
-  // If this is a checkpoint quiz, create the checkpoint record
   if (input.quizType === "checkpoint" && input.checkpointPage) {
     const { error: checkpointError } = await supabase
       .from("quiz_checkpoints")
@@ -877,7 +595,7 @@ export const generateQuizForBookWithContent = async (input: {
     quizId: inserted.id,
     quiz: quizPayload,
     contentSource,
-    questionCount,
+    questionCount: quizPayload.questions.length || questionCount,
   };
 };
 
@@ -1337,28 +1055,19 @@ export const generateBookDescription = async (input: {
 
   await ensureLibrarianOrAdmin();
 
-  console.log("🔍 generateBookDescription input:", {
-    title: input.title,
-    author: input.author,
-    hasPdfUrl: !!input.pdfUrl,
-    hasBookId: !!input.bookId,
-  });
-
-  const ragApiUrl = process.env.RAG_API_URL || "http://172.16.0.65:8000";
-  console.log("🌐 RAG API URL (server):", ragApiUrl);
-
   try {
     const supabase = getSupabaseAdminClient();
-    let bookRecord: {
-      title: string | null;
-      pdf_url: string | null;
-      original_file_url: string | null;
-      page_text_content: any;
-      text_extracted_at: string | null;
-    } | null = null;
+    let bookRecord:
+      | {
+          title: string | null;
+          pdf_url: string | null;
+          original_file_url: string | null;
+          page_text_content: any;
+          text_extracted_at: string | null;
+        }
+      | null = null;
 
     if (input.bookId) {
-      console.log("📚 Fetching book record for book ID:", input.bookId);
       const { data: book, error } = await supabase
         .from("books")
         .select(
@@ -1374,7 +1083,6 @@ export const generateBookDescription = async (input: {
       bookRecord = book;
     }
 
-    // Strategy 1: Use extracted text stored in the database (if available)
     const textContent =
       bookRecord?.text_extracted_at && bookRecord.page_text_content
         ? (bookRecord.page_text_content as {
@@ -1383,126 +1091,53 @@ export const generateBookDescription = async (input: {
           })
         : null;
 
-    if (textContent && Array.isArray(textContent.pages)) {
-      const ragUrl = `${ragApiUrl}/generate-description`;
-      console.log("📤 Calling RAG API with extracted text:", ragUrl);
+    const pagesFromText = textContent?.pages?.map((page) => ({
+      pageNumber: page.pageNumber,
+      text: page.text,
+      wordCount: (page as { wordCount?: number }).wordCount
+        ?? page.text.split(/\s+/).length,
+    }));
 
-      const ragResponse = await fetch(ragUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: input.title || bookRecord?.title,
-          author: input.author,
-          pages: textContent.pages,
-          totalWords: textContent.totalWords,
-        }),
-      });
+    const previewPage =
+      !pagesFromText?.length && input.textPreview
+        ? [
+            {
+              pageNumber: 0,
+              text: input.textPreview,
+              wordCount: input.textPreview.split(/\s+/).length,
+            },
+          ]
+        : null;
 
-      if (!ragResponse.ok) {
-        const errorText = await ragResponse.text();
-        console.error("❌ RAG API error (text path):", errorText);
-        throw new Error(
-          `RAG API error: ${ragResponse.statusText} - ${errorText}`,
-        );
-      }
+    const pdfUrl =
+      input.pdfUrl ||
+      bookRecord?.original_file_url ||
+      bookRecord?.pdf_url ||
+      undefined;
 
-      const result = await ragResponse.json();
-      if (result.description) {
-        return {
-          success: true,
-          description: result.description,
-        };
-      }
-
-      console.warn(
-        "⚠️ RAG API did not return a description from text path, falling back to PDF path",
-      );
+    if (!pagesFromText?.length && !previewPage?.length && !pdfUrl) {
+      return {
+        success: false,
+        message:
+          "No extracted text or PDF file available for description generation",
+      };
     }
 
-    // Strategy 2: Download PDF and send to RAG API (fallback)
-    let pdfUrl = input.pdfUrl;
-    if (!pdfUrl && bookRecord) {
-      pdfUrl = bookRecord.original_file_url || bookRecord.pdf_url || null;
-    }
+    const aiResult = await AIService.generateDescription({
+      title: input.title || bookRecord?.title || "Untitled",
+      author: input.author,
+      genre: input.genre,
+      pages: pagesFromText?.length ? pagesFromText : previewPage || undefined,
+      totalWords: pagesFromText?.length
+        ? textContent?.totalWords
+        : previewPage?.[0]?.wordCount,
+      textPreview: input.textPreview,
+      pdfUrl,
+    });
 
-    if (pdfUrl) {
-      console.log("📥 Fetching PDF from:", pdfUrl);
-
-      // Fetch the PDF file
-      let pdfResponse;
-      try {
-        pdfResponse = await fetch(pdfUrl);
-      } catch (fetchError) {
-        console.error("❌ Failed to fetch PDF:", fetchError);
-        throw new Error(
-          `Failed to fetch PDF from MinIO: ${fetchError instanceof Error ? fetchError.message : "Unknown error"}`,
-        );
-      }
-
-      if (!pdfResponse.ok) {
-        console.error(
-          "❌ PDF fetch failed with status:",
-          pdfResponse.status,
-          pdfResponse.statusText,
-        );
-        throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
-      }
-
-      const pdfBlob = await pdfResponse.blob();
-      console.log("📦 PDF fetched, size:", pdfBlob.size, "bytes");
-
-      // Create form data with the PDF file
-      const formData = new FormData();
-      formData.append("file", pdfBlob, "ebook.pdf");
-
-      // Call RAG API
-      const ragUrl = `${ragApiUrl}/generate-description`;
-      console.log("📤 Calling RAG API:", ragUrl);
-
-      let ragResponse;
-      try {
-        ragResponse = await fetch(ragUrl, {
-          method: "POST",
-          body: formData,
-        });
-      } catch (ragFetchError) {
-        console.error("❌ Failed to connect to RAG API:", ragFetchError);
-        throw new Error(
-          `Failed to connect to RAG API at ${ragUrl}: ${ragFetchError instanceof Error ? ragFetchError.message : "Unknown error"}`,
-        );
-      }
-
-      console.log(
-        "📥 RAG API response status:",
-        ragResponse.status,
-        ragResponse.statusText,
-      );
-
-      if (!ragResponse.ok) {
-        const errorText = await ragResponse.text();
-        console.error("❌ RAG API error response:", errorText);
-        throw new Error(
-          `RAG API error: ${ragResponse.statusText} - ${errorText}`,
-        );
-      }
-
-      const result = await ragResponse.json();
-
-      if (result.description) {
-        return {
-          success: true,
-          description: result.description,
-        };
-      } else {
-        throw new Error("RAG API did not return a description");
-      }
-    }
-
-    // Fallback: If no PDF URL, return a basic description
     return {
-      success: false,
-      message:
-        "No extracted text or PDF file available for description generation",
+      success: true,
+      description: aiResult.description,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

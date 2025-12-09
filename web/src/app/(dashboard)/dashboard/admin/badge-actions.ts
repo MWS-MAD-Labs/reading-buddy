@@ -8,6 +8,7 @@ import {
   buildPublicObjectUrl,
   getObjectKeyFromPublicUrl,
 } from "@/lib/minioUtils";
+import { AIService } from "@/lib/ai";
 import type {
   Badge,
   BadgeType,
@@ -591,10 +592,6 @@ export async function generateBadgeIconWithAI(input: {
 }): Promise<{ url: string }> {
   await requireAdminOrLibrarian();
 
-  const diffuserApiUrl =
-    process.env.DIFFUSER_API_URL || "http://172.16.0.165:8000";
-  const endpoint = "/generate-badge-image";
-
   // Build a descriptive prompt for the AI
   const tierDescriptions: Record<string, string> = {
     bronze: "bronze colored, beginner level",
@@ -627,104 +624,20 @@ export async function generateBadgeIconWithAI(input: {
     badgeName: input.badgeName,
     prompt: prompt,
     negativePrompt: negativePrompt,
-    settings: { width: 512, height: 512, steps: 40, guidance: 11 },
-    apiUrl: diffuserApiUrl,
+    settings: { width: 512, height: 512 },
   });
 
   try {
-    // Call Diffuser API
-    const response = await fetch(`${diffuserApiUrl}${endpoint}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt: prompt,
-        negative_prompt: negativePrompt,
-        width: 512,
-        height: 512,
-        num_inference_steps: 40,
-        guidance_scale: 11,
-      }),
+    const { base64Image, mimeType } = await AIService.generateImage({
+      prompt,
+      negativePrompt,
+      width: 512,
+      height: 512,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ Diffuser API error:", errorText);
-      throw new Error(
-        `Failed to generate image: ${response.statusText} - ${errorText}`,
-      );
-    }
-
-    const result = await response.json();
-    console.log("📦 Diffuser API response keys:", Object.keys(result));
-
-    // Check for base64 encoded image first
-    const base64Image =
-      result.image_base64 ||
-      result.base64 ||
-      result.imageBase64 ||
-      result.image_data ||
-      result.data;
-
-    let imageBuffer: Buffer;
-
-    if (base64Image) {
-      console.log("📥 Processing base64 image from response");
-
-      // Remove data:image/png;base64, prefix if present
-      const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
-
-      // Convert base64 to buffer
-      imageBuffer = Buffer.from(base64Data, "base64");
-      console.log("📊 Decoded base64 image size:", imageBuffer.length, "bytes");
-    } else {
-      // Check for URL/path to download
-      const imagePath =
-        result.image_url ||
-        result.url ||
-        result.imageUrl ||
-        result.image ||
-        result.output_url ||
-        result.output ||
-        result.image_path ||
-        result.path;
-
-      if (!imagePath) {
-        console.error("❌ No image data found in response:", result);
-        throw new Error(
-          `Diffuser API did not return an image. Response: ${JSON.stringify(result).substring(0, 200)}`,
-        );
-      }
-
-      console.log("📥 Downloading generated image from:", imagePath);
-
-      // Download the generated image from Diffuser API
-      let imageResponse: Response;
-      try {
-        // If it's a relative path, prepend the API URL
-        const imageUrl = imagePath.startsWith("http")
-          ? imagePath
-          : `${diffuserApiUrl}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
-
-        imageResponse = await fetch(imageUrl);
-
-        if (!imageResponse.ok) {
-          throw new Error(
-            `Failed to download image: ${imageResponse.statusText}`,
-          );
-        }
-      } catch (downloadError) {
-        console.error("❌ Failed to download generated image:", downloadError);
-        throw new Error(
-          `Failed to download generated image: ${downloadError instanceof Error ? downloadError.message : "Unknown error"}`,
-        );
-      }
-
-      // Convert to buffer
-      imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-      console.log("📊 Downloaded image size:", imageBuffer.length, "bytes");
-    }
+    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+    const imageBuffer = Buffer.from(base64Data, "base64");
+    console.log("📊 Generated image size:", imageBuffer.length, "bytes");
 
     // Generate unique filename for MinIO
     const timestamp = Date.now();
@@ -745,7 +658,7 @@ export async function generateBadgeIconWithAI(input: {
         imageBuffer,
         imageBuffer.length,
         {
-          "Content-Type": "image/png",
+          "Content-Type": mimeType || "image/png",
         },
       );
     } catch (uploadError) {

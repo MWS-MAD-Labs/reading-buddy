@@ -22,7 +22,8 @@
     "list-books": "tsx scripts/list-books.ts",
     "check:extracted-text": "tsx scripts/check-extracted-text.ts",
     "test:quiz-generation": "tsx scripts/test-quiz-generation.ts",
-    "test:auto-checkpoints": "tsx scripts/test-auto-checkpoints.ts"
+    "test:auto-checkpoints": "tsx scripts/test-auto-checkpoints.ts",
+    "test:ai-providers": "tsx scripts/test-ai-providers.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
