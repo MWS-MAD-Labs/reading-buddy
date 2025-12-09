@@ -14,9 +14,147 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Planned Features
 - **Reader Enhancements** - Bookmarks/annotations, better resume cues, and dark mode
 - **Accessibility/Performance** - WCAG 2.1 AA audit, keyboard/focus polish, and reduced layout shift
-- **BYOAI Support** - Support for OpenAI, Anthropic, and local LLMs (Ollama)
+- **Extended BYOAI Support** - Support for OpenAI, Anthropic, and additional local LLMs (Ollama)
 - **Quality Gates** - Push coverage toward 80%, add server-action integration tests, and visual regression baselines
 - **CI/CD** - Automated Vitest + Playwright runs with coverage gating and dashboards
+
+---
+
+## [1.5.0] - 2025-12-09
+
+### Added
+
+#### Configurable AI Provider System
+- **Deployment-Time AI Choice** - Single `AI_PROVIDER` environment variable to choose between cloud and local AI
+  - `AI_PROVIDER=cloud` - Uses Google Gemini 2.5 Flash for all AI operations
+  - `AI_PROVIDER=local` - Uses self-hosted RAG + Diffuser APIs
+  - Factory pattern with service abstraction layer for clean architecture
+  - Environment validation with clear error messages on misconfiguration
+
+- **Cloud Provider (Gemini)**
+  - Text generation: `gemini-2.5-flash` (temperature 0.4 for quizzes, 0.7 for descriptions)
+  - Image generation: `gemini-2.5-flash-image` for badge icons
+  - JSON response mode for structured outputs
+  - Requires extracted text (no PDF upload support)
+  - Plain text output without markdown formatting
+
+- **Local Provider (RAG + Diffuser)**
+  - Wraps existing RAG API for quiz and description generation
+  - Wraps existing Diffuser API for image generation
+  - Supports both extracted text and PDF upload strategies
+  - Base64 image normalization across all responses
+
+- **AI Service Infrastructure**
+  - New `/web/src/lib/ai/` module with 8 core files
+  - Type-safe interfaces throughout with TypeScript
+  - Comprehensive console logging with timing metrics for all operations
+  - Unified error handling with `AIProviderError` class
+  - Response normalization between different providers
+
+- **Testing & Documentation**
+  - Test script: `npm run test:ai-providers` to verify both providers
+  - Migration guide: `/web/docs/AI_PROVIDER_MIGRATION.md`
+  - Updated README with AI configuration section
+  - Troubleshooting guide for common issues
+
+### Changed
+
+#### Code Refactoring
+- **Librarian Actions** - Refactored 3 functions to use `AIService`
+  - `generateQuizForBook` - Simplified from ~200 lines using direct RAG calls
+  - `generateQuizForBookWithContent` - Simplified from ~250 lines
+  - `generateBookDescription` - Simplified from ~150 lines
+  - Total reduction: ~550 lines of duplicate code removed
+
+- **Badge Actions** - Refactored image generation
+  - `generateBadgeIconWithAI` - Simplified from ~150 lines using direct Diffuser calls
+  - Unified interface regardless of AI provider
+
+- **Environment Configuration**
+  - Updated `.env.example` with comprehensive AI provider settings
+  - Added validation for required environment variables per provider
+  - Clear documentation for both cloud and local configurations
+
+### Technical Details
+
+#### Architecture
+- **Factory Pattern**: Single point of provider instantiation with caching
+- **Service Layer**: High-level API with logging and error wrapping
+- **Provider Interface**: Contract that all providers must implement
+  - `generateQuiz()` - Quiz generation from text or PDF
+  - `generateDescription()` - Book description generation
+  - `generateImage()` - Badge icon generation
+
+#### Implementation
+```typescript
+// Usage example
+const result = await AIService.generateQuiz({
+  title: "Book Title",
+  author: "Author Name",
+  quizType: "classroom",
+  questionCount: 5,
+  pages: extractedPages,
+});
+```
+
+#### Configuration
+```bash
+# Environment variables
+AI_PROVIDER=local              # or "cloud"
+GEMINI_API_KEY=your-key        # Required when cloud
+RAG_API_URL=http://...         # Required when local
+DIFFUSER_API_URL=http://...    # Required when local
+```
+
+#### Performance
+- Console logging shows timing for all AI operations
+- Cached provider instance for optimal performance
+- Minimal overhead with factory pattern
+
+#### Files Changed
+- **New**: 11 files (8 in `/web/src/lib/ai/`, test script, migration guide, providers directory)
+- **Modified**: 6 files (2 action files, .env.example, README, package.json, web/.env.example)
+- **Code reduction**: ~550 lines removed through refactoring
+
+### Migration Required
+
+#### For Existing Deployments
+1. **Set AI_PROVIDER** - Add to environment variables (required, no default)
+   ```bash
+   AI_PROVIDER=local  # or "cloud"
+   ```
+
+2. **Cloud Provider** - If using `AI_PROVIDER=cloud`
+   ```bash
+   GEMINI_API_KEY=your-gemini-api-key
+   ```
+
+3. **Local Provider** - If using `AI_PROVIDER=local`
+   ```bash
+   RAG_API_URL=http://172.16.0.65:8000
+   DIFFUSER_API_URL=http://172.16.0.165:8000
+   ```
+
+4. **Restart Application** - Provider is cached, requires restart to pick up changes
+
+#### Testing
+```bash
+# Test local provider
+AI_PROVIDER=local npm run test:ai-providers
+
+# Test cloud provider  
+AI_PROVIDER=cloud npm run test:ai-providers
+```
+
+#### Breaking Changes
+None - maintains full backward compatibility. Only requires adding `AI_PROVIDER` to environment.
+
+### Notes
+- Provider choice is global - all AI features use the same backend
+- Gemini requires extracted text - cannot process PDFs directly
+- Local provider supports both text and PDF inputs
+- Cost consideration: Gemini charges per request (~$0.039 per image)
+- See migration guide for detailed troubleshooting
 
 ---
 
