@@ -273,11 +273,22 @@ Phase 3: Cutover
 ### 6.3 AI Flexibility
 
 #### Bring Your Own AI (BYOAI)
-**Priority:** High | **Target:** v1.3.0+
+**Priority:** High | **Status:** ✅ Partially Complete (v1.5.0) | **Next:** v1.6.0
 
-**Current State:** Hard-coded to Google Gemini API
+**Current State (v1.5.0):** Configurable provider system with Cloud (Gemini) and Local (RAG + Diffuser) support
 
-**Supported AI Providers:**
+**Implemented Providers (v1.5.0):**
+1. **Cloud Provider** - Google Gemini 2.5 Flash
+   - Text generation: `gemini-2.5-flash`
+   - Image generation: `gemini-2.5-flash-image`
+   - Requires: `GEMINI_API_KEY`
+
+2. **Local Provider** - Self-hosted RAG + Diffuser
+   - Quiz/Description: RAG API
+   - Images: Stable Diffusion 1.5 via Diffuser API
+   - Requires: `RAG_API_URL`, `DIFFUSER_API_URL`
+
+**Planned Additional Providers (v1.6.0+):**
 
 1. **OpenAI (GPT Models)**
    - GPT-4, GPT-4 Turbo, GPT-3.5 Turbo
@@ -292,10 +303,23 @@ Phase 3: Cutover
    - Ollama (Llama 3.1, Mistral, Phi-3)
    - LM Studio, vLLM, LocalAI
 
-**Configuration Example:**
+**Current Configuration (v1.5.0):**
+```env
+# AI Provider Selection (REQUIRED)
+AI_PROVIDER=cloud # or "local"
+
+# Cloud Provider (Gemini) - Required when AI_PROVIDER=cloud
+GEMINI_API_KEY=your-gemini-api-key
+
+# Local Provider - Required when AI_PROVIDER=local
+RAG_API_URL=http://172.16.0.65:8000
+DIFFUSER_API_URL=http://172.16.0.165:8000
+```
+
+**Planned Configuration (v1.6.0+):**
 ```env
 # AI Provider Selection
-AI_PROVIDER=openai # or anthropic, gemini, ollama, localai
+AI_PROVIDER=openai # or anthropic, gemini, ollama, localai, local
 
 # OpenAI
 OPENAI_API_KEY=sk-...
@@ -319,22 +343,37 @@ AI_DESCRIPTION_PROVIDER=gemini
 AI_SUMMARY_PROVIDER=ollama
 ```
 
-**Implementation:**
+**Implementation (v1.5.0 - Complete):**
 ```typescript
-// AI abstraction layer
-interface AIProvider {
-  generateQuiz(bookText: string, options: QuizOptions): Promise<Quiz>
-  generateDescription(bookText: string): Promise<string>
-  generateSummary(text: string): Promise<string>
+// AI abstraction layer - IMPLEMENTED
+interface IAIProvider {
+  generateQuiz(input: QuizGenerationInput): Promise<QuizGenerationOutput>
+  generateDescription(input: DescriptionGenerationInput): Promise<DescriptionGenerationOutput>
+  generateImage(input: ImageGenerationInput): Promise<ImageGenerationOutput>
+  getName(): string
+  getType(): AIProvider
 }
 
-class OpenAIProvider implements AIProvider { ... }
-class AnthropicProvider implements AIProvider { ... }
-class GeminiProvider implements AIProvider { ... }
-class OllamaProvider implements AIProvider { ... }
+// Implemented providers
+class CloudAIProvider implements IAIProvider { ... } // Gemini
+class LocalAIProvider implements IAIProvider { ... } // RAG + Diffuser
 
-// Factory pattern
-const aiProvider = AIProviderFactory.create(process.env.AI_PROVIDER)
+// Factory pattern - IMPLEMENTED
+const provider = getAIProvider() // Returns cached singleton
+
+// Service layer - IMPLEMENTED
+class AIService {
+  static async generateQuiz(input): Promise<QuizGenerationOutput>
+  static async generateDescription(input): Promise<DescriptionGenerationOutput>
+  static async generateImage(input): Promise<ImageGenerationOutput>
+}
+```
+
+**Planned Extensions (v1.6.0+):**
+```typescript
+class OpenAIProvider implements IAIProvider { ... }
+class AnthropicProvider implements IAIProvider { ... }
+class OllamaProvider implements IAIProvider { ... }
 ```
 
 **Benefits:**
@@ -676,13 +715,28 @@ const aiProvider = AIProviderFactory.create(process.env.AI_PROVIDER)
 - ✅ Badge collection page with progress bars
 - ✅ Real-time XP updates on reading/quiz completion
 
-### v1.5.0 (Q1 2026) - UX & AI Flexibility
+### ✅ v1.5.0 (Completed December 9, 2025) - AI Provider Flexibility
+- ✅ Configurable AI provider system (Cloud/Local)
+- ✅ Single `AI_PROVIDER` environment variable for deployment-time choice
+- ✅ Cloud provider: Google Gemini 2.5 Flash (text + images)
+- ✅ Local provider: Self-hosted RAG + Diffuser APIs
+- ✅ Factory pattern with service abstraction layer
+- ✅ Type-safe AI service infrastructure (`/web/src/lib/ai/`)
+- ✅ Comprehensive console logging with timing metrics
+- ✅ Environment validation with clear error messages
+- ✅ Test script: `npm run test:ai-providers`
+- ✅ Complete migration guide and documentation
+- ✅ Code refactoring: ~550 lines of duplicate code removed
+- ✅ Plain text output for descriptions (markdown stripping)
+- ✅ Unified error handling with AIProviderError class
+
+### v1.6.0 (Q1 2026) - UX Enhancements
 - **Reader Enhancements:** Bookmarks, Dark mode, Better resume
-- **AI Flexibility:** BYOAI (OpenAI, Anthropic, Ollama)
+- **Extended AI Flexibility:** Additional providers (OpenAI, Anthropic, Ollama)
 - **Accessibility:** WCAG 2.1 AA audit
 - **Quality Gates:** 80% coverage, visual regression tests
 
-### v1.6.0 (Q2 2026) - Content & Competition
+### v1.7.0 (Q2 2026) - Content & Competition
 - Class vs class competitions
 - Bulk book upload
 - Book series management
@@ -690,7 +744,7 @@ const aiProvider = AIProviderFactory.create(process.env.AI_PROVIDER)
 - Reading lists/collections
 - Analytics dashboard for teachers
 
-### v1.7.0 (Q3 2026) - Additional Format Support
+### v1.8.0 (Q3 2026) - Additional Format Support
 - CBZ/CBR comic book format support
 - DOCX Word document support
 - ODT OpenDocument support
