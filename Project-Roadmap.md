@@ -219,54 +219,313 @@ EPUB/MOBI/AZW → Calibre → PDF → pdf2pic → Page Images → Text Extractio
 
 ### 6.2 Self-Hosted Infrastructure
 
-#### Full Self-Hosted Services
-**Priority:** High | **Target:** v2.0.0+
+#### Full Self-Hosted Deployment Option
+**Priority:** High | **Target:** v1.7.0 - v2.0.0 | **Status:** Partially Complete
 
-**Current State:** Hybrid (Supabase cloud + MinIO self-hosted)
+**Vision:** Complete on-premises deployment with zero external dependencies for organizations requiring full data sovereignty.
 
-**Proposed Changes:** Replace Supabase with self-hosted alternatives
+**Current State (v1.5.0):** Partially Self-Hosted ✅
 
-**Database:**
-- Self-hosted PostgreSQL with Docker
-- Maintain existing schema and RLS policies
-- Optional PostgREST for REST API
+| Component | Status | Solution | Notes |
+|-----------|--------|----------|-------|
+| **Storage (S3)** | ✅ **Self-Hosted** | MinIO | Complete - no cloud dependency |
+| **AI Services** | ✅ **Self-Hosted Option** | Local RAG + Diffuser | Configurable via `AI_PROVIDER=local` |
+| **Database** | ⚠️ Cloud | Supabase (PostgreSQL) | **Needs self-hosted option** |
+| **Authentication** | ⚠️ Cloud | Supabase Auth | **Needs self-hosted option** |
+| **Application** | ✅ Self-Hosted | Next.js Docker | Already containerized |
 
-**Authentication Options:**
+**Achievements (v1.0.0 - v1.5.0):**
+- ✅ MinIO self-hosted S3-compatible storage (v1.0.0)
+- ✅ Docker deployment for Next.js application (v1.0.0)
+- ✅ Local AI provider option with RAG + Diffuser (v1.5.0)
+- ✅ Environment-based configuration system (v1.5.0)
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **Keycloak** | Industry-standard, OAuth 2.0/SAML/LDAP, MFA | Complex setup |
-| **Authentik** | Modern UI, LDAP/SCIM, easy Docker deploy | Newer/less mature |
-| **Custom** | Full control, lighter weight, JWT-based | Requires maintenance |
+**Remaining Goals:**
+
+### Phase 1: Self-Hosted Database (v1.7.0 - Target Q2 2026)
+
+**Objective:** Add PostgreSQL self-hosted option alongside Supabase
+
+**Implementation:**
+
+**A. Database Layer**
+
+*Option 1: Direct PostgreSQL (Recommended)*
+```yaml
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: reading_buddy
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+```
+
+*Implementation Tasks:*
+- Create database adapter layer (abstract Supabase client)
+- Implement direct PostgreSQL connection with `pg` or Prisma
+- Migrate RLS policies to application-level middleware
+- Create database migration scripts from Supabase schema
+- Add connection pooling (PgBouncer)
+- Implement health checks and monitoring
+
+*Configuration:*
+```env
+# Database Provider Selection
+DB_PROVIDER=supabase  # or "postgres" for self-hosted
+
+# Supabase (Cloud)
+NEXT_PUBLIC_SUPABASE_URL=https://...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+
+# Self-Hosted PostgreSQL
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=reading_buddy
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=...
+POSTGRES_SSL=false
+```
+
+*Option 2: PostgREST (Supabase-compatible)*
+- Deploy PostgREST for REST API layer
+- Maintains compatibility with existing Supabase client code
+- Keep existing RLS policies in database
+- Minimal code changes required
+
+### Phase 2: Self-Hosted Authentication (v1.8.0 - Target Q3 2026)
+
+**Objective:** Replace Supabase Auth with self-hosted authentication
+
+**Authentication Options Comparison:**
+
+| Solution | Complexity | Features | Supabase Compatibility | Recommendation |
+|----------|-----------|----------|----------------------|----------------|
+| **Keycloak** | High | OAuth2, SAML, LDAP, MFA, SSO | Low (requires rewrite) | Enterprise deployments |
+| **Authentik** | Medium | OAuth2, LDAP, SCIM, Modern UI | Low (requires rewrite) | Modern orgs |
+| **Auth.js (NextAuth)** | Low | OAuth providers, JWT, Session | Medium (some rewrite) | **Recommended** |
+| **Custom JWT** | Low | Full control, lightweight | Low (full rewrite) | Small deployments |
+
+**Recommended: Auth.js (NextAuth.js v5)**
+
+*Why Auth.js:*
+- Native Next.js integration
+- Built-in OAuth providers (Google, GitHub, etc.)
+- JWT and session support
+- Lightweight and easy to configure
+- Active development and community
+- Credential provider for email/password
+
+*Implementation Tasks:*
+- Install and configure Auth.js in Next.js app
+- Create auth adapter for PostgreSQL (store sessions, users, accounts)
+- Implement OAuth providers (Google, GitHub, Microsoft)
+- Add credential provider (email/password with bcrypt)
+- Create role-based access control middleware
+- Migrate existing user accounts from Supabase Auth
+- Update all auth-protected routes and API endpoints
+- Implement session management and refresh tokens
+
+*Configuration:*
+```env
+# Auth Provider Selection
+AUTH_PROVIDER=supabase  # or "authjs" for self-hosted
+
+# Supabase Auth (Cloud)
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+
+# Auth.js (Self-Hosted)
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=...
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+```
+
+*Auth.js Example Setup:*
+```typescript
+// /web/src/lib/auth/authjs-config.ts
+import NextAuth from "next-auth"
+import Google from "next-auth/providers/google"
+import Credentials from "next-auth/providers/credentials"
+import { PostgresAdapter } from "@auth/pg-adapter"
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: PostgresAdapter(pool),
+  providers: [
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
+    Credentials({
+      credentials: { email: {}, password: {} },
+      authorize: async (credentials) => {
+        // Validate credentials against PostgreSQL
+      },
+    }),
+  ],
+  callbacks: {
+    session({ session, user }) {
+      session.user.role = user.role // Add custom fields
+      return session
+    },
+  },
+})
+```
+
+### Phase 3: Complete Self-Hosted Stack (v2.0.0 - Target Q4 2026)
+
+**Objective:** Unified deployment with zero cloud dependencies
+
+**Full Docker Compose Stack:**
+```yaml
+version: '3.8'
+
+services:
+  # Application
+  app:
+    build: ./web
+    environment:
+      - DB_PROVIDER=postgres
+      - AUTH_PROVIDER=authjs
+      - AI_PROVIDER=local
+      - S3_PROVIDER=minio
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - minio
+      - rag-api
+      - diffuser-api
+  
+  # Database
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: reading_buddy
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  
+  # Object Storage
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+  
+  # AI Services (Local)
+  rag-api:
+    image: your-rag-api:latest
+    ports:
+      - "8000:8000"
+  
+  diffuser-api:
+    image: your-diffuser-api:latest
+    ports:
+      - "8001:8000"
+  
+  # Connection Pooler (Optional)
+  pgbouncer:
+    image: pgbouncer/pgbouncer
+    environment:
+      DATABASES_HOST: postgres
+      DATABASES_PORT: 5432
+      DATABASES_USER: admin
+      DATABASES_DATABASE: reading_buddy
+    ports:
+      - "6432:6432"
+
+volumes:
+  postgres_data:
+  minio_data:
+```
+
+**Deployment Options:**
+
+*Option 1: Single Server*
+- All services on one machine
+- Suitable for small schools (< 500 users)
+- 8GB RAM, 4 CPU cores, 500GB storage minimum
+
+*Option 2: Multi-Server*
+- App server (load balanced)
+- Database server (with replication)
+- Storage server (MinIO cluster)
+- AI server (GPU for diffuser)
+
+*Option 3: Kubernetes*
+- Helm charts for all services
+- Auto-scaling for app pods
+- StatefulSets for database
+- Persistent volumes for storage
 
 **Benefits:**
-- Complete data sovereignty
-- No cloud vendor lock-in
-- Zero external API costs
-- Enhanced privacy and security
-- Can run entirely on-premises
+- ✅ Complete data sovereignty
+- ✅ No cloud vendor lock-in
+- ✅ Zero external API costs (except optional OAuth providers)
+- ✅ Enhanced privacy and security
+- ✅ Can run entirely on-premises or air-gapped networks
+- ✅ Full control over updates and maintenance
+- ✅ Customizable to organization needs
 
 **Migration Strategy:**
-```
-Phase 1: Database Migration
-1. Export Supabase data to SQL dump
-2. Set up PostgreSQL container
-3. Import data and verify integrity
-4. Update connection strings
 
-Phase 2: Authentication Migration
-1. Deploy Keycloak/Authentik
-2. Configure auth providers (Google, email)
-3. Migrate user accounts
-4. Update auth client in app
-5. Test all auth flows
+*For Existing Deployments (Supabase → Self-Hosted):*
 
-Phase 3: Cutover
-1. Run both systems in parallel (testing)
-2. Gradual user migration
-3. Monitor for issues
-4. Full cutover after validation
-```
+1. **Preparation Phase**
+   - Audit current data and usage
+   - Set up parallel self-hosted environment
+   - Test all functionality in self-hosted mode
+   - Train team on new infrastructure
+
+2. **Database Migration**
+   - Export Supabase data to SQL dump
+   - Set up PostgreSQL container
+   - Import data and verify integrity
+   - Update connection strings with `DB_PROVIDER=postgres`
+   - Run in parallel for validation
+
+3. **Authentication Migration**
+   - Deploy Auth.js configuration
+   - Configure OAuth providers
+   - Migrate user accounts (preserve passwords if using credentials)
+   - Update auth middleware
+   - Test all auth flows (login, logout, password reset, OAuth)
+   - Run both auth systems in parallel
+
+4. **Cutover**
+   - Set cutover date and maintenance window
+   - Final data sync from Supabase
+   - Switch environment variables
+   - Monitor for issues
+   - Keep Supabase as backup for 30 days
+
+5. **Cleanup**
+   - Decommission Supabase project
+   - Remove Supabase dependencies
+   - Update documentation
+   - Archive migration scripts
+
+**Documentation Deliverables:**
+- Self-hosted deployment guide
+- Migration playbook
+- Backup and recovery procedures
+- Monitoring and maintenance guide
+- Troubleshooting documentation
+- Security hardening checklist
 
 ---
 
