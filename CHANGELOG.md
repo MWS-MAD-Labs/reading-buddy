@@ -9,13 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned for v1.4.0 - Enhanced UX & Gamification
+### Planned for v1.5.0 - UX & AI Flexibility
 
 #### Planned Features
-- Reader enhancements: bookmarks/annotations, better resume cues, and dark mode for the reader
-- Accessibility/performance: WCAG 2.1 AA audit, keyboard/focus polish, and reduced layout shift
-- Quality gates: push coverage toward 80% (pdf-extractor/minio/file helpers), add server-action integration tests, authenticated E2E, and visual regression baselines
-- CI/CD: automated Vitest + Playwright runs with coverage gating and dashboards
+- **Reader Enhancements** - Bookmarks/annotations, better resume cues, and dark mode
+- **Accessibility/Performance** - WCAG 2.1 AA audit, keyboard/focus polish, and reduced layout shift
+- **BYOAI Support** - Support for OpenAI, Anthropic, and local LLMs (Ollama)
+- **Quality Gates** - Push coverage toward 80%, add server-action integration tests, and visual regression baselines
+- **CI/CD** - Automated Vitest + Playwright runs with coverage gating and dashboards
 
 ---
 

@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getMinioBucketName, getMinioClient } from "@/lib/minio";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -16,6 +15,7 @@ import type {
   QuizQuestionsData,
 } from "@/types/database";
 import { checkRateLimit } from "@/lib/middleware/withRateLimit";
+import { AIService } from "@/lib/ai";
 
 export const checkCurrentUserRole = async () => {
   const supabase = await createSupabaseServerClient();
@@ -355,7 +355,9 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
 
   const { data: book, error: bookError } = await supabase
     .from("books")
-    .select("id, title, description")
+    .select(
+      "id, title, author, genre, description, pdf_url, original_file_url, page_text_content, text_extracted_at",
+    )
     .eq("id", input.bookId)
     .single();
 
@@ -363,62 +365,49 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
     throw new Error("Book not found.");
   }
 
-  if (!book.description) {
-    throw new Error("Add a summary/description before generating a quiz.");
-  }
+  const quizQuestionCount = 5;
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured.");
-  }
+  const textContent =
+    book.text_extracted_at && book.page_text_content
+      ? (book.page_text_content as {
+          pages: {
+            pageNumber: number;
+            text: string;
+            wordCount?: number;
+          }[];
+          totalWords: number;
+        })
+      : null;
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    generationConfig: {
-      responseMimeType: "application/json",
-      temperature: 0.4,
-    },
-  });
+  const pages =
+    textContent?.pages?.map((page) => ({
+      pageNumber: page.pageNumber,
+      text: page.text,
+      wordCount: page.wordCount,
+    })) || [];
 
-  const prompt = `
-    You are an assistant who writes engaging multiple-choice quizzes for students aged 10-16.
-    Based on the following book summary, write 5 multiple-choice questions.
-    Each question must contain 4 answer options and a correct answer index.
+  const pdfUrl = book.original_file_url || book.pdf_url || undefined;
 
-    Return JSON with this shape:
-    {
-      "title": "${book.title} Quiz",
-      "questions": [
-        {
-          "question": "string",
-          "options": ["A", "B", "C", "D"],
-          "answerIndex": 1,
-          "explanation": "Optional explanation"
-        }
-      ]
-    }
-
-    Summary:
-    """${book.description}"""
-  `;
-
-  const result = await model.generateContent(prompt);
-  const response = result.response;
-  const text = response.text();
-
-  if (!text) {
-    throw new Error("Gemini did not return any content.");
-  }
-
-  let quizPayload: unknown;
-  try {
-    quizPayload = JSON.parse(text);
-  } catch (err) {
+  if (!pages.length && !pdfUrl) {
     throw new Error(
-      `Gemini returned invalid JSON: ${err instanceof Error ? err.message : "unknown error"}`,
+      "No extracted text or PDF available for quiz generation.",
     );
   }
+
+  const aiResult = await AIService.generateQuiz({
+    title: book.title ?? "Untitled",
+    author: book.author ?? undefined,
+    genre: book.genre ?? undefined,
+    description: book.description ?? undefined,
+    quizType: "classroom",
+    questionCount: quizQuestionCount,
+    pages: pages.length ? pages : undefined,
+    totalWords: textContent?.totalWords,
+    pdfUrl,
+    contentSource: pages.length ? "extracted_text" : pdfUrl ? "pdf" : undefined,
+  });
+
+  const quizPayload = aiResult.quiz;
 
   const { data: inserted, error: quizError } = await supabase
     .from("quizzes")
@@ -472,7 +461,7 @@ export const generateQuizForBookWithContent = async (input: {
   const { data: book, error: bookError } = await supabase
     .from("books")
     .select(
-      "id, title, author, genre, description, page_count, page_text_content, text_extracted_at",
+      "id, title, author, genre, description, page_count, page_text_content, text_extracted_at, pdf_url, original_file_url",
     )
     .eq("id", input.bookId)
     .single();
@@ -481,20 +470,23 @@ export const generateQuizForBookWithContent = async (input: {
     throw new Error("Book not found.");
   }
 
-  // Check if text has been extracted
-  const hasExtractedText = book.text_extracted_at && book.page_text_content;
+  const textContent =
+    book.text_extracted_at && book.page_text_content
+      ? (book.page_text_content as {
+          pages: { pageNumber: number; text: string; wordCount?: number }[];
+          totalPages: number;
+          totalWords: number;
+        })
+      : null;
 
-  let bookContent = "";
+  const questionCount = input.questionCount ?? 5;
+  let pagesPayload:
+    | { pageNumber: number; text: string; wordCount?: number }[]
+    | null = null;
+  let totalWords = 0;
   let contentSource = "description";
 
-  if (hasExtractedText && book.page_text_content) {
-    const textContent = book.page_text_content as {
-      pages: { pageNumber: number; text: string; wordCount: number }[];
-      totalPages: number;
-      totalWords: number;
-    };
-
-    // Extract text from specified page range or full book
+  if (textContent) {
     const startPage = input.pageRangeStart ?? 1;
     const endPage = input.pageRangeEnd ?? textContent.totalPages;
 
@@ -502,109 +494,65 @@ export const generateQuizForBookWithContent = async (input: {
       (p) => p.pageNumber >= startPage && p.pageNumber <= endPage,
     );
 
-    bookContent = pagesInRange
-      .map((p) => `[Page ${p.pageNumber}]\n${p.text}`)
-      .join("\n\n");
+    const filteredPages = pagesInRange.filter(
+      (page) => page.text && page.text.trim().length > 0,
+    );
 
-    contentSource = `pages ${startPage}-${endPage}`;
-
-    // Fallback to description if no text content in range
-    if (!bookContent.trim() || bookContent.split(" ").length < 50) {
-      bookContent = book.description || "";
-      contentSource = "description (fallback - insufficient text extracted)";
+    if (filteredPages.length) {
+      pagesPayload = filteredPages;
+      totalWords =
+        filteredPages.reduce(
+          (sum, page) =>
+            sum + (page.wordCount ?? page.text.split(/\s+/).length),
+          0,
+        ) || textContent.totalWords;
+      contentSource = `pages ${startPage}-${endPage}`;
     }
-  } else {
-    // Use description if no extracted text
-    bookContent = book.description || "";
-    if (!bookContent) {
+  }
+
+  if (!pagesPayload) {
+    const fallbackText = book.description || "";
+    if (!fallbackText) {
       throw new Error(
         "No book content available. Please add a description or extract text from the PDF.",
       );
     }
+
+    const wordCount = fallbackText.split(/\s+/).length;
+    pagesPayload = [
+      {
+        pageNumber: 0,
+        text: fallbackText,
+        wordCount,
+      },
+    ];
+    totalWords = wordCount;
+    contentSource =
+      textContent && textContent.pages.length
+        ? "description (fallback - insufficient text extracted)"
+        : "description";
   }
 
-  // Determine question count
-  const questionCount = input.questionCount ?? 5;
+  const pdfUrl = book.original_file_url || book.pdf_url || undefined;
 
-  // Generate quiz with Gemini
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured.");
-  }
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    generationConfig: {
-      responseMimeType: "application/json",
-      temperature: 0.4,
-    },
+  const aiResult = await AIService.generateQuiz({
+    title: book.title ?? "Untitled",
+    author: book.author ?? undefined,
+    genre: book.genre ?? undefined,
+    description: book.description ?? undefined,
+    quizType: input.quizType,
+    questionCount,
+    checkpointPage: input.checkpointPage,
+    pageRangeStart: input.pageRangeStart,
+    pageRangeEnd: input.pageRangeEnd,
+    pages: pagesPayload,
+    totalWords,
+    pdfUrl,
+    contentSource,
   });
 
-  const quizTypeDescription =
-    input.quizType === "checkpoint"
-      ? `a checkpoint quiz that students must complete while reading`
-      : `a classroom quiz for assessment`;
+  const quizPayload = aiResult.quiz;
 
-  const pageRangeInfo =
-    input.pageRangeStart && input.pageRangeEnd
-      ? `Content: Pages ${input.pageRangeStart}-${input.pageRangeEnd}`
-      : "Content: Full book";
-
-  const prompt = `
-You are an educational assistant creating ${quizTypeDescription} for students aged 10-16.
-
-Book: "${book.title}" by ${book.author}
-${pageRangeInfo}
-Genre: ${book.genre || "General"}
-
-Below is the actual content from the book:
-"""
-${bookContent}
-"""
-
-Generate ${questionCount} multiple-choice questions that:
-1. Test comprehension of key concepts and plot points from the provided content
-2. Are appropriate for the target age group (10-16 years old)
-3. Include varied difficulty levels (mix of easy, medium, and hard)
-4. Focus on important themes, character development, and story elements
-5. Have clear, unambiguous correct answers
-
-Return JSON with this exact structure:
-{
-  "title": "${book.title} Quiz - ${contentSource}",
-  "questions": [
-    {
-      "question": "Question text here",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "answerIndex": 0,
-      "difficulty": "easy|medium|hard",
-      "explanation": "Brief explanation of why this answer is correct"
-    }
-  ]
-}
-
-Important: answerIndex should be 0-3 (zero-based index of the correct option).
-`;
-
-  const result = await model.generateContent(prompt);
-  const response = result.response;
-  const text = response.text();
-
-  if (!text) {
-    throw new Error("Gemini did not return any content.");
-  }
-
-  let quizPayload: unknown;
-  try {
-    quizPayload = JSON.parse(text);
-  } catch (err) {
-    throw new Error(
-      `Gemini returned invalid JSON: ${err instanceof Error ? err.message : "unknown error"}`,
-    );
-  }
-
-  // Save quiz to database
   const { data: inserted, error: quizError } = await supabase
     .from("quizzes")
     .insert({
@@ -623,7 +571,6 @@ Important: answerIndex should be 0-3 (zero-based index of the correct option).
     throw quizError ?? new Error("Failed to save quiz.");
   }
 
-  // If this is a checkpoint quiz, create the checkpoint record
   if (input.quizType === "checkpoint" && input.checkpointPage) {
     const { error: checkpointError } = await supabase
       .from("quiz_checkpoints")
@@ -648,7 +595,7 @@ Important: answerIndex should be 0-3 (zero-based index of the correct option).
     quizId: inserted.id,
     quiz: quizPayload,
     contentSource,
-    questionCount,
+    questionCount: quizPayload.questions.length || questionCount,
   };
 };
 
@@ -1079,53 +1026,118 @@ export const checkRenderStatus = async (bookId: number) => {
   };
 };
 
+/*
+  Ollama prompt (reference only, currently not used because the RAG API yields better descriptions):
+
+  You are an editorial copywriter. Use the provided book content to craft an enticing teaser in English.
+
+  Rules:
+  - 2-3 sentences, 40-60 words total.
+  - Start immediately with the hook—no preamble, labels, or framing (e.g., "Here is", "This is", "Rewritten description").
+  - Include one vivid detail (character, setting, conflict, or fact) to prove you've read it.
+  - Use active, sensory language and hint at the stakes; make it feel urgent and inviting without spoilers.
+  - Finish with a hook that leaves tension or a question in the reader's mind.
+  - Avoid filler like "this book" or "the author" unless you naturally name them.
+  - Keep it inviting and spoiler-light; avoid repeating the title/author unless it fits naturally.
+  - Output only the finished description text—no markdown or labels.
+*/
+
 export const generateBookDescription = async (input: {
   title: string;
   author: string;
   genre?: string;
   pageCount?: number;
   textPreview?: string;
+  pdfUrl?: string;
+  bookId?: number;
 }) => {
   "use server";
 
   await ensureLibrarianOrAdmin();
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return { success: false, message: "Gemini API key not configured" };
-  }
-
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const supabase = getSupabaseAdminClient();
+    let bookRecord:
+      | {
+          title: string | null;
+          pdf_url: string | null;
+          original_file_url: string | null;
+          page_text_content: any;
+          text_extracted_at: string | null;
+        }
+      | null = null;
 
-    const prompt = `Generate a compelling and intriguing book description for the following book:
+    if (input.bookId) {
+      const { data: book, error } = await supabase
+        .from("books")
+        .select(
+          "title, pdf_url, original_file_url, page_text_content, text_extracted_at",
+        )
+        .eq("id", input.bookId)
+        .single();
 
-Title: ${input.title}
-Author: ${input.author}
-${input.genre ? `Genre: ${input.genre}` : ""}
-${input.pageCount ? `Page Count: ${input.pageCount}` : ""}
-${input.textPreview ? `\nText Preview (first 500 words):\n${input.textPreview}` : ""}
+      if (error) {
+        throw new Error(`Book lookup failed: ${error.message}`);
+      }
 
-Please write a SHORT, punchy description that:
-1. Hooks readers with an intriguing opening line
-2. Creates mystery or excitement without revealing too much
-3. Is appropriate for a library catalog
-4. Avoids spoilers but teases the story
-5. Is MAXIMUM 50 words (approximately 250-300 characters)
-6. Uses vivid, engaging language that makes people want to read the book
+      bookRecord = book;
+    }
 
-IMPORTANT: Keep it under 50 words. Be concise and impactful.
-Write in an exciting, cinematic style. Think movie trailer tagline, not full summary.
+    const textContent =
+      bookRecord?.text_extracted_at && bookRecord.page_text_content
+        ? (bookRecord.page_text_content as {
+            pages: { pageNumber: number; text: string }[];
+            totalWords: number;
+          })
+        : null;
 
-Return ONLY the description text, without any preamble or additional commentary.`;
+    const pagesFromText = textContent?.pages?.map((page) => ({
+      pageNumber: page.pageNumber,
+      text: page.text,
+      wordCount: (page as { wordCount?: number }).wordCount
+        ?? page.text.split(/\s+/).length,
+    }));
 
-    const result = await model.generateContent(prompt);
-    const description = result.response.text().trim();
+    const previewPage =
+      !pagesFromText?.length && input.textPreview
+        ? [
+            {
+              pageNumber: 0,
+              text: input.textPreview,
+              wordCount: input.textPreview.split(/\s+/).length,
+            },
+          ]
+        : null;
+
+    const pdfUrl =
+      input.pdfUrl ||
+      bookRecord?.original_file_url ||
+      bookRecord?.pdf_url ||
+      undefined;
+
+    if (!pagesFromText?.length && !previewPage?.length && !pdfUrl) {
+      return {
+        success: false,
+        message:
+          "No extracted text or PDF file available for description generation",
+      };
+    }
+
+    const aiResult = await AIService.generateDescription({
+      title: input.title || bookRecord?.title || "Untitled",
+      author: input.author,
+      genre: input.genre,
+      pages: pagesFromText?.length ? pagesFromText : previewPage || undefined,
+      totalWords: pagesFromText?.length
+        ? textContent?.totalWords
+        : previewPage?.[0]?.wordCount,
+      textPreview: input.textPreview,
+      pdfUrl,
+    });
 
     return {
       success: true,
-      description,
+      description: aiResult.description,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

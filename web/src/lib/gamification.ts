@@ -511,8 +511,87 @@ export async function onBookCompleted(
     "Completed a book",
   );
 
-  // Evaluate badges
-  return evaluateBadges(supabase, studentId, { bookId });
+  // Award book-specific completion badges
+  const bookSpecificBadges = await awardBookSpecificBadges(
+    supabase,
+    studentId,
+    bookId,
+  );
+
+  // Evaluate general badges
+  const generalBadges = await evaluateBadges(supabase, studentId, { bookId });
+
+  // Combine results
+  return {
+    newBadges: [...bookSpecificBadges.newBadges, ...generalBadges.newBadges],
+    totalXpAwarded:
+      bookSpecificBadges.totalXpAwarded + generalBadges.totalXpAwarded,
+  };
+}
+
+/**
+ * Award book-specific completion badges for a completed book
+ */
+async function awardBookSpecificBadges(
+  supabase: SupabaseClient,
+  studentId: string,
+  bookId: number,
+): Promise<EvaluateBadgesResult> {
+  // Get book-specific badges for this book that the student hasn't earned
+  const { data: badges, error: badgesError } = await supabase
+    .from("badges")
+    .select("*")
+    .eq("is_active", true)
+    .eq("book_id", bookId)
+    .eq("badge_type", "book_completion_specific");
+
+  if (badgesError || !badges || badges.length === 0) {
+    return { newBadges: [], totalXpAwarded: 0 };
+  }
+
+  // Get student's earned badges for this book
+  const { data: earnedBadges } = await supabase
+    .from("student_badges")
+    .select("badge_id")
+    .eq("student_id", studentId);
+
+  const earnedBadgeIds = new Set(earnedBadges?.map((b) => b.badge_id) ?? []);
+
+  const newBadges: Badge[] = [];
+  let totalXpAwarded = 0;
+
+  for (const badge of badges) {
+    // Skip if already earned
+    if (earnedBadgeIds.has(badge.id)) continue;
+
+    // Award the badge
+    const { error: insertError } = await supabase
+      .from("student_badges")
+      .insert({
+        student_id: studentId,
+        badge_id: badge.id,
+        book_id: bookId,
+      });
+
+    if (!insertError) {
+      newBadges.push(badge as Badge);
+
+      // Award XP for the badge
+      if (badge.xp_reward > 0) {
+        await awardXP(
+          supabase,
+          studentId,
+          badge.xp_reward,
+          "badge_earned",
+          badge.id,
+          `Earned badge: ${badge.name}`,
+        );
+        totalXpAwarded += badge.xp_reward;
+      }
+    }
+  }
+
+  return { newBadges, totalXpAwarded };
 }
 
 /**

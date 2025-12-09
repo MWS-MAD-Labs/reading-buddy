@@ -41,7 +41,7 @@ A modern K-12 e-library platform with gamification, AI-powered quizzes, and role
 - **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS
 - **Backend:** Supabase (PostgreSQL + Auth)
 - **Storage:** MinIO (self-hosted S3-compatible)
-- **AI:** Google Gemini 2.5 Flash
+- **AI:** Configurable (Gemini 2.5 Flash cloud or local RAG + Diffuser)
 - **PDF Processing:** pdfjs-dist, react-pdf, canvas
 - **Deployment:** Docker
 
@@ -69,8 +69,9 @@ A modern K-12 e-library platform with gamification, AI-powered quizzes, and role
 3. **Configure environment**
    ```bash
    cp .env.example .env
-   nano .env  # Add your credentials (Supabase, MinIO, Gemini API)
+   nano .env  # Add your credentials (Supabase, MinIO, AI provider)
    ```
+   - Set `AI_PROVIDER` to `cloud` (Gemini) or `local` (RAG + Diffuser) and fill in the required keys/URLs.
 
 4. **Deploy with Docker**
    ```bash
@@ -92,6 +93,7 @@ See [DATABASE_SETUP.md](DATABASE_SETUP.md) for database setup and [DOCKER.md](DO
 - [Project Roadmap](Project-Roadmap.md) - **Complete roadmap** from v1.0.0 to v2.0.0+ with detailed feature planning
 - [Changelog](CHANGELOG.md) - **Version history** and detailed release notes
 - [Docker Deployment](DOCKER.md) - Production deployment guide
+- [AI Provider Migration](web/docs/AI_PROVIDER_MIGRATION.md) - Configure `AI_PROVIDER` for cloud or local AI
 - [AI Development Guide](AI-Readme.md) - Architecture and development guidelines
 - [Admin Panel](web/ADMIN_PANEL.md) - Admin features documentation
 
@@ -118,7 +120,9 @@ npm run test:quiz-generation  # Test AI quiz generation
 See [.env.example](.env.example) for all required environment variables:
 - Supabase URL and keys (public + service role)
 - MinIO endpoint and credentials
-- Google Gemini API key
+- AI provider switch (`AI_PROVIDER=cloud|local`)
+- Cloud: `GEMINI_API_KEY` for Gemini 2.5 Flash
+- Local: `RAG_API_URL`, `DIFFUSER_API_URL`, and `NEXT_PUBLIC_RAG_API_URL`
 - Port configuration
 
 ## Architecture

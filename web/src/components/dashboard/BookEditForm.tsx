@@ -189,6 +189,8 @@ export const BookEditForm = ({
         author,
         genre,
         pageCount,
+        pdfUrl: book.pdfUrl,
+        bookRecord: book,
       });
 
       if (!title || !author) {
@@ -202,6 +204,8 @@ export const BookEditForm = ({
         author,
         genre: genre || undefined,
         pageCount: pageCount || undefined,
+        bookId: book.id, // Try extracted text first (fast!)
+        pdfUrl: book.pdfUrl, // Fallback to PDF if no extracted text
       });
 
       console.log("Generation result:", result);

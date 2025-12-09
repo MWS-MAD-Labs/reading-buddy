@@ -9,6 +9,8 @@ type QuizQuestion = {
   options: string[];
   answerIndex: number;
   explanation?: string;
+  correctFeedback?: string;
+  incorrectFeedback?: string;
 };
 
 type QuizData = {
@@ -143,10 +145,28 @@ export const QuizPlayer = ({
             })}
           </div>
 
-          {status === "completed" && question.explanation ? (
-            <div className="mt-5 rounded-2xl border-4 border-yellow-300 bg-yellow-50 p-4">
-              <p className="text-base font-bold text-yellow-800">
-                💡 {question.explanation}
+          {status === "completed" ? (
+            <div
+              className={`mt-5 rounded-2xl border-4 p-4 ${
+                selectedAnswers[questionIndex] === question.answerIndex
+                  ? "border-green-300 bg-green-50"
+                  : "border-yellow-300 bg-yellow-50"
+              }`}
+            >
+              <p
+                className={`text-base font-bold ${
+                  selectedAnswers[questionIndex] === question.answerIndex
+                    ? "text-green-800"
+                    : "text-yellow-800"
+                }`}
+              >
+                💡{" "}
+                {selectedAnswers[questionIndex] === question.answerIndex
+                  ? question.correctFeedback ||
+                    question.explanation ||
+                    "Correct! Well done!"
+                  : question.incorrectFeedback ||
+                    `The correct answer is ${answerLabels[question.answerIndex]}.`}
               </p>
             </div>
           ) : null}
