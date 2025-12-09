@@ -404,17 +404,157 @@ class OllamaProvider implements IAIProvider { ... }
 
 ---
 
-### 6.5 Enhanced Reading Experience
+### 6.5 UX & Dashboard Improvements
+
+#### Comprehensive Dashboard Enhancements
+**Priority:** High | **Target:** v1.6.0 | **Status:** Planned
+
+**Current Issues Identified:**
+- Admin dashboard has minimal content (only 3 cards, lots of white space)
+- Student dashboard shows good gamification but limited functionality
+- Teacher dashboard needs more classroom management tools
+- Librarian table view is overwhelming without better organization
+- Navigation could be more intuitive across roles
+- Missing quick actions and shortcuts for common tasks
+
+**Planned Improvements:**
+
+**A. Dashboard-Specific Enhancements**
+
+*Admin Overview:*
+- System statistics cards (total users by role, total books, active readers)
+- Recent activity feed (new signups, uploads, quiz submissions)
+- System health indicators (storage usage, AI provider status, error rates)
+- Quick action panel (add user, upload book, manage badges, view reports)
+- Usage analytics charts (daily active users, books read per week)
+- Alert center (pending approvals, system issues, low storage warnings)
+
+*Student Dashboard:*
+- Personalized book recommendations (based on reading history, genre preferences)
+- Reading progress charts (pages per day, books per month)
+- Class & global leaderboards with ranking
+- Expanded achievement showcase (badges in progress, next milestones)
+- Reading goals tracker (books per month, pages per day)
+- Continue reading section with visual page preview
+- Friend activity feed (if social features added)
+- Weekly reading challenge cards
+
+*Teacher Dashboard:*
+- Class analytics overview (average reading time, completion rates, engagement)
+- Assignment tracking (pending reviews, overdue submissions)
+- Student performance heatmap (identify struggling students)
+- Quick class management (add/remove students, assign books)
+- Reading assignment calendar view
+- Bulk operations (assign quizzes to multiple classes, export reports)
+- Top performers and students needing help sections
+
+*Librarian Dashboard:*
+- Upload statistics (success rate, format distribution, processing times)
+- Popular books widget (most read, most quizzed, trending)
+- Recent uploads with processing status
+- Content moderation queue (pending reviews, reported content)
+- Batch operations UI (bulk edit metadata, delete, assign access)
+- Book collection management (create collections, featured books)
+- AI generation analytics (quiz generation success rate, costs)
+
+**B. Navigation & User Flow Improvements**
+
+*Global Navigation:*
+- Breadcrumb trail for deep navigation
+- Quick switcher modal (Cmd/Ctrl+K for power users)
+- Contextual help system (tooltips, guided tours for new users)
+- Role-based dashboard shortcuts in header
+- Sticky header with compact mode on scroll
+- Notification center dropdown (system alerts, mentions, updates)
+
+*Search & Discovery:*
+- Advanced search modal with filters
+- Recently viewed books section
+- "Recommended for you" personalized suggestions
+- Genre/category browse mode with filtering
+- Multiple sort options (popularity, recent, rating, alphabetical)
+- Search history and saved searches
+- Quick filters chips (New arrivals, Popular, By grade level)
+
+*Library Page Enhancements:*
+- View mode toggle (Grid/List/Compact)
+- Pagination with infinite scroll option
+- Book preview card on hover (cover zoom, quick description, stats)
+- Quick action buttons (Read now, Add to favorites, Assign to class)
+- Active filter chips with clear all option
+- Collapsible/expandable filter sidebar
+- Bulk selection mode for librarians/teachers
+
+**C. Component & Interaction Improvements**
+
+*Forms & Input Fields:*
+- Real-time inline validation with helpful error messages
+- Auto-save for long forms (draft saving)
+- Field-level contextual help icons
+- Progress indicators for multi-step forms
+- Smart defaults and suggestions
+- Better date/time pickers
+- Rich text editor for descriptions
+
+*Tables & Data Lists:*
+- Sortable columns with visual indicators
+- Column visibility customization
+- Export functionality (CSV, Excel, PDF)
+- Advanced filtering per column
+- Bulk selection with action menu
+- Pagination controls with size options
+- Expandable rows for detailed view
+- Sticky header on scroll
+
+*Modals & Overlays:*
+- Slide-over panels for secondary actions
+- Full keyboard navigation support
+- Stacked modal management
+- Better loading states within modals
+- Context-aware confirmation dialogs
+- Modal sizing options (small, medium, large, fullscreen)
+
+**D. Visual Design & Feedback**
+
+*Loading & Empty States:*
+- Skeleton screens for content loading
+- Animated progress indicators
+- Optimistic UI updates (immediate feedback)
+- Helpful empty states with call-to-action
+- Error states with recovery suggestions
+- Success confirmations with animations
+
+*Notifications & Alerts:*
+- Enhanced toast notifications (with actions, auto-dismiss, persistence)
+- Celebration animations for achievements
+- Contextual inline alerts
+- Notification center with history
+- Email/push notification preferences
+- Undo actions for destructive operations
+
+*Responsive & Mobile:*
+- Mobile-optimized dashboard layouts
+- Touch-friendly controls (larger tap targets)
+- Swipe gestures for navigation
+- Bottom navigation for mobile
+- Tablet-specific multi-column layouts
+- Progressive Web App (PWA) support
+
+### 6.6 Enhanced Reading Experience
 
 #### Reader Improvements
-**Priority:** Medium | **Target:** v1.5.0
+**Priority:** Medium | **Target:** v1.6.0
 
+- Bookmarks with notes capability (mark important pages)
+- Annotations & highlights (student markup with sharing)
+- Dark mode / Reading mode themes (sepia, night mode)
+- Better resume reading (visual page preview, "Continue from page X")
+- Reading position sync across devices
+- Adjustable font size, family, spacing, and margins
 - Audio narration (Text-to-speech or uploaded audio)
-- Annotations & highlights (Student markup)
-- Bookmarks (Visual bookmark system)
-- Reading statistics (Time spent, pages per session)
-- Dark mode reader
-- Font controls (Size, family, spacing, margins)
+- Reading statistics (time spent, pages per session, reading speed)
+- Page thumbnails navigator
+- Fullscreen mode improvements
 - Read-along mode (TTS word highlighting)
 
 ---
@@ -730,11 +870,142 @@ class OllamaProvider implements IAIProvider { ... }
 - ✅ Plain text output for descriptions (markdown stripping)
 - ✅ Unified error handling with AIProviderError class
 
-### v1.6.0 (Q1 2026) - UX Enhancements
-- **Reader Enhancements:** Bookmarks, Dark mode, Better resume
-- **Extended AI Flexibility:** Additional providers (OpenAI, Anthropic, Ollama)
-- **Accessibility:** WCAG 2.1 AA audit
-- **Quality Gates:** 80% coverage, visual regression tests
+### v1.6.0 (Q1 2026) - UX & Dashboard Enhancements
+**Focus:** Comprehensive UX improvements across all dashboards and user flows
+
+#### Dashboard Improvements
+- **Admin Overview**
+  - System-wide statistics cards (total users, books, active students)
+  - Recent activity feed (new users, uploads, quiz completions)
+  - Quick action shortcuts (add user, upload book, manage badges)
+  - System health indicators (storage usage, AI provider status)
+  
+- **Student Dashboard**
+  - Personalized book recommendations based on reading history
+  - Reading progress visualization (charts, graphs)
+  - Leaderboard widget (class ranking, global ranking)
+  - Achievement showcase (earned badges, milestones)
+  - Reading goals and progress tracking
+  - Continue reading section with page preview
+  
+- **Teacher Dashboard**
+  - Class analytics overview (average reading time, completion rates)
+  - Assignment tracking dashboard (pending, in-progress, completed)
+  - Student performance heatmap
+  - Quick class management actions
+  - Reading assignment calendar
+  - Bulk quiz assignment interface
+  
+- **Librarian Dashboard**
+  - Upload statistics (success rate, format distribution)
+  - Popular books widget (most read, most quizzed)
+  - Recent uploads with status
+  - Content moderation queue
+  - Batch operations UI improvements
+  - Book collection management
+
+#### Navigation & Flow Improvements
+- **Global Navigation**
+  - Breadcrumb navigation for deep pages
+  - Quick switcher (Cmd/Ctrl+K) for power users
+  - Contextual help tooltips
+  - Sticky header with minimal mode on scroll
+  
+- **Search & Discovery**
+  - Advanced search with saved filters
+  - Recently viewed books
+  - Recommended for you section
+  - Genre/category browse mode
+  - Sort options (popularity, date, rating)
+  
+- **Library Page**
+  - Grid/List view toggle
+  - Pagination with infinite scroll option
+  - Book preview on hover (cover, description, stats)
+  - Quick actions (read, add to list, assign)
+  - Filter chips for active filters
+  - Collapsible filter sidebar
+
+#### Reading Experience
+- **Book Reader**
+  - Bookmarks with notes capability
+  - Dark mode / Reading mode themes
+  - Better resume reading (visual page preview)
+  - Reading position sync across devices
+  - Adjustable font size and spacing
+  - Progress indicator improvements
+  
+- **Quiz Interface**
+  - Progress bar during quiz
+  - Question navigator (jump to question)
+  - Review mode before submission
+  - Detailed feedback with explanations
+  - Retry mechanism for failed quizzes
+
+#### Component Enhancements
+- **Forms & Inputs**
+  - Better validation feedback (inline errors)
+  - Auto-save for long forms
+  - Field-level help text
+  - Progress indicators for multi-step forms
+  
+- **Tables & Lists**
+  - Column sorting and filtering
+  - Customizable column visibility
+  - Export functionality (CSV, PDF)
+  - Bulk selection improvements
+  - Row actions menu
+  
+- **Modals & Dialogs**
+  - Slide-over panels for non-critical actions
+  - Keyboard navigation support
+  - Better loading states
+  - Confirmation dialogs with context
+
+#### Visual & Interaction Design
+- **Loading States**
+  - Skeleton screens for content
+  - Progress indicators for long operations
+  - Optimistic UI updates
+  - Better error messages with recovery actions
+  
+- **Notifications & Feedback**
+  - Toast notification improvements (actions, persistence)
+  - Success animations
+  - Empty states with call-to-action
+  - Contextual onboarding tips
+  
+- **Responsive Design**
+  - Mobile-optimized dashboards
+  - Tablet-specific layouts
+  - Touch-friendly controls
+  - Improved mobile navigation
+
+#### Accessibility (WCAG 2.1 AA)
+- Keyboard navigation for all features
+- Screen reader optimization
+- Focus indicators and skip links
+- Color contrast compliance
+- Alt text for all images
+- ARIA labels and roles
+
+#### Performance Optimizations
+- Image lazy loading and optimization
+- Code splitting for faster initial load
+- Caching strategies
+- Debounced search inputs
+- Virtual scrolling for large lists
+
+#### Extended AI Flexibility
+- Additional providers (OpenAI, Anthropic, Ollama)
+- Per-feature provider selection
+- AI usage analytics dashboard
+
+#### Quality Gates
+- 80% test coverage target
+- Visual regression tests (Chromatic/Percy)
+- Performance budgets
+- Accessibility audits
 
 ### v1.7.0 (Q2 2026) - Content & Competition
 - Class vs class competitions
