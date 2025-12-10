@@ -65,7 +65,7 @@ export default async function TeacherDashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-bold text-purple-900">
-                💡 Looking for all classrooms?
+                Looking for all classrooms?
               </p>
               <p className="text-xs text-purple-600">
                 View detailed stats and manage all classrooms in the system
@@ -75,7 +75,7 @@ export default async function TeacherDashboardPage() {
               href="/dashboard/teacher/classrooms"
               className="rounded-full bg-purple-500 px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-purple-600"
             >
-              View All Classrooms →
+              View all classrooms
             </Link>
           </div>
         </div>

@@ -69,7 +69,7 @@ export default async function AdminDashboardPage() {
         <header className="rounded-3xl border-4 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 p-6 shadow-lg">
           <div className="mb-2 inline-block rounded-2xl border-4 border-purple-300 bg-purple-400 px-4 py-1">
             <p className="text-sm font-black uppercase tracking-wide text-purple-900">
-              ⚙️ Admin Panel
+              Admin Panel
             </p>
           </div>
           <h1 className="text-3xl font-black text-violet-900">
@@ -83,13 +83,13 @@ export default async function AdminDashboardPage() {
               href="/dashboard/admin/badges"
               className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105"
             >
-              🏅 Manage Badges
+              Manage Badges
             </Link>
             <Link
               href="/dashboard/admin/broadcasts"
               className="inline-flex items-center gap-2 rounded-full border-2 border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
             >
-              📢 Login Messages
+              Login Messages
             </Link>
           </div>
         </header>
@@ -131,13 +131,13 @@ export default async function AdminDashboardPage() {
             href="/dashboard/admin/badges"
             className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105"
           >
-            🏅 Manage Badges
+            Manage Badges
           </Link>
           <Link
             href="/dashboard/admin/broadcasts"
             className="inline-flex items-center gap-2 rounded-full border-2 border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
           >
-            📢 Login Messages
+            Login Messages
           </Link>
         </div>
       </header>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -71,7 +72,24 @@ export default async function StudentClassroomPage({
 
   const assignedBooks =
     assignedBookRows?.map(
-      (entry: { book_id: number; assigned_at: string; books: any }) => {
+      (entry: {
+        book_id: number;
+        assigned_at: string;
+        books:
+          | {
+              id: number;
+              title: string;
+              author: string;
+              cover_url: string | null;
+            }
+          | {
+              id: number;
+              title: string;
+              author: string;
+              cover_url: string | null;
+            }[]
+          | null;
+      }) => {
         const bookData =
           Array.isArray(entry.books) && entry.books.length > 0
             ? entry.books[0]
@@ -93,7 +111,7 @@ export default async function StudentClassroomPage({
 
   // Get student's reading progress for these books
   const bookIds = assignedBooks.map((b) => b.book_id);
-  let readingProgress: Map<number, { current_page: number }> = new Map();
+  const readingProgress: Map<number, { current_page: number }> = new Map();
   if (bookIds.length > 0) {
     const { data: progress } = await supabaseAdmin
       .from("student_books")
@@ -118,7 +136,30 @@ export default async function StudentClassroomPage({
 
   const assignedQuizzes =
     quizAssignments?.map(
-      (item: { quiz_id: number; due_date: string | null; quizzes: any }) => {
+      (item: {
+        quiz_id: number;
+        due_date: string | null;
+        quizzes:
+          | {
+              id?: number;
+              book_id?: number;
+              quiz_type?: string;
+              books?:
+                | { title: string | null }
+                | { title: string | null }[]
+                | null;
+            }
+          | Array<{
+              id?: number;
+              book_id?: number;
+              quiz_type?: string;
+              books?:
+                | { title: string | null }
+                | { title: string | null }[]
+                | null;
+            }>
+          | null;
+      }) => {
         const quizData =
           Array.isArray(item.quizzes) && item.quizzes.length > 0
             ? item.quizzes[0]
@@ -142,7 +183,7 @@ export default async function StudentClassroomPage({
 
   // Get quiz attempts to check which quizzes have been taken
   const quizIds = assignedQuizzes.map((q) => q.id);
-  let quizAttempts: Map<number, { score: number; submitted_at: string }> =
+  const quizAttempts: Map<number, { score: number; submitted_at: string }> =
     new Map();
   if (quizIds.length > 0) {
     const { data: attempts } = await supabaseAdmin
@@ -220,9 +261,11 @@ export default async function StudentClassroomPage({
                     {/* Book Cover */}
                     {book.cover_url && (
                       <div className="flex-shrink-0">
-                        <img
+                        <Image
                           src={book.cover_url}
                           alt={`Cover of ${book.title}`}
+                          width={96}
+                          height={128}
                           className="h-32 w-24 rounded-lg object-cover shadow-md"
                         />
                       </div>
@@ -273,7 +316,6 @@ export default async function StudentClassroomPage({
         <section className={cardClass}>
           <div>
             <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1">
-              <span className="text-lg">📝</span>
               <p className="text-xs font-black uppercase tracking-wide text-purple-600">
                 Class quizzes
               </p>
@@ -310,7 +352,6 @@ export default async function StudentClassroomPage({
                     </p>
                     {isCompleted ? (
                       <div className="mt-1 flex items-center gap-2">
-                        <span className="text-lg">✅</span>
                         <p className="text-sm font-semibold text-emerald-600">
                           Score: {attempt.score}%
                         </p>

@@ -151,6 +151,7 @@ export const BookManager = ({
   const [isDeleting, startDeleteTransition] = useTransition();
   const [renderingBookId, setRenderingBookId] = useState<number | null>(null);
   const [extractingBookId, setExtractingBookId] = useState<number | null>(null);
+  const [actionMenuBookId, setActionMenuBookId] = useState<number | null>(null);
 
   const sortedBooks = useMemo(
     () =>
@@ -344,11 +345,10 @@ export const BookManager = ({
               type="button"
               onClick={onAddBookClick}
               disabled={isAddPanelOpen}
-              icon="➕"
               variant="primary"
               size="md"
             >
-              {isAddPanelOpen ? "Adding eBook…" : "Add New eBook"}
+              {isAddPanelOpen ? "Adding eBook…" : "Add new eBook"}
             </Button>
           </div>
         </CardHeader>
@@ -371,7 +371,7 @@ export const BookManager = ({
           >
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="search">🔍 Search</Label>
+                <Label htmlFor="search">Search</Label>
                 <Input
                   id="search"
                   type="search"
@@ -383,7 +383,7 @@ export const BookManager = ({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="author">✍️ Author</Label>
+                <Label htmlFor="author">Author</Label>
                 <Select
                   id="author"
                   value={authorFilter}
@@ -398,7 +398,7 @@ export const BookManager = ({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="publisher">🏢 Publisher</Label>
+                <Label htmlFor="publisher">Publisher</Label>
                 <Select
                   id="publisher"
                   value={publisherFilter}
@@ -413,7 +413,7 @@ export const BookManager = ({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="year">📅 Year</Label>
+                <Label htmlFor="year">Year</Label>
                 <Select
                   id="year"
                   value={yearFilter}
@@ -428,7 +428,7 @@ export const BookManager = ({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="genre">🎭 Genre</Label>
+                <Label htmlFor="genre">Genre</Label>
                 <Select
                   id="genre"
                   value={genreFilter}
@@ -443,7 +443,7 @@ export const BookManager = ({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="language">🌍 Language</Label>
+                <Label htmlFor="language">Language</Label>
                 <Select
                   id="language"
                   value={languageFilter}
@@ -458,7 +458,7 @@ export const BookManager = ({
                 </Select>
               </div>
               <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                <Label htmlFor="access">👥 Access</Label>
+                <Label htmlFor="access">Access</Label>
                 <Select
                   id="access"
                   value={accessFilter}
@@ -482,8 +482,8 @@ export const BookManager = ({
           {filteredBooks.length === 0 ? (
             <Alert variant="warning" className="text-center">
               {books.length === 0
-                ? '📚 No books yet! Click "Add New eBook" to get started!'
-                : "🔍 No books match your filters. Try adjusting them!"}
+                ? 'No books yet. Click "Add new eBook" to get started.'
+                : "No books match your filters. Try adjusting them."}
             </Alert>
           ) : (
             <>
@@ -500,49 +500,43 @@ export const BookManager = ({
                           {book.title}
                         </h3>
                         <p className="text-sm font-semibold text-purple-600">
-                          ✍️ {book.author}
+                          {book.author}
                         </p>
                       </div>
                     </div>
 
                     <div className="mb-4 space-y-2 text-sm">
                       <div className="flex gap-2">
-                        <span className="font-black text-blue-600">
-                          🔢 ISBN:
-                        </span>
+                        <span className="font-black text-blue-600">ISBN:</span>
                         <span className="text-purple-900">{book.isbn}</span>
                       </div>
                       <div className="flex gap-2">
                         <span className="font-black text-blue-600">
-                          🏢 Publisher:
+                          Publisher:
                         </span>
                         <span className="text-purple-900">
                           {book.publisher}
                         </span>
                       </div>
                       <div className="flex gap-2">
-                        <span className="font-black text-blue-600">
-                          📅 Year:
-                        </span>
+                        <span className="font-black text-blue-600">Year:</span>
                         <span className="text-purple-900">
                           {book.publicationYear}
                         </span>
                       </div>
                       <div className="flex gap-2">
-                        <span className="font-black text-blue-600">
-                          🎭 Genre:
-                        </span>
+                        <span className="font-black text-blue-600">Genre:</span>
                         <span className="text-purple-900">{book.genre}</span>
                       </div>
                       <div className="flex gap-2">
                         <span className="font-black text-blue-600">
-                          🌍 Language:
+                          Language:
                         </span>
                         <span className="text-purple-900">{book.language}</span>
                       </div>
                       <div className="flex gap-2">
                         <span className="font-black text-blue-600">
-                          📄 Content:
+                          Content:
                         </span>
                         {getContentStatusBadge(book)}
                       </div>
@@ -551,7 +545,7 @@ export const BookManager = ({
                     {book.accessLevels.length > 0 && (
                       <div className="mb-4">
                         <p className="mb-2 text-sm font-black text-blue-600">
-                          👥 Access Levels:
+                          Access Levels:
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {book.accessLevels.map((level) => {
@@ -578,8 +572,9 @@ export const BookManager = ({
                         type="button"
                         onClick={() => setQuizManagementBook(book)}
                         className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-purple-300 bg-purple-100 px-4 py-2 text-sm font-black text-purple-600 transition hover:bg-purple-200 active:scale-95"
+                        aria-label="Manage quizzes"
                       >
-                        📝 Quizzes
+                        📝
                       </button>
                       {!book.pageImagesCount && (
                         <button
@@ -587,10 +582,9 @@ export const BookManager = ({
                           onClick={() => handleRender(book)}
                           disabled={renderingBookId === book.id}
                           className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-emerald-300 bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-600 transition hover:bg-emerald-200 active:scale-95 disabled:opacity-40"
+                          aria-label="Render images"
                         >
-                          {renderingBookId === book.id
-                            ? "⏳ Rendering"
-                            : "🎨 Render"}
+                          {renderingBookId === book.id ? "🎨" : "🎨"}
                         </button>
                       )}
                       {!book.textExtractedAt && (
@@ -599,26 +593,27 @@ export const BookManager = ({
                           onClick={() => handleExtractText(book)}
                           disabled={extractingBookId === book.id}
                           className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-amber-300 bg-amber-100 px-4 py-2 text-sm font-black text-amber-700 transition hover:bg-amber-200 active:scale-95 disabled:opacity-40"
+                          aria-label="Extract text"
                         >
-                          {extractingBookId === book.id
-                            ? "⏳ Extracting"
-                            : "📝 Extract Text"}
+                          {extractingBookId === book.id ? "🧾" : "🧾"}
                         </button>
                       )}
                       <button
                         type="button"
                         onClick={() => handleEdit(book)}
                         className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-indigo-300 bg-indigo-100 px-4 py-2 text-sm font-black text-indigo-600 transition hover:bg-indigo-200 active:scale-95"
+                        aria-label="Edit book"
                       >
-                        ✏️ Edit
+                        ✏️
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(book)}
                         disabled={isDeleting && deletePendingId === book.id}
                         className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-rose-300 bg-rose-100 px-4 py-2 text-sm font-black text-rose-600 transition hover:bg-rose-200 active:scale-95 disabled:opacity-40"
+                        aria-label="Delete book"
                       >
-                        🗑️ Delete
+                        🗑️
                       </button>
                     </div>
                   </div>
@@ -631,34 +626,34 @@ export const BookManager = ({
                   <thead className="bg-gradient-to-r from-blue-100 via-purple-100 to-pink-100">
                     <tr>
                       <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                        📖 Title
+                        Title
                       </th>
                       <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                        🔢 ISBN
+                        ISBN
                       </th>
                       <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                        ✍️ Author
+                        Author
                       </th>
                       <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                        🏢 Publisher
+                        Publisher
                       </th>
                       <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                        📅 Year
+                        Year
                       </th>
                       <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                        🎭 Genre
+                        Genre
                       </th>
                       <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                        🌍 Language
+                        Language
                       </th>
                       <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                        📄 Content
+                        Content
                       </th>
                       <th className="px-4 py-3 text-left text-base font-black text-blue-600">
-                        👥 Access
+                        Access
                       </th>
                       <th className="px-4 py-3 text-right text-base font-black text-blue-600">
-                        ⚡ Actions
+                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -708,61 +703,101 @@ export const BookManager = ({
                             <span className="text-purple-300">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                        <td className="relative px-4 py-3 text-right">
+                          <div className="flex items-center justify-end">
                             <button
                               type="button"
-                              onClick={() => setQuizManagementBook(book)}
-                              className="min-h-[44px] min-w-[44px] rounded-full border border-purple-200 bg-white/80 p-2 text-purple-600 shadow-sm transition hover:bg-purple-50"
-                              aria-label="Manage quizzes"
-                              title="Manage quizzes"
-                            >
-                              📝
-                            </button>
-                            {!book.pageImagesCount && (
-                              <button
-                                type="button"
-                                onClick={() => handleRender(book)}
-                                disabled={renderingBookId === book.id}
-                                className="min-h-[44px] min-w-[44px] rounded-full border border-emerald-200 bg-white/80 p-2 text-emerald-600 shadow-sm transition hover:bg-emerald-50 disabled:opacity-40"
-                                aria-label="Render book images"
-                                title="Render book images"
-                              >
-                                {renderingBookId === book.id ? "⏳" : "🎨"}
-                              </button>
-                            )}
-                            {!book.textExtractedAt && (
-                              <button
-                                type="button"
-                                onClick={() => handleExtractText(book)}
-                                disabled={extractingBookId === book.id}
-                                className="min-h-[44px] min-w-[44px] rounded-full border border-amber-200 bg-white/80 p-2 text-amber-600 shadow-sm transition hover:bg-amber-50 disabled:opacity-40"
-                                aria-label="Extract text from book"
-                                title="Extract text from book"
-                              >
-                                {extractingBookId === book.id ? "⏳" : "📝"}
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleEdit(book)}
-                              className="min-h-[44px] min-w-[44px] rounded-full border border-indigo-200 bg-white/80 p-2 text-indigo-600 shadow-sm transition hover:bg-indigo-50"
-                              aria-label="Edit book"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(book)}
-                              disabled={
-                                isDeleting && deletePendingId === book.id
+                              onClick={() =>
+                                setActionMenuBookId((prev) =>
+                                  prev === book.id ? null : book.id,
+                                )
                               }
-                              className="min-h-[44px] min-w-[44px] rounded-full border border-rose-200 bg-white/80 p-2 text-rose-500 shadow-sm transition hover:bg-rose-50 disabled:opacity-40"
-                              aria-label="Delete book"
+                              className="h-10 w-10 rounded-full border border-indigo-200 bg-white/80 text-lg font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+                              aria-haspopup="true"
+                              aria-expanded={actionMenuBookId === book.id}
+                              aria-label="Open actions"
                             >
-                              🗑️
+                              ⋯
                             </button>
                           </div>
+                          {actionMenuBookId === book.id ? (
+                            <div className="absolute right-2 top-1/2 z-10 w-44 -translate-y-1/2 rounded-2xl border border-indigo-100 bg-white p-2 text-sm font-semibold text-indigo-800 shadow-lg transition-transform duration-150 ease-out animate-[actionPop_160ms_ease-out_forwards]">
+                              <div className="flex flex-col gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuBookId(null);
+                                    setQuizManagementBook(book);
+                                  }}
+                                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
+                                >
+                                  <span aria-hidden>📝</span>
+                                  <span>Quizzes</span>
+                                </button>
+                                {!book.pageImagesCount && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActionMenuBookId(null);
+                                      void handleRender(book);
+                                    }}
+                                    disabled={renderingBookId === book.id}
+                                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
+                                  >
+                                    <span aria-hidden>🎨</span>
+                                    <span>
+                                      {renderingBookId === book.id
+                                        ? "Rendering…"
+                                        : "Render"}
+                                    </span>
+                                  </button>
+                                )}
+                                {!book.textExtractedAt && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActionMenuBookId(null);
+                                      void handleExtractText(book);
+                                    }}
+                                    disabled={extractingBookId === book.id}
+                                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
+                                  >
+                                    <span aria-hidden>🧾</span>
+                                    <span>
+                                      {extractingBookId === book.id
+                                        ? "Extracting…"
+                                        : "Extract text"}
+                                    </span>
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuBookId(null);
+                                    handleEdit(book);
+                                  }}
+                                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
+                                >
+                                  <span aria-hidden>✏️</span>
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuBookId(null);
+                                    handleDelete(book);
+                                  }}
+                                  disabled={
+                                    isDeleting && deletePendingId === book.id
+                                  }
+                                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                                >
+                                  <span aria-hidden>🗑️</span>
+                                  <span>Delete</span>
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                         </td>
                       </tr>
                     ))}
@@ -781,7 +816,7 @@ export const BookManager = ({
             <div className="mb-6 flex items-start justify-between">
               <div>
                 <h3 className="text-2xl font-black text-indigo-900">
-                  📝 Quiz Management
+                  Quiz Management
                 </h3>
                 <p className="text-lg font-semibold text-indigo-600">
                   {quizManagementBook.title}
@@ -803,6 +838,18 @@ export const BookManager = ({
           </div>
         </div>
       )}
+      <style jsx>{`
+        @keyframes actionPop {
+          from {
+            opacity: 0;
+            transform: translateY(-50%) scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(-50%) scale(1);
+          }
+        }
+      `}</style>
     </section>
   );
 };

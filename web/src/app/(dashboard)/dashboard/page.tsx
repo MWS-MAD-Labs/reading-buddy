@@ -97,24 +97,24 @@ const roleQuickLinks: Record<UserRole | "DEFAULT", QuickLink[]> = {
 const heroCopy: Record<UserRole | "DEFAULT", { title: string; body: string }> =
   {
     STUDENT: {
-      title: "Hey reader, ready for today’s quest? 🌈",
-      body: "Jump back into your story, earn badges, and explore new worlds picked just for you.",
+      title: "Welcome back to your reading list",
+      body: "Jump into your stories, earn badges, and explore new worlds picked for you.",
     },
     TEACHER: {
-      title: "Welcome back, classroom hero! 🍎",
-      body: "Keep tabs on reading progress, celebrate milestones, and discover quizzes to challenge your students.",
+      title: "Classroom insights at a glance",
+      body: "Keep tabs on reading progress, celebrate milestones, and share quizzes with your students.",
     },
     LIBRARIAN: {
-      title: "Story curator in the house! 📚",
-      body: "Upload books, keep the library sparkly, and make sure every reader has something magical to open.",
+      title: "Keep the collection organized",
+      body: "Upload books, maintain metadata, and make sure every reader has something great to open.",
     },
     ADMIN: {
-      title: "Captain of the Reading Buddy ship! ⚙️",
-      body: "Manage roles, keep everyone in sync, and ensure the whole community runs smoothly.",
+      title: "Manage roles and visibility",
+      body: "Keep access up to date, monitor the system, and support every team.",
     },
     DEFAULT: {
-      title: "Welcome to your amazing library! 🎉",
-      body: "Manage books, track reading progress, and build AI-powered quizzes all in one fun place.",
+      title: "Welcome to your library workspace",
+      body: "Manage books, track reading progress, and build AI-powered quizzes in one place.",
     },
   };
 
@@ -136,7 +136,7 @@ export default async function DashboardHomePage() {
     <div className="space-y-8">
       <section className="pop-in rounded-[32px] border border-white/60 bg-white/90 p-8 text-indigo-950 shadow-[0_30px_90px_rgba(147,118,255,0.25)]">
         <div className="mb-3 inline-block rounded-full border border-rose-200 bg-gradient-to-r from-rose-200 to-amber-200 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-rose-700">
-          📚 Reading Buddy
+          Reading Buddy
         </div>
         <h1 className="mt-2 text-4xl font-black">{copy.title}</h1>
         <p className="mt-3 max-w-2xl text-lg text-indigo-500">{copy.body}</p>

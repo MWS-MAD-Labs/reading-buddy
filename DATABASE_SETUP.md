@@ -6,7 +6,7 @@ This guide will help you set up the Supabase database for Reading Buddy v1.0.0.
 
 Reading Buddy uses Supabase (PostgreSQL) for all data storage, authentication, and row-level security. The database schema includes:
 
-- **18 tables** covering users, books, classes, quizzes, checkpoints, and badges
+- **19 tables** covering users, books, classes, quizzes, checkpoints, badges, and login broadcasts
 - **Complete RLS policies** for secure multi-role access
 - **15+ indexes** for optimal performance
 - **Triggers and functions** for automation
@@ -52,18 +52,18 @@ Version: 1.0.0
 Created:
   - 2 ENUMs (user_role, book_access_level)
   - 18 Tables (with all v1.0.0 features)
-  - 15+ Indexes for performance
-  - 3 Functions (user creation, email lookup, timestamp updates)
-  - 3 Triggers
-  - Complete RLS policies
-  - 6 Default badges
+- 15+ Indexes for performance
+- 3 Functions (user creation, email lookup, timestamp updates)
+- 3 Triggers
+- Complete RLS policies
+- 6 Default badges
 =================================================
 ```
 
 ### Step 3: Verify the Setup
 
 1. Go to **Table Editor** in the left sidebar
-2. You should see all 18 tables:
+2. You should see all 19 tables:
    - `profiles`
    - `books`
    - `book_access`
@@ -80,6 +80,7 @@ Created:
    - `student_checkpoint_progress`
    - `badges`
    - `student_badges`
+   - `login_broadcasts` (admin-controlled announcement messages shown on the login page)
 
 3. Click on the **`badges`** table
 4. You should see 6 default badges already inserted:

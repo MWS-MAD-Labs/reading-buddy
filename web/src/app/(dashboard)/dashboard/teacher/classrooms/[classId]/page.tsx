@@ -112,27 +112,42 @@ export default async function ManageClassroomPage({
     }
 
     // Transform array relationships to single objects
-    readings = (readingsData ?? []).map((entry: any) => {
-      const profileData =
-        Array.isArray(entry.profiles) && entry.profiles.length > 0
-          ? entry.profiles[0]
-          : entry.profiles;
-      const bookData =
-        Array.isArray(entry.books) && entry.books.length > 0
-          ? entry.books[0]
-          : entry.books;
-      return {
-        student_id: entry.student_id,
-        current_page: entry.current_page,
-        started_at: entry.started_at,
-        completed_at: entry.completed_at,
-        profiles: profileData as { full_name: string | null } | null,
-        books: bookData as {
-          title: string;
-          page_count: number | null;
-        } | null,
-      };
-    });
+    readings = (readingsData ?? []).map(
+      (entry: {
+        student_id: string;
+        current_page: number | null;
+        started_at: string | null;
+        completed_at: string | null;
+        profiles:
+          | { full_name: string | null }
+          | { full_name: string | null }[]
+          | null;
+        books:
+          | { title: string; page_count: number | null }
+          | { title: string; page_count: number | null }[]
+          | null;
+      }) => {
+        const profileData =
+          Array.isArray(entry.profiles) && entry.profiles.length > 0
+            ? entry.profiles[0]
+            : entry.profiles;
+        const bookData =
+          Array.isArray(entry.books) && entry.books.length > 0
+            ? entry.books[0]
+            : entry.books;
+        return {
+          student_id: entry.student_id,
+          current_page: entry.current_page,
+          started_at: entry.started_at,
+          completed_at: entry.completed_at,
+          profiles: profileData as { full_name: string | null } | null,
+          books: bookData as {
+            title: string;
+            page_count: number | null;
+          } | null,
+        };
+      },
+    );
   }
 
   let quizAttempts: {
@@ -161,19 +176,40 @@ export default async function ManageClassroomPage({
       (entry: {
         score: number;
         submitted_at: string | null;
-        profiles: any;
-        quizzes: any;
+        profiles:
+          | { full_name: string | null }
+          | { full_name: string | null }[]
+          | null;
+        quizzes:
+          | {
+              id?: number;
+              books?:
+                | { title: string | null }
+                | { title: string | null }[]
+                | null;
+            }
+          | Array<{
+              id?: number;
+              books?:
+                | { title: string | null }
+                | { title: string | null }[]
+                | null;
+            }>
+          | null;
       }) => {
         const profileData =
           Array.isArray(entry.profiles) && entry.profiles.length > 0
             ? entry.profiles[0]
             : entry.profiles;
 
-        const quizData =
+        const quizInfo =
           Array.isArray(entry.quizzes) && entry.quizzes.length > 0
             ? entry.quizzes[0]
             : entry.quizzes;
-        const quiz = quizData as { id?: number; books?: any } | null;
+        const quiz = quizInfo as {
+          id?: number;
+          books?: { title: string | null } | { title: string | null }[] | null;
+        } | null;
 
         const bookData =
           quiz && Array.isArray(quiz.books) && quiz.books.length > 0
@@ -436,7 +472,6 @@ export default async function ManageClassroomPage({
         <section className="space-y-6">
           <div className="rounded-[32px] border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-4">
             <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1">
-              <span className="text-lg">📝</span>
               <p className="text-xs font-black uppercase tracking-wide text-purple-600">
                 Quiz Assignments
               </p>

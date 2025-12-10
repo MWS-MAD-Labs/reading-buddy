@@ -2,19 +2,22 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getBadgesWithProgress, getGamificationStats } from "@/lib/gamification";
+import {
+  getBadgesWithProgress,
+  getGamificationStats,
+} from "@/lib/gamification";
 import { BadgeCard } from "@/components/dashboard/gamification";
 import type { BadgeCategory } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
-const categoryLabels: Record<BadgeCategory, { label: string; icon: string }> = {
-  reading: { label: "Reading", icon: "📖" },
-  quiz: { label: "Quiz", icon: "📝" },
-  streak: { label: "Streak", icon: "🔥" },
-  milestone: { label: "Milestone", icon: "🏆" },
-  special: { label: "Special", icon: "⭐" },
-  general: { label: "General", icon: "🎯" },
+const categoryLabels: Record<BadgeCategory, { label: string }> = {
+  reading: { label: "Reading" },
+  quiz: { label: "Quiz" },
+  streak: { label: "Streak" },
+  milestone: { label: "Milestone" },
+  special: { label: "Special" },
+  general: { label: "General" },
 };
 
 export default async function BadgesPage() {
@@ -29,7 +32,10 @@ export default async function BadgesPage() {
   }
 
   const stats = await getGamificationStats(supabaseAdmin, user.id);
-  const badgesWithProgress = await getBadgesWithProgress(supabaseAdmin, user.id);
+  const badgesWithProgress = await getBadgesWithProgress(
+    supabaseAdmin,
+    user.id,
+  );
 
   // Group badges by category
   const badgesByCategory = badgesWithProgress.reduce(
@@ -41,7 +47,7 @@ export default async function BadgesPage() {
       acc[category].push(item);
       return acc;
     },
-    {} as Record<string, typeof badgesWithProgress>
+    {} as Record<string, typeof badgesWithProgress>,
   );
 
   // Sort each category: earned first, then by progress
@@ -101,11 +107,15 @@ export default async function BadgesPage() {
           {stats && (
             <div className="flex gap-6">
               <div className="text-center">
-                <p className="text-2xl font-bold">{stats.total_books_completed}</p>
+                <p className="text-2xl font-bold">
+                  {stats.total_books_completed}
+                </p>
                 <p className="text-xs text-white/70">Books</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold">{stats.total_quizzes_completed}</p>
+                <p className="text-2xl font-bold">
+                  {stats.total_quizzes_completed}
+                </p>
                 <p className="text-xs text-white/70">Quizzes</p>
               </div>
               <div className="text-center">
@@ -145,16 +155,13 @@ export default async function BadgesPage() {
             className="space-y-4 rounded-[28px] border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(147,118,255,0.18)]"
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{categoryInfo.icon}</span>
-                <div>
-                  <h2 className="text-xl font-black text-indigo-950">
-                    {categoryInfo.label} Badges
-                  </h2>
-                  <p className="text-sm text-indigo-500">
-                    {earnedInCategory} of {badges.length} earned
-                  </p>
-                </div>
+              <div>
+                <h2 className="text-xl font-black text-indigo-950">
+                  {categoryInfo.label} Badges
+                </h2>
+                <p className="text-sm text-indigo-500">
+                  {earnedInCategory} of {badges.length} earned
+                </p>
               </div>
             </div>
 

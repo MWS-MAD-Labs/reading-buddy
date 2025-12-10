@@ -66,7 +66,7 @@ export const ForgotPasswordForm = () => {
             </Badge>
             <div className="space-y-2">
               <CardTitle className="text-3xl md:text-4xl">
-                🔒 Reset your Reading Buddy access
+                Reset your Reading Buddy access
               </CardTitle>
               <p className="text-base font-semibold text-indigo-600 md:text-lg">
                 We&apos;ll send a secure reset link to your school email so you
@@ -90,7 +90,7 @@ export const ForgotPasswordForm = () => {
 
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
-                <Label htmlFor="email">📧 School email</Label>
+                <Label htmlFor="email">School email</Label>
                 <Input
                   id="email"
                   name="email"
@@ -126,24 +126,35 @@ export const ForgotPasswordForm = () => {
           <div className="relative h-full rounded-[24px] border-4 border-white/60 bg-white/70 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.08)] backdrop-blur">
             <div className="absolute inset-0 -z-10 rounded-[24px] bg-gradient-to-br from-sky-200/60 via-indigo-100/50 to-teal-100/60 blur-3xl" />
             <div className="mb-4 flex items-center justify-between">
-              <span className="text-2xl">🛠️</span>
               <Badge variant="neutral">Quick steps</Badge>
             </div>
             <ul className="space-y-3 text-sm font-semibold text-indigo-700 md:text-base">
               <li className="flex items-center gap-2">
-                <span className="text-lg">✅</span>
+                <span
+                  className="h-2 w-2 rounded-full bg-indigo-400"
+                  aria-hidden
+                />
                 Enter your school email
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-lg">📬</span>
+                <span
+                  className="h-2 w-2 rounded-full bg-indigo-400"
+                  aria-hidden
+                />
                 Open the link we send
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-lg">🔑</span>
+                <span
+                  className="h-2 w-2 rounded-full bg-indigo-400"
+                  aria-hidden
+                />
                 Choose a fresh password
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-lg">🚀</span>
+                <span
+                  className="h-2 w-2 rounded-full bg-indigo-400"
+                  aria-hidden
+                />
                 Sign back in and keep reading
               </li>
             </ul>

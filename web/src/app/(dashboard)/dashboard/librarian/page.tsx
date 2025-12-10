@@ -102,7 +102,6 @@ export default async function LibrarianPage() {
               "no-underline",
             )}
           >
-            <span className="text-lg">🏅</span>
             <span>Manage Book Badges</span>
           </Link>
         </CardContent>

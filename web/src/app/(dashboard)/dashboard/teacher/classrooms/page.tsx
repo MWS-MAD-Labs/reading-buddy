@@ -102,7 +102,6 @@ export default async function ClassroomManagementPage() {
     <div className="space-y-8">
       <header className="rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_25px_70px_rgba(93,80,255,0.18)]">
         <div className="mb-3 inline-flex items-center gap-3 rounded-full bg-indigo-100/80 px-4 py-2">
-          <span className="text-lg">🧑‍🏫</span>
           <p className="text-sm font-black uppercase tracking-wide text-indigo-600">
             Classrooms
           </p>

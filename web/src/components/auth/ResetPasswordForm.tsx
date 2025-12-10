@@ -72,7 +72,7 @@ export const ResetPasswordForm = () => {
             </Badge>
             <div className="space-y-2">
               <CardTitle className="text-3xl md:text-4xl">
-                🔑 Choose a new password
+                Choose a new password
               </CardTitle>
               <p className="text-base font-semibold text-indigo-600 md:text-lg">
                 You verified your email. Let&apos;s secure your account before
@@ -97,7 +97,7 @@ export const ResetPasswordForm = () => {
 
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
-                <Label htmlFor="password">🔐 New password</Label>
+                <Label htmlFor="password">New password</Label>
                 <Input
                   id="password"
                   name="password"
@@ -111,7 +111,7 @@ export const ResetPasswordForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">✅ Confirm password</Label>
+                <Label htmlFor="confirmPassword">Confirm password</Label>
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"
@@ -142,24 +142,35 @@ export const ResetPasswordForm = () => {
           <div className="relative h-full rounded-[24px] border-4 border-white/60 bg-white/70 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.08)] backdrop-blur">
             <div className="absolute inset-0 -z-10 rounded-[24px] bg-gradient-to-br from-emerald-200/60 via-teal-100/50 to-blue-100/60 blur-3xl" />
             <div className="mb-4 flex items-center justify-between">
-              <span className="text-2xl">🧠</span>
               <Badge variant="neutral">Smart password tips</Badge>
             </div>
             <ul className="space-y-3 text-sm font-semibold text-indigo-700 md:text-base">
               <li className="flex items-center gap-2">
-                <span className="text-lg">🎲</span>
+                <span
+                  className="h-2 w-2 rounded-full bg-indigo-400"
+                  aria-hidden
+                />
                 Combine words, numbers, and a symbol or two.
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-lg">🚫</span>
+                <span
+                  className="h-2 w-2 rounded-full bg-indigo-400"
+                  aria-hidden
+                />
                 Skip birthdays or easy-to-guess info.
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-lg">🛡️</span>
+                <span
+                  className="h-2 w-2 rounded-full bg-indigo-400"
+                  aria-hidden
+                />
                 Keep this password unique to Reading Buddy.
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-lg">⌛</span>
+                <span
+                  className="h-2 w-2 rounded-full bg-indigo-400"
+                  aria-hidden
+                />
                 We will sign you in again right after saving.
               </li>
             </ul>
