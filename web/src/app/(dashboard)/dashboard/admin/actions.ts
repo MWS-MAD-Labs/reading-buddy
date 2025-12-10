@@ -321,10 +321,11 @@ export async function getSystemStats(): Promise<{
     }
 
     // Count descriptions by checking books with ai_description
-    const { data: descriptionsCount, error: descriptionsError } = await supabase
-      .from("books")
-      .select("id", { count: "exact", head: true })
-      .not("ai_description", "is", null);
+    const { count: descriptionsCount, error: descriptionsError } =
+      await supabase
+        .from("books")
+        .select("id", { count: "exact", head: true })
+        .not("ai_description", "is", null);
 
     if (descriptionsError) {
       console.error("Error fetching descriptions:", descriptionsError);
