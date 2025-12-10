@@ -334,6 +334,16 @@ body::after {
     }
 }
 
+/* Shimmer animation for skeleton loaders */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
 /* Gradient animation for AI generating button */
 @keyframes gradient {
     0% {
@@ -443,6 +453,11 @@ body::after {
 /* Slide up page transition */
 .page-transition {
     animation: slideUp 0.4s ease-out;
+}
+
+/* Shimmer animation utility */
+.animate-shimmer {
+    animation: shimmer 2s ease-in-out infinite;
 }
 
 /* Indeterminate top loading bar animation */

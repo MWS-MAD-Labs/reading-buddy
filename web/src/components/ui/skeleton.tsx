@@ -7,25 +7,11 @@ export function Skeleton({
   return (
     <div
       className={cn(
-        "animate-pulse rounded-2xl bg-gradient-to-r from-purple-100 via-pink-100 to-purple-100 bg-[length:200%_100%]",
+        "animate-shimmer rounded-2xl bg-gradient-to-r from-purple-100 via-pink-100 to-purple-100 bg-[length:200%_100%]",
         className,
       )}
-      style={{
-        animation: "shimmer 2s ease-in-out infinite",
-      }}
       {...props}
-    >
-      <style jsx>{`
-        @keyframes shimmer {
-          0% {
-            background-position: -200% 0;
-          }
-          100% {
-            background-position: 200% 0;
-          }
-        }
-      `}</style>
-    </div>
+    />
   );
 }
 
@@ -129,11 +115,7 @@ export function SkeletonList() {
   );
 }
 
-export function SkeletonAvatar({
-  size = "md",
-}: {
-  size?: "sm" | "md" | "lg";
-}) {
+export function SkeletonAvatar({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   const sizeClasses = {
     sm: "h-8 w-8",
     md: "h-12 w-12",
@@ -143,11 +125,7 @@ export function SkeletonAvatar({
   return <Skeleton className={cn("rounded-full", sizeClasses[size])} />;
 }
 
-export function SkeletonText({
-  lines = 3,
-}: {
-  lines?: number;
-}) {
+export function SkeletonText({ lines = 3 }: { lines?: number }) {
   return (
     <div className="space-y-2">
       {Array.from({ length: lines }).map((_, i) => (
