@@ -137,9 +137,11 @@ export default async function DashboardHomePage() {
   const links = roleQuickLinks[role] ?? roleQuickLinks.DEFAULT;
 
   // Fetch stats based on role
-  const adminStatsResult = role === "ADMIN" ? await getSystemStats() : null;
+  // Admin sees all stats from all roles
+  const adminStatsResult =
+    role === "ADMIN" || role === "LIBRARIAN" ? await getSystemStats() : null;
   const librarianStatsResult =
-    role === "LIBRARIAN" ? await getLibrarianStats() : null;
+    role === "ADMIN" || role === "LIBRARIAN" ? await getLibrarianStats() : null;
 
   return (
     <div className="space-y-8">
@@ -151,38 +153,56 @@ export default async function DashboardHomePage() {
         <p className="mt-3 max-w-2xl text-lg text-indigo-500">{copy.body}</p>
       </section>
 
-      {/* System Overview - Admin Only */}
-      {role === "ADMIN" &&
-        adminStatsResult?.success &&
-        adminStatsResult.data && (
-          <SystemStatsCards stats={adminStatsResult.data} />
-        )}
+      {/* Admin gets all overview cards */}
+      {role === "ADMIN" && (
+        <>
+          {/* System Overview */}
+          {adminStatsResult?.success && adminStatsResult.data && (
+            <SystemStatsCards stats={adminStatsResult.data} />
+          )}
 
-      {/* Librarian Overview */}
-      {role === "LIBRARIAN" &&
-        librarianStatsResult?.success &&
-        librarianStatsResult.data && (
-          <LibrarianStatsCards stats={librarianStatsResult.data} />
-        )}
+          {/* Librarian Overview */}
+          {librarianStatsResult?.success && librarianStatsResult.data && (
+            <LibrarianStatsCards stats={librarianStatsResult.data} />
+          )}
 
-      {/* Error states */}
-      {role === "ADMIN" && adminStatsResult && !adminStatsResult.success && (
-        <div className="rounded-2xl border-4 border-rose-200 bg-rose-50 p-4">
-          <p className="font-semibold text-rose-800">
-            Failed to load admin statistics: {adminStatsResult.error}
-          </p>
-        </div>
+          {/* Error states for admin */}
+          {adminStatsResult && !adminStatsResult.success && (
+            <div className="rounded-2xl border-4 border-rose-200 bg-rose-50 p-4">
+              <p className="font-semibold text-rose-800">
+                Failed to load system statistics: {adminStatsResult.error}
+              </p>
+            </div>
+          )}
+
+          {librarianStatsResult && !librarianStatsResult.success && (
+            <div className="rounded-2xl border-4 border-rose-200 bg-rose-50 p-4">
+              <p className="font-semibold text-rose-800">
+                Failed to load librarian statistics:{" "}
+                {librarianStatsResult.error}
+              </p>
+            </div>
+          )}
+        </>
       )}
 
-      {role === "LIBRARIAN" &&
-        librarianStatsResult &&
-        !librarianStatsResult.success && (
-          <div className="rounded-2xl border-4 border-rose-200 bg-rose-50 p-4">
-            <p className="font-semibold text-rose-800">
-              Failed to load librarian statistics: {librarianStatsResult.error}
-            </p>
-          </div>
-        )}
+      {/* Librarian gets their specific overview */}
+      {role === "LIBRARIAN" && (
+        <>
+          {librarianStatsResult?.success && librarianStatsResult.data && (
+            <LibrarianStatsCards stats={librarianStatsResult.data} />
+          )}
+
+          {librarianStatsResult && !librarianStatsResult.success && (
+            <div className="rounded-2xl border-4 border-rose-200 bg-rose-50 p-4">
+              <p className="font-semibold text-rose-800">
+                Failed to load librarian statistics:{" "}
+                {librarianStatsResult.error}
+              </p>
+            </div>
+          )}
+        </>
+      )}
 
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {links.map((card) => (

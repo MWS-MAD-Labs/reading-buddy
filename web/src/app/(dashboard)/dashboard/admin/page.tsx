@@ -3,10 +3,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AdminUserTable } from "@/components/dashboard/AdminUserTable";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { SystemStatsCards } from "@/components/dashboard/admin/SystemStatsCards";
-import { getSystemStats } from "./actions";
-import { Suspense } from "react";
-import { SkeletonStatsGrid } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -68,9 +64,6 @@ export default async function AdminDashboardPage() {
 
     const users = usersWithEmails;
 
-    // Fetch system statistics (fallback case)
-    const statsResult = await getSystemStats();
-
     return (
       <div className="space-y-6">
         <header className="rounded-3xl border-4 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 p-6 shadow-lg">
@@ -80,11 +73,10 @@ export default async function AdminDashboardPage() {
             </p>
           </div>
           <h1 className="text-3xl font-black text-violet-900">
-            System Dashboard
+            User Management
           </h1>
           <p className="text-base font-semibold text-violet-700">
-            Monitor system statistics, manage users, and configure platform
-            settings.
+            Manage users, roles, and access levels for the entire system.
           </p>
           <div className="mt-4 flex gap-3">
             <Link
@@ -99,32 +91,16 @@ export default async function AdminDashboardPage() {
             >
               Login Messages
             </Link>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-purple-200 bg-white px-4 py-2 text-sm font-bold text-purple-700 shadow-sm transition hover:bg-purple-50"
+            >
+              📊 System Overview
+            </Link>
           </div>
         </header>
 
-        {/* System Statistics */}
-        {statsResult.success && statsResult.data ? (
-          <SystemStatsCards stats={statsResult.data} />
-        ) : (
-          <div className="rounded-2xl border-4 border-rose-200 bg-rose-50 p-4">
-            <p className="font-semibold text-rose-800">
-              Failed to load system statistics: {statsResult.error}
-            </p>
-          </div>
-        )}
-
-        {/* User Management Section */}
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-xl font-black text-indigo-900">
-              User Management
-            </h2>
-            <p className="text-sm font-semibold text-indigo-600">
-              Manage users, roles, and access levels
-            </p>
-          </div>
-          <AdminUserTable users={users} />
-        </div>
+        <AdminUserTable users={users} />
       </div>
     );
   }
@@ -144,9 +120,6 @@ export default async function AdminDashboardPage() {
       };
     }) ?? [];
 
-  // Fetch system statistics
-  const statsResult = await getSystemStats();
-
   return (
     <div className="space-y-6">
       <header className="rounded-3xl border-4 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 p-6 shadow-lg">
@@ -155,12 +128,9 @@ export default async function AdminDashboardPage() {
             Admin Panel
           </p>
         </div>
-        <h1 className="text-3xl font-black text-violet-900">
-          System Dashboard
-        </h1>
+        <h1 className="text-3xl font-black text-violet-900">User Management</h1>
         <p className="text-base font-semibold text-violet-700">
-          Monitor system statistics, manage users, and configure platform
-          settings.
+          Manage users, roles, and access levels for the entire system.
         </p>
         <div className="mt-4 flex gap-3">
           <Link
@@ -175,32 +145,16 @@ export default async function AdminDashboardPage() {
           >
             Login Messages
           </Link>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 rounded-full border-2 border-purple-200 bg-white px-4 py-2 text-sm font-bold text-purple-700 shadow-sm transition hover:bg-purple-50"
+          >
+            📊 System Overview
+          </Link>
         </div>
       </header>
 
-      {/* System Statistics */}
-      {statsResult.success && statsResult.data ? (
-        <SystemStatsCards stats={statsResult.data} />
-      ) : (
-        <div className="rounded-2xl border-4 border-rose-200 bg-rose-50 p-4">
-          <p className="font-semibold text-rose-800">
-            Failed to load system statistics: {statsResult.error}
-          </p>
-        </div>
-      )}
-
-      {/* User Management Section */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-xl font-black text-indigo-900">
-            User Management
-          </h2>
-          <p className="text-sm font-semibold text-indigo-600">
-            Manage users, roles, and access levels
-          </p>
-        </div>
-        <AdminUserTable users={users} />
-      </div>
+      <AdminUserTable users={users} />
     </div>
   );
 }
