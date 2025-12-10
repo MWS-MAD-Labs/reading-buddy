@@ -4,7 +4,7 @@
 > **Base Version:** v1.5.0  
 > **Target Version:** v1.6.0 and beyond  
 > **Last Updated:** December 10, 2025  
-> **Status:** Planning Phase
+> **Status:** In Progress — dashboard enrichment underway
 
 ---
 
@@ -33,11 +33,13 @@ The `ui-improvement` branch has laid a strong foundation for v1.6.0 with a new d
 - ✅ Design system foundation (6 UI components)
 - ✅ Login page redesign with broadcast system
 - ✅ Admin broadcast manager
-- ⚠️ Dashboards still minimal (missing planned widgets)
+- ✅ Admin dashboard shows merged System + Library ops cards (no duplicates)
+- ✅ Teacher dashboard includes "Your Teaching Journey" overview cards
+- ⚠️ Student dashboard hero + reading journey present; top-level quick stats removed pending redesign
 - ⚠️ Navigation needs enhancement
 - ⚠️ Reading experience needs features
 
-**Completion Status:** ~25% of v1.6.0 goals achieved
+**Completion Status:** ~40% of v1.6.0 goals achieved
 
 ---
 
