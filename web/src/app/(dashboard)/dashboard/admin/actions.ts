@@ -2,6 +2,52 @@
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
+type AddUserParams = {
+  email: string;
+  password: string;
+  fullName: string | null;
+  role: "STUDENT" | "TEACHER" | "LIBRARIAN" | "ADMIN";
+  accessLevel: string | null;
+};
+
+export async function addUser(params: AddUserParams): Promise<void> {
+  const supabase = getSupabaseAdminClient();
+
+  // Create auth user
+  const { data: authData, error: authError } =
+    await supabase.auth.admin.createUser({
+      email: params.email,
+      password: params.password,
+      email_confirm: true,
+    });
+
+  if (authError) {
+    console.error("Error creating auth user:", authError);
+    throw new Error(`Failed to create user: ${authError.message}`);
+  }
+
+  if (!authData.user) {
+    throw new Error("User creation failed: No user returned");
+  }
+
+  // Update profile with role and other details
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({
+      full_name: params.fullName,
+      role: params.role,
+      access_level: params.accessLevel,
+    })
+    .eq("id", authData.user.id);
+
+  if (profileError) {
+    console.error("Error updating profile:", profileError);
+    // Try to clean up the auth user if profile update fails
+    await supabase.auth.admin.deleteUser(authData.user.id);
+    throw new Error(`Failed to update user profile: ${profileError.message}`);
+  }
+}
+
 export type SystemStats = {
   userCounts: {
     students: number;
