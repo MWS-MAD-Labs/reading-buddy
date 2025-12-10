@@ -45,8 +45,9 @@ export default async function StudentDashboardPage() {
   // Get student's current readings (personal progress)
   const { data: assignments, error: assignmentsError } = await supabase
     .from("student_books")
-    .select("book_id, current_page, books(*)")
+    .select("book_id, current_page, updated_at, started_at, books(*)")
     .eq("student_id", user.id)
+    .order("updated_at", { ascending: false })
     .order("started_at", { ascending: false });
 
   // Debug logging

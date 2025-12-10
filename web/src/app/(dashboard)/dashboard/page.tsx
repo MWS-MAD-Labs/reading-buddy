@@ -5,9 +5,17 @@ import type { UserRole } from "@/lib/auth/roleCheck";
 import { SystemStatsCards } from "@/components/dashboard/admin/SystemStatsCards";
 import { LibrarianStatsCards } from "@/components/dashboard/librarian/LibrarianStatsCards";
 import { ReadingJourneySection } from "@/components/dashboard/student";
+import {
+  StudentLeaderboard,
+  StaffLeaderboard,
+} from "@/components/dashboard/leaderboard";
 import { getGamificationStats } from "@/lib/gamification";
 import { getSystemStats } from "./admin/actions";
 import { getLibrarianStats } from "./librarian/stats-actions";
+import {
+  getStudentLeaderboard,
+  getStaffLeaderboard,
+} from "./leaderboard-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -168,16 +176,18 @@ export default async function DashboardHomePage() {
           // Legacy aliases to keep older UI pieces safe
           total_xp: stats.xp ?? 0,
           current_level_min_xp: 0,
-          next_level_min_xp:
-            (stats.xp ?? 0) + (stats.xp_to_next_level ?? 0),
+          next_level_min_xp: (stats.xp ?? 0) + (stats.xp_to_next_level ?? 0),
         }
       : null;
 
     // Get current reading book
     const { data: currentReading } = await supabaseAdmin
       .from("student_books")
-      .select("book_id, current_page, books(id, title, author, cover_url)")
+      .select(
+        "book_id, current_page, updated_at, started_at, books(id, title, author, cover_url)",
+      )
       .eq("student_id", user.id)
+      .order("updated_at", { ascending: false })
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -320,6 +330,29 @@ export default async function DashboardHomePage() {
     };
   }
 
+  // Fetch leaderboard data
+  let leaderboardData: {
+    studentLeaderboard: Awaited<
+      ReturnType<typeof getStudentLeaderboard>
+    > | null;
+    staffLeaderboard: Awaited<ReturnType<typeof getStaffLeaderboard>> | null;
+  } | null = null;
+
+  if (user) {
+    const isStudent = role === "STUDENT";
+    const studentLeaderboard = isStudent
+      ? await getStudentLeaderboard(user.id, 5)
+      : null;
+    const staffLeaderboard = !isStudent
+      ? await getStaffLeaderboard(user.id, 5)
+      : null;
+
+    leaderboardData = {
+      studentLeaderboard,
+      staffLeaderboard,
+    };
+  }
+
   // Fetch stats based on role
   // Admin sees all stats from all roles
   const adminStatsResult =
@@ -344,6 +377,41 @@ export default async function DashboardHomePage() {
           currentBook={readingJourneyData.currentBook}
           showTitle={true}
         />
+      )}
+
+      {/* Leaderboard Sections */}
+      {leaderboardData && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Student Leaderboard */}
+          {leaderboardData.studentLeaderboard?.success &&
+            leaderboardData.studentLeaderboard.data && (
+              <StudentLeaderboard
+                entries={leaderboardData.studentLeaderboard.data.entries}
+                currentUserEntry={
+                  leaderboardData.studentLeaderboard.data.currentUserEntry
+                }
+                totalParticipants={
+                  leaderboardData.studentLeaderboard.data.totalParticipants
+                }
+                showFullList={false}
+              />
+            )}
+
+          {/* Staff Leaderboard */}
+          {leaderboardData.staffLeaderboard?.success &&
+            leaderboardData.staffLeaderboard.data && (
+              <StaffLeaderboard
+                entries={leaderboardData.staffLeaderboard.data.entries}
+                currentUserEntry={
+                  leaderboardData.staffLeaderboard.data.currentUserEntry
+                }
+                totalParticipants={
+                  leaderboardData.staffLeaderboard.data.totalParticipants
+                }
+                showFullList={false}
+              />
+            )}
+        </div>
       )}
 
       {(role === "TEACHER" || role === "ADMIN") && teacherOverview && (
