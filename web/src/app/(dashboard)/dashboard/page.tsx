@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { UserRole } from "@/lib/auth/roleCheck";
+import { SystemStatsCards } from "@/components/dashboard/admin/SystemStatsCards";
+import { LibrarianStatsCards } from "@/components/dashboard/librarian/LibrarianStatsCards";
+import { getSystemStats } from "./admin/actions";
+import { getLibrarianStats } from "./librarian/stats-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -132,6 +136,11 @@ export default async function DashboardHomePage() {
   const copy = heroCopy[role] ?? heroCopy.DEFAULT;
   const links = roleQuickLinks[role] ?? roleQuickLinks.DEFAULT;
 
+  // Fetch stats based on role
+  const adminStatsResult = role === "ADMIN" ? await getSystemStats() : null;
+  const librarianStatsResult =
+    role === "LIBRARIAN" ? await getLibrarianStats() : null;
+
   return (
     <div className="space-y-8">
       <section className="pop-in rounded-[32px] border border-white/60 bg-white/90 p-8 text-indigo-950 shadow-[0_30px_90px_rgba(147,118,255,0.25)]">
@@ -141,6 +150,39 @@ export default async function DashboardHomePage() {
         <h1 className="mt-2 text-4xl font-black">{copy.title}</h1>
         <p className="mt-3 max-w-2xl text-lg text-indigo-500">{copy.body}</p>
       </section>
+
+      {/* System Overview - Admin Only */}
+      {role === "ADMIN" &&
+        adminStatsResult?.success &&
+        adminStatsResult.data && (
+          <SystemStatsCards stats={adminStatsResult.data} />
+        )}
+
+      {/* Librarian Overview */}
+      {role === "LIBRARIAN" &&
+        librarianStatsResult?.success &&
+        librarianStatsResult.data && (
+          <LibrarianStatsCards stats={librarianStatsResult.data} />
+        )}
+
+      {/* Error states */}
+      {role === "ADMIN" && adminStatsResult && !adminStatsResult.success && (
+        <div className="rounded-2xl border-4 border-rose-200 bg-rose-50 p-4">
+          <p className="font-semibold text-rose-800">
+            Failed to load admin statistics: {adminStatsResult.error}
+          </p>
+        </div>
+      )}
+
+      {role === "LIBRARIAN" &&
+        librarianStatsResult &&
+        !librarianStatsResult.success && (
+          <div className="rounded-2xl border-4 border-rose-200 bg-rose-50 p-4">
+            <p className="font-semibold text-rose-800">
+              Failed to load librarian statistics: {librarianStatsResult.error}
+            </p>
+          </div>
+        )}
 
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {links.map((card) => (
