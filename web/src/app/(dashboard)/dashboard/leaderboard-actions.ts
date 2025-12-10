@@ -60,10 +60,10 @@ export async function getStudentLeaderboard(
         return {
           userId: profile.id,
           name: profile.full_name || "Anonymous Student",
-          xp: stats?.total_xp || 0,
+          xp: stats?.xp || 0,
           level: stats?.level || 1,
-          booksCompleted: stats?.books_completed || 0,
-          pagesRead: stats?.pages_read || 0,
+          booksCompleted: stats?.total_books_completed || 0,
+          pagesRead: stats?.total_pages_read || 0,
           readingStreak: stats?.reading_streak || 0,
           isCurrentUser: profile.id === currentUserId,
         };
@@ -145,10 +145,10 @@ export async function getStaffLeaderboard(
           name:
             profile.full_name ||
             `Anonymous ${profile.role?.toLowerCase() || "staff"}`,
-          xp: stats?.total_xp || 0,
+          xp: stats?.xp || 0,
           level: stats?.level || 1,
-          booksCompleted: stats?.books_completed || 0,
-          pagesRead: stats?.pages_read || 0,
+          booksCompleted: stats?.total_books_completed || 0,
+          pagesRead: stats?.total_pages_read || 0,
           readingStreak: stats?.reading_streak || 0,
           isCurrentUser: profile.id === currentUserId,
         };
