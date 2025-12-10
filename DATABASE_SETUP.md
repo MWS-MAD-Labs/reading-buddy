@@ -8,9 +8,10 @@ Reading Buddy uses Supabase (PostgreSQL) for all data storage, authentication, a
 
 - **19 tables** covering users, books, classes, quizzes, checkpoints, badges, and login broadcasts
 - **Complete RLS policies** for secure multi-role access
-- **15+ indexes** for optimal performance
-- **Triggers and functions** for automation
+- **18+ indexes** for optimal performance (including gamification indexes)
+- **Triggers and functions** for automation (including auto-update timestamps)
 - **6 default badges** for gamification
+- **Full gamification system** with XP, levels, streaks, and reading stats
 
 ## Prerequisites
 
@@ -157,6 +158,23 @@ Created:
 | `student_badges` | Badges earned by students |
 | `achievements` | Legacy achievement definitions |
 | `student_achievements` | Legacy student achievements |
+| `xp_transactions` | XP earning history and audit log |
+
+#### Profiles Table - Gamification Columns
+
+The `profiles` table includes the following gamification fields:
+
+- **`xp`** - Total experience points earned
+- **`level`** - Current reader level (calculated from XP)
+- **`reading_streak`** - Current consecutive days reading
+- **`longest_streak`** - Longest consecutive days reading ever
+- **`last_read_date`** - Last date user read any content
+- **`total_books_completed`** - Lifetime count of completed books
+- **`total_pages_read`** - Lifetime count of pages read
+- **`total_quizzes_completed`** - Lifetime count of quizzes completed
+- **`total_perfect_quizzes`** - Lifetime count of perfect quiz scores
+- **`books_completed`** - Books completed (duplicate tracking field)
+- **`pages_read`** - Pages read (duplicate tracking field)
 
 ## Authentication Setup
 
