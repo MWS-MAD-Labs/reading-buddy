@@ -48,6 +48,149 @@ export async function addUser(params: AddUserParams): Promise<void> {
   }
 }
 
+type UpdateUserDataParams = {
+  userId: string;
+  fullName: string | null;
+  role: "STUDENT" | "TEACHER" | "LIBRARIAN" | "ADMIN";
+  accessLevel: string | null;
+};
+
+export async function updateUserData(
+  params: UpdateUserDataParams,
+): Promise<void> {
+  const supabase = getSupabaseAdminClient();
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      full_name: params.fullName,
+      role: params.role,
+      access_level: params.accessLevel,
+    })
+    .eq("id", params.userId);
+
+  if (error) {
+    console.error("Error updating user data:", error);
+    throw new Error(`Failed to update user: ${error.message}`);
+  }
+}
+
+export async function updateUserRole(
+  userId: string,
+  newRole: "STUDENT" | "TEACHER" | "LIBRARIAN" | "ADMIN",
+): Promise<void> {
+  const supabase = getSupabaseAdminClient();
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ role: newRole })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("Error updating user role:", error);
+    throw new Error(`Failed to update role: ${error.message}`);
+  }
+}
+
+export async function updateUserAccessLevel(
+  userId: string,
+  accessLevel: string | null,
+): Promise<void> {
+  const supabase = getSupabaseAdminClient();
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ access_level: accessLevel })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("Error updating access level:", error);
+    throw new Error(`Failed to update access level: ${error.message}`);
+  }
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  const supabase = getSupabaseAdminClient();
+
+  // Delete from auth (this should cascade to profiles via database trigger)
+  const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+
+  if (authError) {
+    console.error("Error deleting user:", authError);
+    throw new Error(`Failed to delete user: ${authError.message}`);
+  }
+}
+
+type BulkUploadResult = {
+  success: boolean;
+  created: number;
+  failed: number;
+  errors: Array<{ email: string; error: string }>;
+};
+
+type BulkUserRow = {
+  email: string;
+  password: string;
+  fullName?: string;
+  role: "STUDENT" | "TEACHER" | "LIBRARIAN" | "ADMIN";
+  accessLevel?: string;
+};
+
+export async function bulkUploadUsers(
+  users: BulkUserRow[],
+): Promise<BulkUploadResult> {
+  const supabase = getSupabaseAdminClient();
+  const result: BulkUploadResult = {
+    success: true,
+    created: 0,
+    failed: 0,
+    errors: [],
+  };
+
+  for (const user of users) {
+    try {
+      // Create auth user
+      const { data: authData, error: authError } =
+        await supabase.auth.admin.createUser({
+          email: user.email,
+          password: user.password,
+          email_confirm: true,
+        });
+
+      if (authError || !authData.user) {
+        throw new Error(authError?.message || "Failed to create user");
+      }
+
+      // Update profile
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          full_name: user.fullName || null,
+          role: user.role,
+          access_level: user.accessLevel || null,
+        })
+        .eq("id", authData.user.id);
+
+      if (profileError) {
+        // Clean up auth user if profile update fails
+        await supabase.auth.admin.deleteUser(authData.user.id);
+        throw new Error(profileError.message);
+      }
+
+      result.created++;
+    } catch (error) {
+      result.failed++;
+      result.errors.push({
+        email: user.email,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  result.success = result.failed === 0;
+  return result;
+}
+
 export type SystemStats = {
   userCounts: {
     students: number;
