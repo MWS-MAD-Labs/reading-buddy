@@ -455,13 +455,13 @@ export async function getSystemStats(): Promise<{
       console.error("Error fetching quizzes:", quizzesError);
     }
 
-    // Count descriptions by checking books with ai_description
+    // Count descriptions by checking books with description
     let descriptionsCount = 0;
     try {
       const { count, error: descriptionsError } = await supabase
         .from("books")
         .select("id", { count: "exact", head: true })
-        .not("ai_description", "is", null);
+        .not("description", "is", null);
 
       if (descriptionsError) {
         console.warn("Unable to fetch descriptions count:", descriptionsError);

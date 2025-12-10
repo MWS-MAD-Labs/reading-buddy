@@ -77,9 +77,9 @@ export async function getLibrarianStats(): Promise<{
     const formatEntries = Object.entries(byFormat);
     const mostCommonFormat =
       formatEntries.length > 0
-        ? formatEntries.reduce((max, curr) =>
-            curr[1] > max[1] ? curr : max,
-          )[0].toUpperCase()
+        ? formatEntries
+            .reduce((max, curr) => (curr[1] > max[1] ? curr : max))[0]
+            .toUpperCase()
         : "N/A";
 
     const bookLibrary = {
@@ -178,13 +178,9 @@ export async function getLibrarianStats(): Promise<{
 
     // 4. Popular Books
     // Most Read (based on student_books entries)
-    const { data: mostReadData, error: mostReadError } = await supabase
+    const { data: allBooksData, error: allBooksError } = await supabase
       .from("books")
-      .select(
-        "id, title, author, cover_url, student_books(count)",
-      )
-      .order("student_books.count", { ascending: false })
-      .limit(5);
+      .select("id, title, author, cover_url");
 
     let mostRead: Array<{
       id: string;
@@ -194,17 +190,31 @@ export async function getLibrarianStats(): Promise<{
       readCount: number;
     }> = [];
 
-    if (mostReadError) {
-      console.warn("Unable to fetch most read books:", mostReadError);
-    } else {
-      mostRead =
-        mostReadData?.map((book) => ({
-          id: book.id,
-          title: book.title,
-          author: book.author ?? "Unknown author",
-          coverUrl: book.cover_url ?? null,
-          readCount: book.student_books?.length || 0,
-        })) || [];
+    if (allBooksError) {
+      console.warn("Unable to fetch books:", allBooksError);
+    } else if (allBooksData) {
+      // Get student_books count for each book
+      const booksWithCounts = await Promise.all(
+        allBooksData.map(async (book) => {
+          const { count } = await supabase
+            .from("student_books")
+            .select("*", { count: "exact", head: true })
+            .eq("book_id", book.id);
+
+          return {
+            id: book.id.toString(),
+            title: book.title,
+            author: book.author ?? "Unknown author",
+            coverUrl: book.cover_url ?? null,
+            readCount: count || 0,
+          };
+        }),
+      );
+
+      // Sort by read count and take top 5
+      mostRead = booksWithCounts
+        .sort((a, b) => b.readCount - a.readCount)
+        .slice(0, 5);
     }
 
     // Most Quizzed (based on quizzes table)
