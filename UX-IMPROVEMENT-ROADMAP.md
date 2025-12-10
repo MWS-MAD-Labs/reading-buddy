@@ -99,6 +99,37 @@ The `ui-improvement` branch has laid a strong foundation for v1.6.0 with a new d
 - Consistent spacing and formatting
 - Better responsive behavior
 
+### ✅ Gamification Features (December 10, 2025)
+
+**Leaderboard System:**
+- ✅ Separate global leaderboards for students vs staff
+- ✅ Student leaderboard with medals (🥇🥈🥉) and ranking
+- ✅ Staff leaderboard with icons (👑⭐🌟) for teachers/librarians/admins
+- ✅ Integrated into main dashboard page
+- ✅ Full leaderboard page at `/dashboard/leaderboard`
+- ✅ Real-time XP, level, books completed, and pages read stats
+
+**Weekly Challenge System:**
+- ✅ 6 rotating weekly challenges (automatic rotation)
+- ✅ Challenge types: pages, books, quizzes, streaks, perfect scores
+- ✅ XP rewards: 200-300 XP per challenge
+- ✅ Progress tracking with visual progress bar
+- ✅ Auto-award XP when completed
+- ✅ One-time completion per week (prevents farming)
+- ✅ WeeklyChallengeCard component on student dashboard
+- ✅ Database tracking via `weekly_challenge_completions` table
+
+**Database Updates:**
+- ✅ Gamification columns added to profiles table (xp, level, streaks, etc.)
+- ✅ Migration scripts for backfilling XP from transactions
+- ✅ Weekly challenge completions table with RLS policies
+- ✅ Updated database-setup.sql and documentation
+
+**Bug Fixes:**
+- ✅ Fixed "last page" detection in BookReader (now uses pageImages.count)
+- ✅ Fixed leaderboard showing 0 XP (field name mismatch)
+- ✅ Added retry logic for transient Supabase auth failures
+
 ---
 
 ## Identified Gaps
@@ -118,16 +149,16 @@ The `ui-improvement` branch has laid a strong foundation for v1.6.0 with a new d
 **Student Dashboard:**
 - ❌ Personalized book recommendations
 - ❌ Reading progress charts
-- ❌ Class & global leaderboards
+- ✅ Class & global leaderboards (Completed Dec 10, 2025)
 - ❌ Enhanced achievement showcase
 - ❌ Reading goals tracker
-- ❌ Continue reading section with previews
-- ❌ Weekly reading challenges
+- ✅ Continue reading section with previews (Already exists)
+- ✅ Weekly reading challenges (Completed Dec 10, 2025)
 
 **Teacher Dashboard:**
-- ❌ Class analytics overview
-- ❌ Assignment tracking dashboard
-- ❌ Student performance heatmap
+- ✅ Class analytics overview (Completed Dec 10, 2025)
+- ✅ Assignment tracking dashboard (Completed Dec 10, 2025)
+- ✅ Student performance heatmap (Completed Dec 10, 2025)
 - ❌ Quick class management tools
 - ❌ Reading assignment calendar
 - ❌ Bulk operations interface
