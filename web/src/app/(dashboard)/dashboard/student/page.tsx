@@ -14,6 +14,8 @@ import {
   BadgeGrid,
   RecentBadges,
 } from "@/components/dashboard/gamification";
+import { WeeklyChallengeCard } from "@/components/dashboard/student/WeeklyChallengeCard";
+import { getWeeklyChallenge } from "../weekly-challenge-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,12 @@ export default async function StudentDashboardPage() {
     user.id,
   );
   const earnedBadges = await getStudentBadges(supabaseAdmin, user.id);
+
+  // Get weekly challenge
+  const weeklyChallengeResult = await getWeeklyChallenge(user.id);
+  const weeklyChallenge = weeklyChallengeResult.success
+    ? weeklyChallengeResult.data
+    : null;
 
   // Get recent badges (last 3 earned)
   const recentBadges = earnedBadges.slice(0, 3).map((sb) => ({
@@ -159,6 +167,9 @@ export default async function StudentDashboardPage() {
 
       {/* Quick Stats */}
       {gamificationStats && <StatsGrid stats={gamificationStats} />}
+
+      {/* Weekly Challenge */}
+      {weeklyChallenge && <WeeklyChallengeCard challenge={weeklyChallenge} />}
 
       {/* Recent Badges */}
       {recentBadges.length > 0 && <RecentBadges badges={recentBadges} />}

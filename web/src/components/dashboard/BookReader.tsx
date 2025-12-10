@@ -55,11 +55,10 @@ export const BookReader = ({
   const achievementsTriggeredRef = useRef(false);
   const router = useRouter();
 
-  // In spread view (2-page view), if we're on page N, we're actually seeing pages N and N+1
-  // So we're on the last page if currentPage >= expectedPages OR currentPage + 1 >= expectedPages
-  const isOnLastPage = expectedPages
-    ? currentPage >= expectedPages || currentPage + 1 >= expectedPages
-    : false;
+  // Only show completion when we've actually reached the last page
+  // Use pageImages.count if available (more accurate), otherwise fall back to expectedPages
+  const totalPages = pageImages?.count ?? expectedPages ?? 0;
+  const isOnLastPage = totalPages > 0 ? currentPage >= totalPages : false;
 
   useEffect(() => {
     achievementsTriggeredRef.current = false;

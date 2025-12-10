@@ -654,12 +654,75 @@ class OllamaProvider implements IAIProvider { ... }
 - Streak tracking (Daily, Weekly, Monthly)
 - Enhanced badge system with progress tracking
 - Gamification UI (Toasts, Cards, Notifications)
+- **Weekly Challenges System** (v1.6.0) ✅
 
 **Features Implemented:**
-- **XP Sources:** Page reads (+1), Books (+100), Quizzes (+50-100), Streaks (+10-200)
+- **XP Sources:** Page reads (+1), Books (+100), Quizzes (+50-100), Streaks (+10-200), Weekly Challenges (+200-300)
 - **Levels:** "Beginner Reader" to "Reading Legend"
 - **Streak Tracking:** Daily streaks with milestone bonuses
 - **Badge System:** Tiered badges with progress bars
+- **Weekly Challenges:** 6 rotating challenges with automatic weekly rotation
+
+#### Weekly Challenge System Details (v1.6.0) ✅
+**Status:** ✅ Complete (December 10, 2025)
+
+**Current Implementation:**
+- **Automatic Rotation:** 6 hardcoded challenges that rotate weekly based on week number
+- **Challenge Types:**
+  1. Page Turner - Read 100 pages (200 XP)
+  2. Avid Reader - Read 150 pages (300 XP)
+  3. Book Worm - Complete 2 books (250 XP)
+  4. Quiz Master - Complete 5 quizzes (200 XP)
+  5. Week Warrior - Read 7 consecutive days (300 XP)
+  6. Perfect Scholar - Get 3 perfect quiz scores (250 XP)
+- **Progress Tracking:** Real-time calculation from existing data (xp_transactions, student_books, quiz_attempts)
+- **Auto-Award XP:** Automatic XP reward when challenge is completed
+- **One-Time Completion:** Each challenge can only be completed once per week (prevents farming)
+- **Visual Feedback:** Progress bar, completion badge, XP display on student dashboard
+
+**Future Enhancement Ideas:**
+**Priority:** Medium | **Target:** v1.7.0 or later | **Status:** Planned
+
+*Admin/Librarian Challenge Management:*
+- **Challenge Creation Interface:**
+  - Create custom challenges with configurable goals and XP rewards
+  - Define challenge types (pages, books, quizzes, streaks, custom metrics)
+  - Set challenge difficulty levels (Easy, Medium, Hard, Expert)
+  - Add custom icons, titles, and descriptions
+  
+- **Challenge Scheduling:**
+  - Schedule specific challenges for specific weeks
+  - Create seasonal/themed challenges (Summer Reading Challenge, Holiday Marathon)
+  - Set challenge duration (weekly, bi-weekly, monthly)
+  - Define start/end dates for special events
+  
+- **Challenge Management Dashboard:**
+  - View all active and upcoming challenges
+  - Edit existing challenges
+  - Enable/disable challenges
+  - View completion statistics (how many students completed each challenge)
+  - Analytics: completion rates, average progress, most popular challenges
+  
+- **Challenge Templates:**
+  - Pre-built challenge templates for common scenarios
+  - Duplicate and customize existing challenges
+  - Import/export challenge configurations
+  
+- **Multiple Active Challenges:**
+  - Allow multiple simultaneous challenges (e.g., weekly + monthly + special event)
+  - Challenge categories (Reading, Quiz Mastery, Social, Special Events)
+  - Student choice: select which challenges to participate in
+  
+- **Team Challenges:**
+  - Class-based challenges (entire classroom competes)
+  - School-wide challenges
+  - Team leaderboards and collaborative goals
+
+**Technical Implementation Notes:**
+- Current system uses `weekly_challenge_completions` table to track completion
+- Challenge definitions stored in code (`/web/src/lib/weekly-challenges.ts`)
+- For admin management, would need new tables: `challenges`, `active_challenges`, `challenge_schedules`
+- UI components already built: `WeeklyChallengeCard.tsx` (can be extended for multiple challenges)
 
 ---
 
