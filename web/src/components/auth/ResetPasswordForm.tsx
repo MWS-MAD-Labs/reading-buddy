@@ -1,8 +1,19 @@
-'use client';
+"use client";
 
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { useSupabaseBrowser } from '@/components/providers/SupabaseProvider';
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useSupabaseBrowser } from "@/components/providers/SupabaseProvider";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardTitle,
+  FieldHelper,
+  Input,
+  Label,
+} from "@/components/ui";
 
 export const ResetPasswordForm = () => {
   const router = useRouter();
@@ -18,26 +29,29 @@ export const ResetPasswordForm = () => {
     setIsLoading(true);
 
     const formData = new FormData(event.currentTarget);
-    const password = String(formData.get('password') ?? '');
-    const confirmPassword = String(formData.get('confirmPassword') ?? '');
+    const password = String(formData.get("password") ?? "");
+    const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError("Passwords do not match.");
       setIsLoading(false);
       return;
     }
 
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password });
+      const { error: updateError } = await supabase.auth.updateUser({
+        password,
+      });
 
       if (updateError) {
         throw updateError;
       }
 
-      setInfo('Password updated. Redirecting to dashboard…');
-      setTimeout(() => router.replace('/dashboard'), 1200);
+      setInfo("Password updated. Redirecting to dashboard...");
+      setTimeout(() => router.replace("/dashboard"), 1200);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to reset password.';
+      const message =
+        err instanceof Error ? err.message : "Unable to reset password.";
       setError(message);
     } finally {
       setIsLoading(false);
@@ -45,54 +59,113 @@ export const ResetPasswordForm = () => {
   };
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur">
-      <div className="mb-6 space-y-2 text-center">
-        <h1 className="text-2xl font-semibold text-white">Choose a new password</h1>
-        <p className="text-sm text-white/70">You successfully verified your email.</p>
-      </div>
+    <div className="pop-in w-full max-w-5xl">
+      <Card
+        variant="playful"
+        padding="cozy"
+        className="border-4 border-white/70"
+      >
+        <CardContent className="grid gap-8 md:grid-cols-[1.15fr_1fr] md:items-center">
+          <div className="space-y-5 md:space-y-6">
+            <Badge variant="bubble" className="uppercase tracking-[0.2em]">
+              Password reset
+            </Badge>
+            <div className="space-y-2">
+              <CardTitle className="text-3xl md:text-4xl">
+                🔑 Choose a new password
+              </CardTitle>
+              <p className="text-base font-semibold text-indigo-600 md:text-lg">
+                You verified your email. Let&apos;s secure your account before
+                jumping back into the dashboard.
+              </p>
+            </div>
 
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <div className="space-y-2">
-          <label htmlFor="password" className="text-sm font-medium text-white">
-            New password
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            minLength={8}
-            required
-            className="w-full rounded-lg border border-white/20 bg-black/20 px-4 py-2 text-white outline-none transition focus:border-white"
-            placeholder="••••••••"
-          />
-        </div>
+            {error ? (
+              <Alert variant="error" title="Could not update password">
+                {error}
+              </Alert>
+            ) : info ? (
+              <Alert variant="success" title="Password saved">
+                {info}
+              </Alert>
+            ) : (
+              <Alert variant="info" title="Password tips">
+                Use at least 8 characters, and mix in numbers or symbols to keep
+                things secure.
+              </Alert>
+            )}
 
-        <div className="space-y-2">
-          <label htmlFor="confirmPassword" className="text-sm font-medium text-white">
-            Confirm new password
-          </label>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            minLength={8}
-            required
-            className="w-full rounded-lg border border-white/20 bg-black/20 px-4 py-2 text-white outline-none transition focus:border-white"
-            placeholder="••••••••"
-          />
-        </div>
+            <form className="space-y-4" onSubmit={handleSubmit}>
+              <div className="space-y-2">
+                <Label htmlFor="password">🔐 New password</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  minLength={8}
+                  required
+                  autoComplete="new-password"
+                  placeholder="Enter a strong password"
+                />
+                <FieldHelper>At least 8 characters recommended.</FieldHelper>
+              </div>
 
-        {error ? <p className="text-sm text-red-300">{error}</p> : null}
-        {info ? <p className="text-sm text-green-200">{info}</p> : null}
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">✅ Confirm password</Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  minLength={8}
+                  required
+                  autoComplete="new-password"
+                  placeholder="Enter it again to confirm"
+                />
+              </div>
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full rounded-lg bg-white/90 px-4 py-2 font-semibold text-black transition hover:bg-white disabled:pointer-events-none disabled:opacity-50"
-        >
-          {isLoading ? 'Updating…' : 'Update password'}
-        </button>
-      </form>
+              <Button
+                type="submit"
+                loading={isLoading}
+                size="lg"
+                fullWidth
+                icon="✨"
+              >
+                Save and continue
+              </Button>
+              <p className="text-sm font-semibold text-indigo-600">
+                We will redirect you to the dashboard as soon as your password
+                is updated.
+              </p>
+            </form>
+          </div>
+
+          <div className="relative h-full rounded-[24px] border-4 border-white/60 bg-white/70 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.08)] backdrop-blur">
+            <div className="absolute inset-0 -z-10 rounded-[24px] bg-gradient-to-br from-emerald-200/60 via-teal-100/50 to-blue-100/60 blur-3xl" />
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-2xl">🧠</span>
+              <Badge variant="neutral">Smart password tips</Badge>
+            </div>
+            <ul className="space-y-3 text-sm font-semibold text-indigo-700 md:text-base">
+              <li className="flex items-center gap-2">
+                <span className="text-lg">🎲</span>
+                Combine words, numbers, and a symbol or two.
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-lg">🚫</span>
+                Skip birthdays or easy-to-guess info.
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-lg">🛡️</span>
+                Keep this password unique to Reading Buddy.
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-lg">⌛</span>
+                We will sign you in again right after saving.
+              </li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

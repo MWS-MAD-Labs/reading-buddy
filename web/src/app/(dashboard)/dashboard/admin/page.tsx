@@ -85,6 +85,12 @@ export default async function AdminDashboardPage() {
             >
               🏅 Manage Badges
             </Link>
+            <Link
+              href="/dashboard/admin/broadcasts"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+            >
+              📢 Login Messages
+            </Link>
           </div>
         </header>
 
@@ -126,6 +132,12 @@ export default async function AdminDashboardPage() {
             className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105"
           >
             🏅 Manage Badges
+          </Link>
+          <Link
+            href="/dashboard/admin/broadcasts"
+            className="inline-flex items-center gap-2 rounded-full border-2 border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+          >
+            📢 Login Messages
           </Link>
         </div>
       </header>
