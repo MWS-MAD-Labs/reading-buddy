@@ -133,10 +133,82 @@ function StatCard({
 
 type LibrarianStatsCardsProps = {
   stats: LibrarianStats;
+  variant?: "full" | "compact";
 };
 
-export function LibrarianStatsCards({ stats }: LibrarianStatsCardsProps) {
+export function LibrarianStatsCards({
+  stats,
+  variant = "full",
+}: LibrarianStatsCardsProps) {
   const { bookLibrary, activeReaders, uploadStatistics, popularBooks } = stats;
+  const showCoreLibraryCards = variant !== "compact";
+
+  const cards = [
+    showCoreLibraryCards && (
+      <StatCard
+        key="library"
+        title="Book Library"
+        value={bookLibrary.total}
+        icon="📚"
+        subtitle={`Most common: ${bookLibrary.mostCommonFormat}`}
+        color="blue"
+        details={[
+          { label: "PDF", value: bookLibrary.byFormat.pdf },
+          { label: "EPUB", value: bookLibrary.byFormat.epub },
+          { label: "MOBI", value: bookLibrary.byFormat.mobi },
+          {
+            label: "AZW/AZW3",
+            value: bookLibrary.byFormat.azw + bookLibrary.byFormat.azw3,
+          },
+        ]}
+      />
+    ),
+    showCoreLibraryCards && (
+      <StatCard
+        key="active"
+        title="Active Readers"
+        value={activeReaders.count}
+        icon="📖"
+        subtitle="Read in last 7 days"
+        color="emerald"
+        trend={{
+          value: activeReaders.percentageChange,
+          label: "vs previous week",
+        }}
+      />
+    ),
+    <StatCard
+      key="upload"
+      title="Upload Success"
+      value={`${uploadStatistics.successRate}%`}
+      icon="✅"
+      subtitle="Last 30 days"
+      color="purple"
+      details={[
+        { label: "Total Uploads", value: uploadStatistics.uploadsLast30Days },
+        { label: "Est. Storage", value: `${uploadStatistics.totalStorage}MB` },
+      ]}
+    />,
+    <StatCard
+      key="popular"
+      title="Most Popular"
+      value={popularBooks.mostRead[0]?.readCount || 0}
+      icon="⭐"
+      subtitle={
+        popularBooks.mostRead[0]?.title
+          ? `${popularBooks.mostRead[0].title.slice(0, 25)}...`
+          : "N/A"
+      }
+      color="amber"
+      details={[
+        { label: "Most Read", value: popularBooks.mostRead.length },
+        { label: "Most Quizzed", value: popularBooks.mostQuizzed.length },
+      ]}
+    />,
+  ].filter(Boolean) as JSX.Element[];
+
+  const gridCols =
+    cards.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2";
 
   return (
     <div className="space-y-6">
@@ -144,7 +216,7 @@ export function LibrarianStatsCards({ stats }: LibrarianStatsCardsProps) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-black text-indigo-900">
-            Librarian Overview
+            {variant === "compact" ? "Library Ops Overview" : "Librarian Overview"}
           </h2>
           <p className="text-sm font-semibold text-indigo-600">
             Collection insights and usage metrics
@@ -155,68 +227,8 @@ export function LibrarianStatsCards({ stats }: LibrarianStatsCardsProps) {
         </Badge>
       </div>
 
-      {/* Stats grid - Row 1 */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Book Library */}
-        <StatCard
-          title="Book Library"
-          value={bookLibrary.total}
-          icon="📚"
-          subtitle={`Most common: ${bookLibrary.mostCommonFormat}`}
-          color="blue"
-          details={[
-            { label: "PDF", value: bookLibrary.byFormat.pdf },
-            { label: "EPUB", value: bookLibrary.byFormat.epub },
-            { label: "MOBI", value: bookLibrary.byFormat.mobi },
-            {
-              label: "AZW/AZW3",
-              value:
-                bookLibrary.byFormat.azw + bookLibrary.byFormat.azw3,
-            },
-          ]}
-        />
-
-        {/* Active Readers */}
-        <StatCard
-          title="Active Readers"
-          value={activeReaders.count}
-          icon="📖"
-          subtitle="Read in last 7 days"
-          color="emerald"
-          trend={{
-            value: activeReaders.percentageChange,
-            label: "vs previous week",
-          }}
-        />
-
-        {/* Upload Success Rate */}
-        <StatCard
-          title="Upload Success"
-          value={`${uploadStatistics.successRate}%`}
-          icon="✅"
-          subtitle="Last 30 days"
-          color="purple"
-          details={[
-            { label: "Total Uploads", value: uploadStatistics.uploadsLast30Days },
-            { label: "Est. Storage", value: `${uploadStatistics.totalStorage}MB` },
-          ]}
-        />
-
-        {/* Most Popular */}
-        <StatCard
-          title="Most Popular"
-          value={popularBooks.mostRead[0]?.readCount || 0}
-          icon="⭐"
-          subtitle={
-            popularBooks.mostRead[0]?.title?.slice(0, 25) + "..." || "N/A"
-          }
-          color="amber"
-          details={[
-            { label: "Most Read", value: popularBooks.mostRead.length },
-            { label: "Most Quizzed", value: popularBooks.mostQuizzed.length },
-          ]}
-        />
-      </div>
+      {/* Stats grid */}
+      <div className={cn("grid gap-4", gridCols)}>{cards}</div>
 
       {/* Recent Uploads Section */}
       {uploadStatistics.recentUploads.length > 0 && (

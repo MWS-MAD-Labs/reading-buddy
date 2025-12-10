@@ -164,18 +164,30 @@ export default async function StudentClassroomPage({
           Array.isArray(item.quizzes) && item.quizzes.length > 0
             ? item.quizzes[0]
             : item.quizzes;
+
+        const resolvedQuiz = quizData as
+          | {
+              id?: number;
+              book_id?: number;
+              quiz_type?: string;
+              books?:
+                | { title: string | null }
+                | { title: string | null }[]
+                | null;
+            }
+          | null;
+
+        const booksField = resolvedQuiz?.books;
         const bookData =
-          quizData?.books &&
-          Array.isArray(quizData.books) &&
-          quizData.books.length > 0
-            ? quizData.books[0]
-            : quizData?.books;
+          Array.isArray(booksField) && booksField.length > 0
+            ? booksField[0]
+            : booksField ?? null;
 
         return {
-          id: quizData?.id ?? 0,
-          book_id: quizData?.book_id ?? 0,
-          quiz_type: quizData?.quiz_type ?? "classroom",
-          books: bookData ? { title: bookData.title } : null,
+          id: resolvedQuiz?.id ?? 0,
+          book_id: resolvedQuiz?.book_id ?? 0,
+          quiz_type: resolvedQuiz?.quiz_type ?? "classroom",
+          books: bookData ? { title: bookData.title ?? "Untitled" } : null,
           due_date: item.due_date as string | null,
         };
       },

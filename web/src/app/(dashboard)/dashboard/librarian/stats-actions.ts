@@ -186,8 +186,25 @@ export async function getLibrarianStats(): Promise<{
       .order("student_books.count", { ascending: false })
       .limit(5);
 
+    let mostRead: Array<{
+      id: string;
+      title: string;
+      author: string;
+      coverUrl: string | null;
+      readCount: number;
+    }> = [];
+
     if (mostReadError) {
-      console.error("Error fetching most read books:", mostReadError);
+      console.warn("Unable to fetch most read books:", mostReadError);
+    } else {
+      mostRead =
+        mostReadData?.map((book) => ({
+          id: book.id,
+          title: book.title,
+          author: book.author ?? "Unknown author",
+          coverUrl: book.cover_url ?? null,
+          readCount: book.student_books?.length || 0,
+        })) || [];
     }
 
     // Most Quizzed (based on quizzes table)
@@ -220,21 +237,12 @@ export async function getLibrarianStats(): Promise<{
       console.error("Error fetching most quizzed books:", mostQuizzedError);
     }
 
-    const mostRead =
-      mostReadData?.map((book) => ({
-        id: book.id,
-        title: book.title,
-        author: book.author,
-        coverUrl: book.cover_url,
-        readCount: book.student_books?.length || 0,
-      })) || [];
-
     const mostQuizzed =
       mostQuizzedData?.map((book) => ({
         id: book.id,
         title: book.title,
-        author: book.author,
-        coverUrl: book.cover_url,
+        author: book.author ?? "Unknown author",
+        coverUrl: book.cover_url ?? null,
         quizCount: quizCounts[book.id] || 0,
       })) || [];
 

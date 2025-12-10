@@ -14,5 +14,8 @@
     "docker:logs": "docker-compose logs -f",
     "docker:restart": "docker-compose restart"
   },
-  "description": "Reading Buddy - Hybrid Supabase + MinIO e-library for K-12 schools"
+  "description": "Reading Buddy - Hybrid Supabase + MinIO e-library for K-12 schools",
+  "devDependencies": {
+    "baseline-browser-mapping": "^2.9.5"
+  }
 }

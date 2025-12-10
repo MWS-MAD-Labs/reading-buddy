@@ -220,6 +220,141 @@ export type SystemStats = {
   };
 };
 
+export async function getUsersWithEmails(): Promise<{
+  success: boolean;
+  users?: Array<{
+    id: string;
+    full_name: string | null;
+    role: string;
+    access_level: string | null;
+    email: string | null;
+  }>;
+  error?: string;
+}> {
+  try {
+    const supabase = getSupabaseAdminClient();
+
+    // Get all profiles
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, full_name, role, access_level, updated_at")
+      .order("updated_at", { ascending: false });
+
+    if (profilesError) {
+      console.error("Error fetching profiles:", profilesError);
+      return { success: false, error: "Failed to fetch profiles" };
+    }
+
+    if (!profiles || profiles.length === 0) {
+      return { success: true, users: [] };
+    }
+
+    // Fetch emails individually (more reliable than listUsers)
+    const usersWithEmails = await Promise.all(
+      profiles.map(async (profile) => {
+        try {
+          const { data: userData } = await supabase.auth.admin.getUserById(
+            profile.id,
+          );
+          return {
+            ...profile,
+            email: userData?.user?.email || null,
+          };
+        } catch (error) {
+          console.error(`Error fetching user ${profile.id}:`, error);
+          return {
+            ...profile,
+            email: null,
+          };
+        }
+      }),
+    );
+
+    return { success: true, users: usersWithEmails };
+  } catch (error) {
+    console.error("Error in getUsersWithEmails:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function cleanupOrphanedProfiles(): Promise<{
+  success: boolean;
+  removed: number;
+  orphanedIds: string[];
+  error?: string;
+}> {
+  try {
+    const supabase = getSupabaseAdminClient();
+
+    // Get all profiles
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id");
+
+    if (profilesError || !profiles) {
+      return {
+        success: false,
+        removed: 0,
+        orphanedIds: [],
+        error: "Failed to fetch profiles",
+      };
+    }
+
+    const orphanedIds: string[] = [];
+
+    // Check each profile to see if auth user exists
+    for (const profile of profiles) {
+      try {
+        const { error: userError } = await supabase.auth.admin.getUserById(
+          profile.id,
+        );
+
+        if (userError) {
+          // This profile doesn't have a corresponding auth user
+          orphanedIds.push(profile.id);
+        }
+      } catch (error) {
+        // If we get an error, consider it orphaned
+        orphanedIds.push(profile.id);
+      }
+    }
+
+    // Delete orphaned profiles
+    if (orphanedIds.length > 0) {
+      const { error: deleteError } = await supabase
+        .from("profiles")
+        .delete()
+        .in("id", orphanedIds);
+
+      if (deleteError) {
+        return {
+          success: false,
+          removed: 0,
+          orphanedIds,
+          error: `Found ${orphanedIds.length} orphaned profiles but failed to delete them`,
+        };
+      }
+    }
+
+    return {
+      success: true,
+      removed: orphanedIds.length,
+      orphanedIds,
+    };
+  } catch (error) {
+    console.error("Error in cleanupOrphanedProfiles:", error);
+    return {
+      success: false,
+      removed: 0,
+      orphanedIds: [],
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 export async function getSystemStats(): Promise<{
   success: boolean;
   data?: SystemStats;
@@ -321,14 +456,23 @@ export async function getSystemStats(): Promise<{
     }
 
     // Count descriptions by checking books with ai_description
-    const { count: descriptionsCount, error: descriptionsError } =
-      await supabase
+    let descriptionsCount = 0;
+    try {
+      const { count, error: descriptionsError } = await supabase
         .from("books")
         .select("id", { count: "exact", head: true })
         .not("ai_description", "is", null);
 
-    if (descriptionsError) {
-      console.error("Error fetching descriptions:", descriptionsError);
+      if (descriptionsError) {
+        console.warn("Unable to fetch descriptions count:", descriptionsError);
+      } else {
+        descriptionsCount = count || 0;
+      }
+    } catch (error) {
+      console.warn(
+        "Supabase threw while fetching descriptions count:",
+        error instanceof Error ? error.message : error,
+      );
     }
 
     const aiUsage = {
