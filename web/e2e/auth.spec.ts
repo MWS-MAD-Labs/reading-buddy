@@ -4,9 +4,9 @@ test.describe("Authentication", () => {
   test("should show login page with Google OAuth", async ({ page }) => {
     await page.goto("/login");
 
-    // Check for login heading (actual text from LoginForm.tsx)
+    // Check for login heading (actual text from LoginForm.tsx: "Reading Buddy Sign In")
     await expect(
-      page.getByRole("heading", { name: /Welcome to Reading Buddy/i }),
+      page.getByRole("heading", { name: /Reading Buddy Sign In/i }),
     ).toBeVisible();
 
     // Check for Google sign-in button
@@ -47,11 +47,10 @@ test.describe("Authentication", () => {
     await page.goto("/login");
 
     // Check that the page has proper structure for error display
-    const loginForm = page
-      .locator("div")
-      .filter({ hasText: /Welcome to Reading Buddy/i })
-      .first();
-    await expect(loginForm).toBeVisible();
+    // Look for the heading instead of generic div
+    await expect(
+      page.getByRole("heading", { name: /Reading Buddy Sign In/i }),
+    ).toBeVisible();
 
     // Verify button is enabled and clickable
     const googleButton = page.getByRole("button", {
