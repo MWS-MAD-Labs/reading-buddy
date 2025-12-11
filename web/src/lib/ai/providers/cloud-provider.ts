@@ -310,9 +310,10 @@ Respond with JSON only:
         const answerIndex =
           typeof question.answerIndex === "number"
             ? question.answerIndex
-            : typeof (question as { correct_answer?: number })
+            : typeof (question as unknown as { correct_answer?: number })
                   .correct_answer === "number"
-              ? (question as { correct_answer: number }).correct_answer
+              ? (question as unknown as { correct_answer: number })
+                  .correct_answer
               : 0;
 
         const clampedAnswerIndex =

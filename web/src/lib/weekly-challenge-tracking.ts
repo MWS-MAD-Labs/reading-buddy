@@ -5,18 +5,28 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
-import { getCurrentWeekChallenge, getWeeklyChallengeProgress } from "./weekly-challenges";
+import {
+  getCurrentWeekChallenge,
+  getWeeklyChallengeProgress,
+} from "./weekly-challenges";
 import { awardXP } from "./gamification";
 
 /**
  * Get the current week number and year
  */
-function getWeekInfo(date: Date = new Date()): { weekNumber: number; year: number } {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+function getWeekInfo(date: Date = new Date()): {
+  weekNumber: number;
+  year: number;
+} {
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+  );
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNumber = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  const weekNumber = Math.ceil(
+    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
 
   return {
     weekNumber,
@@ -56,14 +66,21 @@ export async function checkAndAwardChallengeXP(
 ): Promise<{ awarded: boolean; xpAmount?: number }> {
   try {
     // Get current challenge and progress
-    const { challenge, isCompleted } = await getWeeklyChallengeProgress(supabase, userId);
+    const { challenge, isCompleted } = await getWeeklyChallengeProgress(
+      supabase,
+      userId,
+    );
 
     if (!isCompleted) {
       return { awarded: false };
     }
 
     // Check if already awarded this week
-    const alreadyCompleted = await hasCompletedChallengeThisWeek(supabase, userId, challenge.id);
+    const alreadyCompleted = await hasCompletedChallengeThisWeek(
+      supabase,
+      userId,
+      challenge.id,
+    );
 
     if (alreadyCompleted) {
       return { awarded: false };
@@ -76,6 +93,7 @@ export async function checkAndAwardChallengeXP(
       supabase,
       userId,
       challenge.xpReward,
+      "challenge_completed",
       `weekly_challenge_${challenge.id}`,
       `Completed weekly challenge: ${challenge.title}`,
     );

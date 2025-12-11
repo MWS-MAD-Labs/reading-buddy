@@ -41,7 +41,9 @@ export class LocalAIProvider implements IAIProvider {
     this.diffuserImagePath = config.diffuserImagePath;
   }
 
-  async generateQuiz(input: QuizGenerationInput): Promise<QuizGenerationOutput> {
+  async generateQuiz(
+    input: QuizGenerationInput,
+  ): Promise<QuizGenerationOutput> {
     console.log("[LocalAIProvider] generateQuiz input:", {
       title: input.title,
       quizType: input.quizType,
@@ -72,7 +74,9 @@ export class LocalAIProvider implements IAIProvider {
         }
       }
     } else {
-      console.log("[LocalAIProvider] No pages provided, attempting PDF generation");
+      console.log(
+        "[LocalAIProvider] No pages provided, attempting PDF generation",
+      );
       payload = await this.generateQuizFromPdf(input, target, fallback);
     }
 
@@ -364,7 +368,10 @@ export class LocalAIProvider implements IAIProvider {
         );
       }
 
-      console.log("[LocalAIProvider] Got 404, retrying with fallback:", fallback);
+      console.log(
+        "[LocalAIProvider] Got 404, retrying with fallback:",
+        fallback,
+      );
       const retryResponse = await fetch(fallback, init);
       if (!retryResponse.ok) {
         const errorText = await retryResponse.text();
@@ -390,9 +397,7 @@ export class LocalAIProvider implements IAIProvider {
     fallbackTitle: string,
     questionCount: number,
   ): QuizPayload {
-    const questions = Array.isArray(result.questions)
-      ? result.questions
-      : [];
+    const questions = Array.isArray(result.questions) ? result.questions : [];
 
     if (!questions.length) {
       throw new AIProviderError(
@@ -419,9 +424,10 @@ export class LocalAIProvider implements IAIProvider {
         const answerIndex =
           typeof question.answerIndex === "number"
             ? question.answerIndex
-            : typeof (question as { correct_answer?: number }).correct_answer ===
-                "number"
-              ? (question as { correct_answer: number }).correct_answer
+            : typeof (question as unknown as { correct_answer?: number })
+                  .correct_answer === "number"
+              ? (question as unknown as { correct_answer: number })
+                  .correct_answer
               : 0;
 
         const clampedAnswerIndex =

@@ -67,7 +67,6 @@ export async function extractTextFromPDF(
       useSystemFonts: true,
       useWorkerFetch: false,
       isEvalSupported: false,
-      disableWorker: true,
     });
 
     const pdfDocument = await loadingTask.promise;
