@@ -1,16 +1,20 @@
 import Link from "next/link";
-import type { ClassAnalytics } from "@/app/(dashboard)/dashboard/teacher-analytics-actions";
+import type { ClassAnalytics } from "@/app/(dashboard)/dashboard/teacher/teacher-analytics-actions";
 
 type ClassAnalyticsOverviewProps = {
   analytics: ClassAnalytics[];
 };
 
-export function ClassAnalyticsOverview({ analytics }: ClassAnalyticsOverviewProps) {
+export function ClassAnalyticsOverview({
+  analytics,
+}: ClassAnalyticsOverviewProps) {
   if (analytics.length === 0) {
     return (
       <div className="rounded-[28px] border-2 border-dashed border-indigo-200 bg-white/80 p-8 text-center">
         <span className="text-4xl">📚</span>
-        <h3 className="mt-3 text-lg font-bold text-indigo-900">No Classes Yet</h3>
+        <h3 className="mt-3 text-lg font-bold text-indigo-900">
+          No Classes Yet
+        </h3>
         <p className="mt-1 text-sm text-indigo-500">
           Create your first classroom to see analytics here
         </p>
@@ -23,7 +27,8 @@ export function ClassAnalyticsOverview({ analytics }: ClassAnalyticsOverviewProp
   const totalActive = analytics.reduce((sum, a) => sum + a.activeStudents, 0);
   const totalBooks = analytics.reduce((sum, a) => sum + a.totalBooksRead, 0);
   const totalPages = analytics.reduce((sum, a) => sum + a.totalPagesRead, 0);
-  const avgEngagement = totalStudents > 0 ? Math.round((totalActive / totalStudents) * 100) : 0;
+  const avgEngagement =
+    totalStudents > 0 ? Math.round((totalActive / totalStudents) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -117,15 +122,19 @@ function StatCard({
 
 // Individual class performance card
 function ClassCard({ analytics }: { analytics: ClassAnalytics }) {
-  const engagementRate = analytics.totalStudents > 0
-    ? Math.round((analytics.activeStudents / analytics.totalStudents) * 100)
-    : 0;
+  const engagementRate =
+    analytics.totalStudents > 0
+      ? Math.round((analytics.activeStudents / analytics.totalStudents) * 100)
+      : 0;
 
   // Determine performance level
   const getPerformanceIndicator = () => {
-    if (engagementRate >= 80) return { emoji: "🔥", text: "Excellent", color: "text-green-600" };
-    if (engagementRate >= 60) return { emoji: "✨", text: "Good", color: "text-blue-600" };
-    if (engagementRate >= 40) return { emoji: "📚", text: "Moderate", color: "text-amber-600" };
+    if (engagementRate >= 80)
+      return { emoji: "🔥", text: "Excellent", color: "text-green-600" };
+    if (engagementRate >= 60)
+      return { emoji: "✨", text: "Good", color: "text-blue-600" };
+    if (engagementRate >= 40)
+      return { emoji: "📚", text: "Moderate", color: "text-amber-600" };
     return { emoji: "💤", text: "Needs Attention", color: "text-red-600" };
   };
 
@@ -143,10 +152,13 @@ function ClassCard({ analytics }: { analytics: ClassAnalytics }) {
             {analytics.className}
           </h4>
           <p className="text-sm text-indigo-500">
-            {analytics.totalStudents} {analytics.totalStudents === 1 ? "student" : "students"}
+            {analytics.totalStudents}{" "}
+            {analytics.totalStudents === 1 ? "student" : "students"}
           </p>
         </div>
-        <div className={`flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-sm font-semibold ${performance.color}`}>
+        <div
+          className={`flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-sm font-semibold ${performance.color}`}
+        >
           <span>{performance.emoji}</span>
           <span>{performance.text}</span>
         </div>
@@ -154,7 +166,10 @@ function ClassCard({ analytics }: { analytics: ClassAnalytics }) {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
-        <MiniStat label="Active" value={`${analytics.activeStudents}/${analytics.totalStudents}`} />
+        <MiniStat
+          label="Active"
+          value={`${analytics.activeStudents}/${analytics.totalStudents}`}
+        />
         <MiniStat label="Avg XP" value={analytics.averageXP.toLocaleString()} />
         <MiniStat label="Books" value={analytics.totalBooksRead} />
         <MiniStat label="Avg Level" value={analytics.averageLevel} />

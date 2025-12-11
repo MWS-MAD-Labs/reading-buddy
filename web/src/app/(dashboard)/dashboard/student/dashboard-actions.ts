@@ -89,7 +89,7 @@ export async function getStudentDashboardData(
 
     // 3. Generate weekly challenge (based on current progress)
     // For now, we'll create a simple reading challenge
-    const pagesReadThisWeek = gamificationStats?.pages_read || 0; // TODO: Calculate actual pages this week
+    const pagesReadThisWeek = 0; // TODO: Calculate actual pages this week from xp_transactions
     const weeklyChallenge = {
       id: "weekly-reading-challenge",
       title: "Read 100 Pages",

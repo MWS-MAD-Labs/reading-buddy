@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { BookAssignment, QuizAssignment } from "@/app/(dashboard)/dashboard/teacher-analytics-actions";
+import type {
+  BookAssignment,
+  QuizAssignment,
+} from "@/app/(dashboard)/dashboard/teacher/teacher-analytics-actions";
 
 type AssignmentTrackingDashboardProps = {
   bookAssignments: BookAssignment[];
@@ -18,7 +21,9 @@ export function AssignmentTrackingDashboard({
     return (
       <div className="rounded-[28px] border-2 border-dashed border-indigo-200 bg-white/80 p-8 text-center">
         <span className="text-4xl">📚</span>
-        <h3 className="mt-3 text-lg font-bold text-indigo-900">No Assignments Yet</h3>
+        <h3 className="mt-3 text-lg font-bold text-indigo-900">
+          No Assignments Yet
+        </h3>
         <p className="mt-1 text-sm text-indigo-500">
           Assign books and quizzes to your classes to see tracking here
         </p>
@@ -90,7 +95,11 @@ function TabButton({
 }
 
 // Book assignments list
-function BookAssignmentsList({ assignments }: { assignments: BookAssignment[] }) {
+function BookAssignmentsList({
+  assignments,
+}: {
+  assignments: BookAssignment[];
+}) {
   if (assignments.length === 0) {
     return (
       <div className="rounded-2xl bg-white/60 p-8 text-center text-indigo-500">
@@ -110,7 +119,12 @@ function BookAssignmentsList({ assignments }: { assignments: BookAssignment[] })
 
 // Individual book assignment card
 function BookAssignmentCard({ assignment }: { assignment: BookAssignment }) {
-  const completionColor = assignment.completionRate >= 70 ? "text-green-600" : assignment.completionRate >= 40 ? "text-amber-600" : "text-red-600";
+  const completionColor =
+    assignment.completionRate >= 70
+      ? "text-green-600"
+      : assignment.completionRate >= 40
+        ? "text-amber-600"
+        : "text-red-600";
 
   return (
     <div className="rounded-[20px] border border-white/70 bg-white/90 p-5 shadow-[0_10px_40px_rgba(0,0,0,0.06)]">
@@ -128,8 +142,12 @@ function BookAssignmentCard({ assignment }: { assignment: BookAssignment }) {
         <div className="flex-1">
           {/* Header */}
           <div className="mb-3">
-            <h4 className="text-lg font-bold text-indigo-900">{assignment.bookTitle}</h4>
-            <p className="text-sm text-indigo-500">by {assignment.bookAuthor}</p>
+            <h4 className="text-lg font-bold text-indigo-900">
+              {assignment.bookTitle}
+            </h4>
+            <p className="text-sm text-indigo-500">
+              by {assignment.bookAuthor}
+            </p>
             <p className="mt-1 text-xs text-gray-500">
               {assignment.assignedClasses.join(", ")}
             </p>
@@ -139,15 +157,23 @@ function BookAssignmentCard({ assignment }: { assignment: BookAssignment }) {
           <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <MiniMetric label="Total" value={assignment.totalStudents} />
             <MiniMetric label="Started" value={assignment.studentsStarted} />
-            <MiniMetric label="Completed" value={assignment.studentsCompleted} />
-            <MiniMetric label="Avg Progress" value={`${assignment.averageProgress}%`} />
+            <MiniMetric
+              label="Completed"
+              value={assignment.studentsCompleted}
+            />
+            <MiniMetric
+              label="Avg Progress"
+              value={`${assignment.averageProgress}%`}
+            />
           </div>
 
           {/* Progress Bar */}
           <div className="space-y-1">
             <div className="flex justify-between text-xs font-semibold">
               <span className="text-gray-600">Completion Rate</span>
-              <span className={completionColor}>{assignment.completionRate}%</span>
+              <span className={completionColor}>
+                {assignment.completionRate}%
+              </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-gray-100">
               <div
@@ -155,8 +181,8 @@ function BookAssignmentCard({ assignment }: { assignment: BookAssignment }) {
                   assignment.completionRate >= 70
                     ? "bg-gradient-to-r from-green-400 to-emerald-400"
                     : assignment.completionRate >= 40
-                    ? "bg-gradient-to-r from-amber-400 to-orange-400"
-                    : "bg-gradient-to-r from-red-400 to-pink-400"
+                      ? "bg-gradient-to-r from-amber-400 to-orange-400"
+                      : "bg-gradient-to-r from-red-400 to-pink-400"
                 }`}
                 style={{ width: `${assignment.completionRate}%` }}
               />
@@ -169,7 +195,11 @@ function BookAssignmentCard({ assignment }: { assignment: BookAssignment }) {
 }
 
 // Quiz assignments list
-function QuizAssignmentsList({ assignments }: { assignments: QuizAssignment[] }) {
+function QuizAssignmentsList({
+  assignments,
+}: {
+  assignments: QuizAssignment[];
+}) {
   if (assignments.length === 0) {
     return (
       <div className="rounded-2xl bg-white/60 p-8 text-center text-indigo-500">
@@ -189,10 +219,18 @@ function QuizAssignmentsList({ assignments }: { assignments: QuizAssignment[] })
 
 // Individual quiz assignment card
 function QuizAssignmentCard({ assignment }: { assignment: QuizAssignment }) {
-  const scoreColor = assignment.averageScore >= 80 ? "text-green-600" : assignment.averageScore >= 60 ? "text-amber-600" : "text-red-600";
-  const participationRate = assignment.totalStudents > 0
-    ? Math.round((assignment.studentsAttempted / assignment.totalStudents) * 100)
-    : 0;
+  const scoreColor =
+    assignment.averageScore >= 80
+      ? "text-green-600"
+      : assignment.averageScore >= 60
+        ? "text-amber-600"
+        : "text-red-600";
+  const participationRate =
+    assignment.totalStudents > 0
+      ? Math.round(
+          (assignment.studentsAttempted / assignment.totalStudents) * 100,
+        )
+      : 0;
 
   return (
     <div className="rounded-[20px] border border-white/70 bg-white/90 p-5 shadow-[0_10px_40px_rgba(0,0,0,0.06)]">
@@ -203,8 +241,12 @@ function QuizAssignmentCard({ assignment }: { assignment: QuizAssignment }) {
             <div className="flex items-center gap-2">
               <span className="text-2xl">🎯</span>
               <div>
-                <h4 className="text-lg font-bold text-indigo-900">{assignment.quizTitle}</h4>
-                <p className="text-sm text-indigo-500">{assignment.bookTitle}</p>
+                <h4 className="text-lg font-bold text-indigo-900">
+                  {assignment.quizTitle}
+                </h4>
+                <p className="text-sm text-indigo-500">
+                  {assignment.bookTitle}
+                </p>
                 <p className="mt-1 text-xs text-gray-500">
                   {assignment.assignedClasses.join(", ")}
                 </p>
@@ -215,8 +257,15 @@ function QuizAssignmentCard({ assignment }: { assignment: QuizAssignment }) {
           {/* Stats Grid */}
           <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <MiniMetric label="Total" value={assignment.totalStudents} />
-            <MiniMetric label="Attempted" value={assignment.studentsAttempted} />
-            <MiniMetric label="Avg Score" value={`${assignment.averageScore}%`} valueColor={scoreColor} />
+            <MiniMetric
+              label="Attempted"
+              value={assignment.studentsAttempted}
+            />
+            <MiniMetric
+              label="Avg Score"
+              value={`${assignment.averageScore}%`}
+              valueColor={scoreColor}
+            />
             <MiniMetric label="Pass Rate" value={`${assignment.passRate}%`} />
           </div>
 
@@ -252,7 +301,9 @@ function MiniMetric({
   return (
     <div>
       <p className="text-xs font-medium text-gray-500">{label}</p>
-      <p className={`text-base font-bold ${valueColor ?? "text-gray-900"}`}>{value}</p>
+      <p className={`text-base font-bold ${valueColor ?? "text-gray-900"}`}>
+        {value}
+      </p>
     </div>
   );
 }

@@ -165,23 +165,20 @@ export default async function StudentClassroomPage({
             ? item.quizzes[0]
             : item.quizzes;
 
-        const resolvedQuiz = quizData as
-          | {
-              id?: number;
-              book_id?: number;
-              quiz_type?: string;
-              books?:
-                | { title: string | null }
-                | { title: string | null }[]
-                | null;
-            }
-          | null;
+        const resolvedQuiz = quizData as {
+          id?: number;
+          book_id?: number;
+          quiz_type?: string;
+          books?: { title: string | null } | { title: string | null }[] | null;
+        } | null;
 
         const booksField = resolvedQuiz?.books;
         const bookData =
           Array.isArray(booksField) && booksField.length > 0
             ? booksField[0]
-            : booksField ?? null;
+            : !Array.isArray(booksField)
+              ? booksField
+              : null;
 
         return {
           id: resolvedQuiz?.id ?? 0,

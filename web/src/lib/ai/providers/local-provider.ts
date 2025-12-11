@@ -42,6 +42,16 @@ export class LocalAIProvider implements IAIProvider {
   }
 
   async generateQuiz(input: QuizGenerationInput): Promise<QuizGenerationOutput> {
+    console.log("[LocalAIProvider] generateQuiz input:", {
+      title: input.title,
+      quizType: input.quizType,
+      contentSource: input.contentSource,
+      pagesCount: input.pages?.length ?? 0,
+      hasPdfUrl: !!input.pdfUrl,
+      totalWords: input.totalWords,
+      questionCount: input.questionCount,
+    });
+
     const target = this.buildRagEndpoint(this.ragQuizPath);
     const fallback = this.buildRagEndpoint(this.ragQuizAltPath);
 
@@ -62,6 +72,7 @@ export class LocalAIProvider implements IAIProvider {
         }
       }
     } else {
+      console.log("[LocalAIProvider] No pages provided, attempting PDF generation");
       payload = await this.generateQuizFromPdf(input, target, fallback);
     }
 
@@ -184,6 +195,17 @@ export class LocalAIProvider implements IAIProvider {
       contentSource: input.contentSource,
     });
 
+    console.log("[LocalAIProvider] Text quiz request:", {
+      title: input.title,
+      quizType: input.quizType,
+      contentSource: input.contentSource,
+      pagesCount: input.pages?.length ?? 0,
+      totalWords: input.totalWords,
+      hasDescription: !!input.description,
+      endpoint: target,
+      bodySize: requestBody.length,
+    });
+
     const response = await this.postWithFallback(target, fallback, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -206,7 +228,10 @@ export class LocalAIProvider implements IAIProvider {
       );
     }
 
+    console.log("[LocalAIProvider] Fetching PDF from:", input.pdfUrl);
     const pdfBlob = await this.fetchPdfBlob(input.pdfUrl);
+    console.log("[LocalAIProvider] PDF fetched, size:", pdfBlob.size, "bytes");
+
     const formData = new FormData();
     formData.append("file", pdfBlob, "ebook.pdf");
     formData.append("title", input.title);
@@ -221,6 +246,13 @@ export class LocalAIProvider implements IAIProvider {
     if (input.checkpointPage)
       formData.append("checkpointPage", String(input.checkpointPage));
     if (input.description) formData.append("description", input.description);
+
+    console.log("[LocalAIProvider] PDF quiz request:", {
+      title: input.title,
+      quizType: input.quizType,
+      pdfUrl: input.pdfUrl,
+      endpoint: target,
+    });
 
     const response = await this.postWithFallback(target, fallback, {
       method: "POST",
@@ -309,29 +341,48 @@ export class LocalAIProvider implements IAIProvider {
     fallback: string,
     init: RequestInit,
   ) {
-    const response = await fetch(target, init);
-    if (response.ok) {
-      return response;
-    }
+    console.log("[LocalAIProvider] Attempting POST to:", target);
+    const startTime = Date.now();
 
-    if (response.status !== 404) {
-      const errorText = await response.text();
-      throw new AIProviderError(
-        `RAG API error: ${response.statusText} - ${errorText}`,
-        this.type,
-      );
-    }
+    try {
+      const response = await fetch(target, init);
+      const elapsed = Date.now() - startTime;
+      console.log(`[LocalAIProvider] Response from ${target} (${elapsed}ms):`, {
+        status: response.status,
+        statusText: response.statusText,
+      });
 
-    const retryResponse = await fetch(fallback, init);
-    if (!retryResponse.ok) {
-      const errorText = await retryResponse.text();
-      throw new AIProviderError(
-        `RAG API error: ${retryResponse.statusText} - ${errorText}`,
-        this.type,
-      );
-    }
+      if (response.ok) {
+        return response;
+      }
 
-    return retryResponse;
+      if (response.status !== 404) {
+        const errorText = await response.text();
+        throw new AIProviderError(
+          `RAG API error: ${response.statusText} - ${errorText}`,
+          this.type,
+        );
+      }
+
+      console.log("[LocalAIProvider] Got 404, retrying with fallback:", fallback);
+      const retryResponse = await fetch(fallback, init);
+      if (!retryResponse.ok) {
+        const errorText = await retryResponse.text();
+        throw new AIProviderError(
+          `RAG API error: ${retryResponse.statusText} - ${errorText}`,
+          this.type,
+        );
+      }
+
+      return retryResponse;
+    } catch (error) {
+      const elapsed = Date.now() - startTime;
+      console.error(`[LocalAIProvider] Fetch failed after ${elapsed}ms:`, {
+        endpoint: target,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   private normalizeQuizPayload(

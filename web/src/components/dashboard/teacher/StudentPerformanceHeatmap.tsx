@@ -1,11 +1,13 @@
 import Link from "next/link";
-import type { ClassAnalytics } from "@/app/(dashboard)/dashboard/teacher-analytics-actions";
+import type { ClassAnalytics } from "@/app/(dashboard)/dashboard/teacher/teacher-analytics-actions";
 
 type StudentPerformanceHeatmapProps = {
   analytics: ClassAnalytics[];
 };
 
-export function StudentPerformanceHeatmap({ analytics }: StudentPerformanceHeatmapProps) {
+export function StudentPerformanceHeatmap({
+  analytics,
+}: StudentPerformanceHeatmapProps) {
   if (analytics.length === 0) {
     return (
       <div className="rounded-[28px] border-2 border-dashed border-indigo-200 bg-white/80 p-8 text-center">
@@ -65,19 +67,25 @@ function PerformanceLegend() {
 // Individual class heatmap card
 function ClassHeatmapCard({ analytics }: { analytics: ClassAnalytics }) {
   // Calculate performance metrics (0-100 scale)
-  const engagementScore = analytics.totalStudents > 0
-    ? (analytics.activeStudents / analytics.totalStudents) * 100
-    : 0;
+  const engagementScore =
+    analytics.totalStudents > 0
+      ? (analytics.activeStudents / analytics.totalStudents) * 100
+      : 0;
 
-  const xpScore = analytics.averageXP > 0
-    ? Math.min((analytics.averageXP / 500) * 100, 100)
-    : 0;
+  const xpScore =
+    analytics.averageXP > 0
+      ? Math.min((analytics.averageXP / 500) * 100, 100)
+      : 0;
 
   const completionScore = analytics.quizCompletionRate;
 
-  const activityScore = analytics.totalPagesRead > 0
-    ? Math.min((analytics.totalPagesRead / (analytics.totalStudents * 100)) * 100, 100)
-    : 0;
+  const activityScore =
+    analytics.totalPagesRead > 0
+      ? Math.min(
+          (analytics.totalPagesRead / (analytics.totalStudents * 100)) * 100,
+          100,
+        )
+      : 0;
 
   const metrics = [
     { label: "Engagement", score: engagementScore, icon: "👥" },
@@ -86,10 +94,13 @@ function ClassHeatmapCard({ analytics }: { analytics: ClassAnalytics }) {
     { label: "Reading", score: activityScore, icon: "📖" },
   ];
 
-  const overallScore = (engagementScore + xpScore + completionScore + activityScore) / 4;
+  const overallScore =
+    (engagementScore + xpScore + completionScore + activityScore) / 4;
   const getOverallColor = () => {
-    if (overallScore >= 70) return { bg: "from-green-400 to-emerald-400", text: "text-green-700" };
-    if (overallScore >= 40) return { bg: "from-amber-400 to-orange-400", text: "text-amber-700" };
+    if (overallScore >= 70)
+      return { bg: "from-green-400 to-emerald-400", text: "text-green-700" };
+    if (overallScore >= 40)
+      return { bg: "from-amber-400 to-orange-400", text: "text-amber-700" };
     return { bg: "from-red-400 to-pink-400", text: "text-red-700" };
   };
 
@@ -107,11 +118,14 @@ function ClassHeatmapCard({ analytics }: { analytics: ClassAnalytics }) {
             {analytics.className}
           </h4>
           <p className="text-xs text-gray-500">
-            {analytics.totalStudents} {analytics.totalStudents === 1 ? "student" : "students"} •{" "}
+            {analytics.totalStudents}{" "}
+            {analytics.totalStudents === 1 ? "student" : "students"} •{" "}
             {analytics.activeStudents} active
           </p>
         </div>
-        <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${colors.bg} font-bold text-white shadow-md`}>
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${colors.bg} font-bold text-white shadow-md`}
+        >
           {Math.round(overallScore)}
         </div>
       </div>
@@ -132,7 +146,15 @@ function ClassHeatmapCard({ analytics }: { analytics: ClassAnalytics }) {
 }
 
 // Individual metric cell
-function MetricCell({ label, score, icon }: { label: string; score: number; icon: string }) {
+function MetricCell({
+  label,
+  score,
+  icon,
+}: {
+  label: string;
+  score: number;
+  icon: string;
+}) {
   const getColor = () => {
     if (score >= 70) return "bg-green-400";
     if (score >= 40) return "bg-amber-400";

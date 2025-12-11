@@ -205,7 +205,7 @@ export function LibrarianStatsCards({
         { label: "Most Quizzed", value: popularBooks.mostQuizzed.length },
       ]}
     />,
-  ].filter(Boolean) as JSX.Element[];
+  ].filter(Boolean) as React.ReactElement[];
 
   const gridCols =
     cards.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2";
@@ -216,7 +216,9 @@ export function LibrarianStatsCards({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-black text-indigo-900">
-            {variant === "compact" ? "Library Ops Overview" : "Librarian Overview"}
+            {variant === "compact"
+              ? "Library Ops Overview"
+              : "Librarian Overview"}
           </h2>
           <p className="text-sm font-semibold text-indigo-600">
             Collection insights and usage metrics
@@ -232,7 +234,11 @@ export function LibrarianStatsCards({
 
       {/* Recent Uploads Section */}
       {uploadStatistics.recentUploads.length > 0 && (
-        <Card variant="glow" padding="cozy" className="border-4 border-white/70">
+        <Card
+          variant="glow"
+          padding="cozy"
+          className="border-4 border-white/70"
+        >
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
