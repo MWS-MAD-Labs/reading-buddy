@@ -2,9 +2,9 @@ services:
   reading-buddy:
     build:
       # Build directly from GitHub repository - always pulls latest code from main branch
-      context: https://github.com/faisalnh/reading-companion.git#main
+      # context: https://github.com/faisalnh/reading-companion.git#main
       # To build from local files instead, comment the line above and uncomment below:
-      # context: .
+      context: .
       dockerfile: Dockerfile
       # Force rebuild without cache to ensure latest code
       no_cache: true
