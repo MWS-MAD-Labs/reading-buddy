@@ -1,4 +1,11 @@
 # Reading Buddy - Production Dockerfile with EPUB Support
+
+# Build arguments - declare at the top for use across stages
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_RAG_API_URL
+
 FROM node:20-slim AS base
 
 # Install dependencies for native modules (canvas, pdf2pic) and Calibre
@@ -45,24 +52,25 @@ COPY package*.json ./
 
 WORKDIR /app/web
 
-# Build arguments for Next.js public env vars
-# Provide placeholder defaults to allow build to succeed
-ARG NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key
-ARG NEXT_PUBLIC_RAG_API_URL=http://172.16.0.65:8000
-ARG MINIO_ENDPOINT=placeholder.minio.com
-ARG MINIO_PORT=443
-ARG MINIO_USE_SSL=true
+# Re-declare build arguments in this stage (required for multi-stage builds)
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_RAG_API_URL
+ARG MINIO_ENDPOINT
+ARG MINIO_PORT
+ARG MINIO_USE_SSL
 
 # Set environment variables for build
 # Next.js collects anonymous telemetry data - disable it
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
-ENV NEXT_PUBLIC_RAG_API_URL=$NEXT_PUBLIC_RAG_API_URL
-ENV MINIO_ENDPOINT=$MINIO_ENDPOINT
-ENV MINIO_PORT=$MINIO_PORT
-ENV MINIO_USE_SSL=$MINIO_USE_SSL
+ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_RAG_API_URL=${NEXT_PUBLIC_RAG_API_URL}
+ENV MINIO_ENDPOINT=${MINIO_ENDPOINT}
+ENV MINIO_PORT=${MINIO_PORT}
+ENV MINIO_USE_SSL=${MINIO_USE_SSL}
 
 # Build the application
 RUN npm run build
