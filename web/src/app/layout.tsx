@@ -32,9 +32,6 @@ export default function RootLayout({
   // Get runtime environment variables on the server
   const env = getServerEnv();
 
-  // Check if this is staging environment
-  const isStaging = env.NEXT_PUBLIC_APP_URL?.includes("staging");
-
   return (
     <html lang="en">
       <head>
@@ -47,12 +44,6 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {isStaging && (
-          <div className="bg-gradient-to-r from-yellow-400 to-orange-400 text-black px-4 py-3 text-center font-bold text-sm sticky top-0 z-50 shadow-lg border-b-4 border-orange-600 animate-pulse">
-            🚀 STAGING - CI/CD Auto-Deploy Test - Build:{" "}
-            {new Date().toISOString().slice(0, 16).replace("T", " ")} UTC 🚀
-          </div>
-        )}
         <SupabaseProvider>{children}</SupabaseProvider>
       </body>
     </html>
