@@ -85,3 +85,13 @@ jobs:
             MINIO_ENDPOINT=minioapi.mws.web.id
             MINIO_PORT=443
             MINIO_USE_SSL=true
+
+      - name: Trigger Komodo Procedure Deployment
+        if: success()
+        run: |
+          PAYLOAD='{"ref":"refs/heads/staging","repository":{"full_name":"${{ github.repository }}"},"pusher":{"name":"${{ github.actor }}"},"head_commit":{"message":"${{ github.event.head_commit.message }}","id":"${{ github.sha }}"}}'
+          SIGNATURE="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "${{ secrets.KOMODO_WEBHOOK_SECRET }}" | sed 's/^.* //')"
+          curl -X POST "${{ secrets.KOMODO_PROCEDURE_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: $SIGNATURE" \
+            -d "$PAYLOAD"
