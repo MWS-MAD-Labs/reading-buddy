@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AdminUserTable } from "@/components/dashboard/AdminUserTable";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -20,100 +19,66 @@ export default async function AdminDashboardPage() {
       ascending: false,
     });
 
-  // Fetch auth users directly from auth.users table using raw SQL
-  // This bypasses the Auth API which seems to have database permission issues
-  const { data: authUsers, error: authError } = await supabaseAdmin
-    .from("profiles")
-    .select("id")
-    .limit(1000);
+  if (profilesError) {
+    console.error("Error fetching profiles:", profilesError);
+  }
 
-  console.log("Fetching emails directly from auth schema...");
+  // Get emails one-by-one to avoid listUsers Auth API failures
+  const emailCache = new Map<string, string | null>();
+  const usersWithEmails = await Promise.all(
+    (profiles || []).map(async (profile) => {
+      if (emailCache.has(profile.id)) {
+        return { ...profile, email: emailCache.get(profile.id) ?? null };
+      }
 
-  // Use RPC or raw query to get emails from auth.users
-  // Since we can't directly query auth.users from the client, we'll use the admin API differently
-  const { data: authData, error: listError } =
-    await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
-
-  if (listError) {
-    console.error("Auth API error:", listError);
-    console.log("Attempting alternative method: querying individual users...");
-
-    // Fallback: Try to get user data individually for each profile
-    const usersWithEmails = await Promise.all(
-      (profiles || []).map(async (profile) => {
+      try {
         const { data: userData, error: userError } =
           await supabaseAdmin.auth.admin.getUserById(profile.id);
 
         if (userError) {
-          console.error(`Error fetching user ${profile.id}:`, userError);
+          console.warn(
+            `Unable to fetch auth user ${profile.id}:`,
+            userError.message || userError,
+          );
+          emailCache.set(profile.id, null);
+          return {
+            ...profile,
+            email: null,
+          };
         }
 
+        const email = userData?.user?.email || null;
+        emailCache.set(profile.id, email);
         return {
           ...profile,
-          email: userData?.user?.email || null,
+          email,
         };
-      }),
-    );
+      } catch (error) {
+        console.warn(
+          `Auth API threw while fetching user ${profile.id}:`,
+          error instanceof Error ? error.message : error,
+        );
+        emailCache.set(profile.id, null);
+        return {
+          ...profile,
+          email: null,
+        };
+      }
+    }),
+  );
 
-    console.log(
-      `Fetched emails for ${usersWithEmails.filter((u) => u.email).length} out of ${profiles?.length || 0} profiles`,
-    );
+  console.log(
+    `Fetched emails for ${usersWithEmails.filter((u) => u.email).length} out of ${profiles?.length || 0} profiles`,
+  );
 
-    const users = usersWithEmails;
-
-    return (
-      <div className="space-y-6">
-        <header className="rounded-3xl border-4 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 p-6 shadow-lg">
-          <div className="mb-2 inline-block rounded-2xl border-4 border-purple-300 bg-purple-400 px-4 py-1">
-            <p className="text-sm font-black uppercase tracking-wide text-purple-900">
-              ⚙️ Admin Panel
-            </p>
-          </div>
-          <h1 className="text-3xl font-black text-violet-900">
-            User Management
-          </h1>
-          <p className="text-base font-semibold text-violet-700">
-            Manage users, roles, and access levels for the entire system.
-          </p>
-          <div className="mt-4 flex gap-3">
-            <Link
-              href="/dashboard/admin/badges"
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105"
-            >
-              🏅 Manage Badges
-            </Link>
-          </div>
-        </header>
-
-        <AdminUserTable users={users} />
-      </div>
-    );
-  }
-
-  console.log(`Total auth users fetched: ${authData.users.length}`);
-  console.log(`Total profiles: ${profiles?.length || 0}`);
-
-  // Merge profile data with email
-  const users =
-    profiles?.map((profile) => {
-      const authUser = authData.users.find(
-        (u: { id: string; email?: string }) => u.id === profile.id,
-      );
-      return {
-        ...profile,
-        email: authUser?.email || null,
-      };
-    }) ?? [];
+  const users = usersWithEmails;
 
   return (
     <div className="space-y-6">
       <header className="rounded-3xl border-4 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 p-6 shadow-lg">
         <div className="mb-2 inline-block rounded-2xl border-4 border-purple-300 bg-purple-400 px-4 py-1">
           <p className="text-sm font-black uppercase tracking-wide text-purple-900">
-            ⚙️ Admin Panel
+            Admin Panel
           </p>
         </div>
         <h1 className="text-3xl font-black text-violet-900">User Management</h1>
@@ -125,7 +90,19 @@ export default async function AdminDashboardPage() {
             href="/dashboard/admin/badges"
             className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105"
           >
-            🏅 Manage Badges
+            Manage Badges
+          </Link>
+          <Link
+            href="/dashboard/admin/broadcasts"
+            className="inline-flex items-center gap-2 rounded-full border-2 border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+          >
+            Login Messages
+          </Link>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 rounded-full border-2 border-purple-200 bg-white px-4 py-2 text-sm font-bold text-purple-700 shadow-sm transition hover:bg-purple-50"
+          >
+            📊 System Overview
           </Link>
         </div>
       </header>

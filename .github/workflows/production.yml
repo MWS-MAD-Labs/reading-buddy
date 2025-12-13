@@ -1,0 +1,100 @@
+name: Production CI/CD
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: reading-companion
+
+jobs:
+  test-and-build:
+    name: Test and Build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./web
+        run: npm ci
+
+      - name: Run linting
+        working-directory: ./web
+        run: npm run lint
+
+      - name: Run type checking
+        working-directory: ./web
+        run: npm run type-check
+
+      - name: Run unit tests
+        working-directory: ./web
+        run: npm run test
+        env:
+          NODE_ENV: test
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=build-${{ github.run_number }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix=main-
+            type=raw,value=prod-{{date 'YYYY-MM-DD-HHmm'}}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=https://hbrosmlrvbkmcbyggriv.supabase.co
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhicm9zbWxydmJrbWNieWdncml2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTA1MTMsImV4cCI6MjA3ODA2NjUxM30.R9d8zWNLXtnO9zGu_1Zts4JP-B9XE26J6gS6Xfg5hpo
+            NEXT_PUBLIC_APP_URL=https://reads.mws.web.id
+            NEXT_PUBLIC_RAG_API_URL=https://rag.mws.web.id/
+            MINIO_ENDPOINT=minioapi.mws.web.id
+            MINIO_PORT=443
+            MINIO_USE_SSL=true
+
+      - name: Trigger Komodo Procedure Deployment
+        if: success()
+        run: |
+          PAYLOAD='{"ref":"refs/heads/main","repository":{"full_name":"${{ github.repository }}"},"pusher":{"name":"${{ github.actor }}"},"head_commit":{"message":"${{ github.event.head_commit.message }}","id":"${{ github.sha }}"}}'
+          SIGNATURE="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "${{ secrets.KOMODO_PROD_WEBHOOK_SECRET }}" | sed 's/^.* //')"
+          curl -X POST "${{ secrets.KOMODO_PROD_PROCEDURE_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: $SIGNATURE" \
+            -d "$PAYLOAD"

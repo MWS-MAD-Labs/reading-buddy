@@ -2,9 +2,9 @@ services:
   reading-buddy:
     build:
       # Build directly from GitHub repository - always pulls latest code from main branch
-      context: https://github.com/faisalnh/reading-companion.git#main
+      # context: https://github.com/faisalnh/reading-companion.git#main
       # To build from local files instead, comment the line above and uncomment below:
-      # context: .
+      context: .
       dockerfile: Dockerfile
       # Force rebuild without cache to ensure latest code
       no_cache: true
@@ -13,6 +13,8 @@ services:
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://placeholder.supabase.co}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-anon-key}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+        NEXT_PUBLIC_RAG_API_URL: ${NEXT_PUBLIC_RAG_API_URL:-http://172.16.0.65:8000}
         MINIO_ENDPOINT: ${MINIO_ENDPOINT:-placeholder.minio.com}
         MINIO_PORT: ${MINIO_PORT:-443}
         MINIO_USE_SSL: ${MINIO_USE_SSL:-true}
@@ -44,7 +46,13 @@ services:
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
       - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME}
       # AI Configuration
+      - AI_PROVIDER=${AI_PROVIDER:-local}
+      # Cloud Provider (Gemini)
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # Local Provider (RAG + Diffuser)
+      - RAG_API_URL=${RAG_API_URL:-http://172.16.0.65:8000}
+      - DIFFUSER_API_URL=${DIFFUSER_API_URL:-http://172.16.0.165:8000}
+      - NEXT_PUBLIC_RAG_API_URL=${NEXT_PUBLIC_RAG_API_URL:-http://172.16.0.65:8000}
 
     healthcheck:
       test:

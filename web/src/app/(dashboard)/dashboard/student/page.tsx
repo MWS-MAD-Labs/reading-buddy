@@ -14,6 +14,8 @@ import {
   BadgeGrid,
   RecentBadges,
 } from "@/components/dashboard/gamification";
+import { WeeklyChallengeCard } from "@/components/dashboard/student/WeeklyChallengeCard";
+import { getWeeklyChallenge } from "../weekly-challenge-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,12 @@ export default async function StudentDashboardPage() {
   );
   const earnedBadges = await getStudentBadges(supabaseAdmin, user.id);
 
+  // Get weekly challenge
+  const weeklyChallengeResult = await getWeeklyChallenge(user.id);
+  const weeklyChallenge = weeklyChallengeResult.success
+    ? weeklyChallengeResult.data
+    : null;
+
   // Get recent badges (last 3 earned)
   const recentBadges = earnedBadges.slice(0, 3).map((sb) => ({
     badge: sb.badge,
@@ -45,8 +53,9 @@ export default async function StudentDashboardPage() {
   // Get student's current readings (personal progress)
   const { data: assignments, error: assignmentsError } = await supabase
     .from("student_books")
-    .select("book_id, current_page, books(*)")
+    .select("book_id, current_page, updated_at, started_at, books(*)")
     .eq("student_id", user.id)
+    .order("updated_at", { ascending: false })
     .order("started_at", { ascending: false });
 
   // Debug logging
@@ -158,6 +167,9 @@ export default async function StudentDashboardPage() {
 
       {/* Quick Stats */}
       {gamificationStats && <StatsGrid stats={gamificationStats} />}
+
+      {/* Weekly Challenge */}
+      {weeklyChallenge && <WeeklyChallengeCard challenge={weeklyChallenge} />}
 
       {/* Recent Badges */}
       {recentBadges.length > 0 && <RecentBadges badges={recentBadges} />}

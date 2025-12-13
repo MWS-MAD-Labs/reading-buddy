@@ -6,11 +6,12 @@ This guide will help you set up the Supabase database for Reading Buddy v1.0.0.
 
 Reading Buddy uses Supabase (PostgreSQL) for all data storage, authentication, and row-level security. The database schema includes:
 
-- **18 tables** covering users, books, classes, quizzes, checkpoints, and badges
+- **20 tables** covering users, books, classes, quizzes, checkpoints, badges, login broadcasts, and weekly challenges
 - **Complete RLS policies** for secure multi-role access
-- **15+ indexes** for optimal performance
-- **Triggers and functions** for automation
+- **20+ indexes** for optimal performance (including gamification and challenge indexes)
+- **Triggers and functions** for automation (including auto-update timestamps)
 - **6 default badges** for gamification
+- **Full gamification system** with XP, levels, streaks, reading stats, and weekly challenges
 
 ## Prerequisites
 
@@ -52,18 +53,18 @@ Version: 1.0.0
 Created:
   - 2 ENUMs (user_role, book_access_level)
   - 18 Tables (with all v1.0.0 features)
-  - 15+ Indexes for performance
-  - 3 Functions (user creation, email lookup, timestamp updates)
-  - 3 Triggers
-  - Complete RLS policies
-  - 6 Default badges
+- 15+ Indexes for performance
+- 3 Functions (user creation, email lookup, timestamp updates)
+- 3 Triggers
+- Complete RLS policies
+- 6 Default badges
 =================================================
 ```
 
 ### Step 3: Verify the Setup
 
 1. Go to **Table Editor** in the left sidebar
-2. You should see all 18 tables:
+2. You should see all 20 tables:
    - `profiles`
    - `books`
    - `book_access`
@@ -80,6 +81,8 @@ Created:
    - `student_checkpoint_progress`
    - `badges`
    - `student_badges`
+   - `login_broadcasts` (admin-controlled announcement messages shown on the login page)
+   - `weekly_challenge_completions` (tracks completed weekly challenges and XP awards)
 
 3. Click on the **`badges`** table
 4. You should see 6 default badges already inserted:
@@ -156,6 +159,42 @@ Created:
 | `student_badges` | Badges earned by students |
 | `achievements` | Legacy achievement definitions |
 | `student_achievements` | Legacy student achievements |
+| `xp_transactions` | XP earning history and audit log |
+| `weekly_challenge_completions` | Tracks completed weekly challenges and XP awards |
+
+#### Profiles Table - Gamification Columns
+
+The `profiles` table includes the following gamification fields:
+
+- **`xp`** - Total experience points earned
+- **`level`** - Current reader level (calculated from XP)
+- **`reading_streak`** - Current consecutive days reading
+- **`longest_streak`** - Longest consecutive days reading ever
+- **`last_read_date`** - Last date user read any content
+- **`total_books_completed`** - Lifetime count of completed books
+- **`total_pages_read`** - Lifetime count of pages read
+- **`total_quizzes_completed`** - Lifetime count of quizzes completed
+- **`total_perfect_quizzes`** - Lifetime count of perfect quiz scores
+- **`books_completed`** - Books completed (duplicate tracking field)
+- **`pages_read`** - Pages read (duplicate tracking field)
+
+#### Weekly Challenges System
+
+The weekly challenges system motivates students with rotating weekly goals:
+
+- **6 Challenge Types**: Page reading, book completion, quiz completion, reading streaks, and perfect quiz scores
+- **Automatic Rotation**: Challenges rotate every week based on the week number
+- **XP Rewards**: 200-300 XP bonus for completing weekly challenges
+- **No Duplication**: Once a student completes a challenge for a given week, they cannot earn the reward again
+- **Auto-Award**: XP is automatically awarded when the challenge is completed and the student views their dashboard
+
+Challenge types:
+1. **Page Turner** - Read 100 pages (200 XP)
+2. **Avid Reader** - Read 150 pages (300 XP)
+3. **Book Worm** - Complete 2 books (250 XP)
+4. **Quiz Master** - Complete 5 quizzes (200 XP)
+5. **Week Warrior** - Read every day for 7 days (300 XP)
+6. **Perfect Scholar** - Get 3 perfect quiz scores (250 XP)
 
 ## Authentication Setup
 

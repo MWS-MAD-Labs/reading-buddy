@@ -9,9 +9,6 @@ const AUTH_ROUTES = [
   "/reset-password",
 ];
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isProtected = PROTECTED_PREFIXES.some((prefix) =>
@@ -21,6 +18,10 @@ export async function proxy(req: NextRequest) {
 
   // Create response object to handle cookie mutations
   let response = NextResponse.next();
+
+  // Access env vars at runtime (middleware is server-side)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return response;

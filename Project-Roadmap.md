@@ -654,12 +654,75 @@ class OllamaProvider implements IAIProvider { ... }
 - Streak tracking (Daily, Weekly, Monthly)
 - Enhanced badge system with progress tracking
 - Gamification UI (Toasts, Cards, Notifications)
+- **Weekly Challenges System** (v1.6.0) ✅
 
 **Features Implemented:**
-- **XP Sources:** Page reads (+1), Books (+100), Quizzes (+50-100), Streaks (+10-200)
+- **XP Sources:** Page reads (+1), Books (+100), Quizzes (+50-100), Streaks (+10-200), Weekly Challenges (+200-300)
 - **Levels:** "Beginner Reader" to "Reading Legend"
 - **Streak Tracking:** Daily streaks with milestone bonuses
 - **Badge System:** Tiered badges with progress bars
+- **Weekly Challenges:** 6 rotating challenges with automatic weekly rotation
+
+#### Weekly Challenge System Details (v1.6.0) ✅
+**Status:** ✅ Complete (December 10, 2025)
+
+**Current Implementation:**
+- **Automatic Rotation:** 6 hardcoded challenges that rotate weekly based on week number
+- **Challenge Types:**
+  1. Page Turner - Read 100 pages (200 XP)
+  2. Avid Reader - Read 150 pages (300 XP)
+  3. Book Worm - Complete 2 books (250 XP)
+  4. Quiz Master - Complete 5 quizzes (200 XP)
+  5. Week Warrior - Read 7 consecutive days (300 XP)
+  6. Perfect Scholar - Get 3 perfect quiz scores (250 XP)
+- **Progress Tracking:** Real-time calculation from existing data (xp_transactions, student_books, quiz_attempts)
+- **Auto-Award XP:** Automatic XP reward when challenge is completed
+- **One-Time Completion:** Each challenge can only be completed once per week (prevents farming)
+- **Visual Feedback:** Progress bar, completion badge, XP display on student dashboard
+
+**Future Enhancement Ideas:**
+**Priority:** Medium | **Target:** v1.7.0 or later | **Status:** Planned
+
+*Admin/Librarian Challenge Management:*
+- **Challenge Creation Interface:**
+  - Create custom challenges with configurable goals and XP rewards
+  - Define challenge types (pages, books, quizzes, streaks, custom metrics)
+  - Set challenge difficulty levels (Easy, Medium, Hard, Expert)
+  - Add custom icons, titles, and descriptions
+  
+- **Challenge Scheduling:**
+  - Schedule specific challenges for specific weeks
+  - Create seasonal/themed challenges (Summer Reading Challenge, Holiday Marathon)
+  - Set challenge duration (weekly, bi-weekly, monthly)
+  - Define start/end dates for special events
+  
+- **Challenge Management Dashboard:**
+  - View all active and upcoming challenges
+  - Edit existing challenges
+  - Enable/disable challenges
+  - View completion statistics (how many students completed each challenge)
+  - Analytics: completion rates, average progress, most popular challenges
+  
+- **Challenge Templates:**
+  - Pre-built challenge templates for common scenarios
+  - Duplicate and customize existing challenges
+  - Import/export challenge configurations
+  
+- **Multiple Active Challenges:**
+  - Allow multiple simultaneous challenges (e.g., weekly + monthly + special event)
+  - Challenge categories (Reading, Quiz Mastery, Social, Special Events)
+  - Student choice: select which challenges to participate in
+  
+- **Team Challenges:**
+  - Class-based challenges (entire classroom competes)
+  - School-wide challenges
+  - Team leaderboards and collaborative goals
+
+**Technical Implementation Notes:**
+- Current system uses `weekly_challenge_completions` table to track completion
+- Challenge definitions stored in code (`/web/src/lib/weekly-challenges.ts`)
+- For admin management, would need new tables: `challenges`, `active_challenges`, `challenge_schedules`
+- UI components already built: `WeeklyChallengeCard.tsx` (can be extended for multiple challenges)
 
 ---
 
@@ -681,31 +744,48 @@ class OllamaProvider implements IAIProvider { ... }
 **A. Dashboard-Specific Enhancements**
 
 *Admin Overview:*
-- System statistics cards (total users by role, total books, active readers)
-- Recent activity feed (new signups, uploads, quiz submissions)
-- System health indicators (storage usage, AI provider status, error rates)
-- Quick action panel (add user, upload book, manage badges, view reports)
-- Usage analytics charts (daily active users, books read per week)
-- Alert center (pending approvals, system issues, low storage warnings)
+- **Future Enhancements (v1.7.0+):**
+  - System statistics cards (total users by role, total books, active readers)
+  - Recent activity feed (new signups, uploads, quiz submissions)
+  - System health indicators (storage usage, AI provider status, error rates)
+  - Quick action panel (add user, upload book, manage badges, view reports)
+  - Usage analytics charts (daily active users, books read per week)
+  - Alert center (pending approvals, system issues, low storage warnings)
 
 *Student Dashboard:*
-- Personalized book recommendations (based on reading history, genre preferences)
-- Reading progress charts (pages per day, books per month)
-- Class & global leaderboards with ranking
-- Expanded achievement showcase (badges in progress, next milestones)
-- Reading goals tracker (books per month, pages per day)
-- Continue reading section with visual page preview
-- Friend activity feed (if social features added)
-- Weekly reading challenge cards
+- ✅ Class & global leaderboards with ranking (Completed v1.6.0 - Dec 10, 2025)
+- ✅ Weekly reading challenge cards (Completed v1.6.0 - Dec 10, 2025)
+- ✅ Continue reading section with visual page preview (Already exists)
+- **Future Enhancements (v1.7.0+):**
+  - Personalized book recommendations (based on reading history, genre preferences)
+  - Reading progress charts (pages per day, books per month)
+  - Expanded achievement showcase (badges in progress, next milestones)
+  - Reading goals tracker (books per month, pages per day)
+  - Friend activity feed (if social features added)
 
 *Teacher Dashboard:*
-- Class analytics overview (average reading time, completion rates, engagement)
-- Assignment tracking (pending reviews, overdue submissions)
-- Student performance heatmap (identify struggling students)
-- Quick class management (add/remove students, assign books)
-- Reading assignment calendar view
-- Bulk operations (assign quizzes to multiple classes, export reports)
-- Top performers and students needing help sections
+- ✅ Class analytics overview (average reading time, completion rates, engagement) (Completed v1.6.0 - Dec 10, 2025)
+- ✅ Assignment tracking (book and quiz progress monitoring) (Completed v1.6.0 - Dec 10, 2025)
+- ✅ Student performance heatmap (identify struggling students) (Completed v1.6.0 - Dec 10, 2025)
+- **Future Enhancements (v1.7.0+):**
+  - Quick class management panel with shortcuts
+    - One-click actions for common tasks (add student, assign book, create quiz)
+    - Recent actions history
+    - Pinned classes for quick access
+  - Reading assignment calendar view
+    - Visual calendar showing due dates and milestones
+    - Drag-and-drop assignment scheduling
+    - Integration with class schedule
+  - Bulk operations interface
+    - Assign quizzes to multiple classes at once
+    - Export class reports (CSV, PDF)
+    - Bulk student enrollment
+    - Mass book assignments
+  - Top performers and students needing help sections
+    - Automatic identification of struggling students
+    - Intervention recommendations
+    - Success stories and achievements showcase
+    - Parent notification system
 
 *Librarian Dashboard:*
 - Upload statistics (success rate, format distribution, processing times)
@@ -1130,31 +1210,48 @@ class OllamaProvider implements IAIProvider { ... }
 - ✅ Unified error handling with AIProviderError class
 
 ### v1.6.0 (Q1 2026) - UX & Dashboard Enhancements
-**Focus:** Comprehensive UX improvements across all dashboards and user flows
+**Focus:** Enhanced UI component library and core dashboard features
 
-#### Dashboard Improvements
-- **Admin Overview**
-  - System-wide statistics cards (total users, books, active students)
-  - Recent activity feed (new users, uploads, quiz completions)
-  - Quick action shortcuts (add user, upload book, manage badges)
-  - System health indicators (storage usage, AI provider status)
+**Status:** In Progress (65% complete as of Dec 11, 2025)
+
+#### ✅ Completed Features (Dec 11, 2025)
+- **Admin Dashboard**
+  - ✅ System-wide statistics cards (total users, books, active students)
+  - ✅ Recent activity feed (new users, uploads, quiz completions)
+  - ✅ Quick action shortcuts (add user, upload book, manage badges)
+  - ✅ System health indicators (storage usage, AI provider status)
   
 - **Student Dashboard**
-  - Personalized book recommendations based on reading history
-  - Reading progress visualization (charts, graphs)
-  - Leaderboard widget (class ranking, global ranking)
-  - Achievement showcase (earned badges, milestones)
-  - Reading goals and progress tracking
-  - Continue reading section with page preview
+  - ✅ Leaderboard widget (class ranking, global ranking) - Completed Dec 10, 2025
+  - ✅ Weekly challenges with progress tracking - Completed Dec 10, 2025
+  - ✅ Continue reading section with page preview - Already exists
   
 - **Teacher Dashboard**
-  - Class analytics overview (average reading time, completion rates)
-  - Assignment tracking dashboard (pending, in-progress, completed)
-  - Student performance heatmap
+  - ✅ Class analytics overview (average reading time, completion rates) - Completed Dec 10, 2025
+  - ✅ Assignment tracking dashboard (pending, in-progress, completed) - Completed Dec 10, 2025
+  - ✅ Student performance heatmap - Completed Dec 10, 2025
+  
+#### 🎯 Current Priority: Enhanced UI Components
+- **Component Library (In Progress)**
+  - Skeleton loading states
+  - Data table with sorting/filtering (TanStack Table)
+  - Chart components (Recharts: Line, Bar, Donut, Pie)
+  - Modal/Dialog improvements
+  - Search bar with autocomplete
+  - Empty state component
+
+#### ⏳ Deferred to v1.7.0+ (Future Enhancements)
+- **Student Dashboard Enhancements**
+  - Personalized book recommendations based on reading history
+  - Reading progress visualization (charts, graphs)
+  - Achievement showcase (earned badges, milestones)
+  - Reading goals and progress tracking
+
+- **Teacher Dashboard Enhancements**
   - Quick class management actions
   - Reading assignment calendar
   - Bulk quiz assignment interface
-  
+
 - **Librarian Dashboard**
   - Upload statistics (success rate, format distribution)
   - Popular books widget (most read, most quizzed)
@@ -1163,116 +1260,84 @@ class OllamaProvider implements IAIProvider { ... }
   - Batch operations UI improvements
   - Book collection management
 
-#### Navigation & Flow Improvements
-- **Global Navigation**
-  - Breadcrumb navigation for deep pages
-  - Quick switcher (Cmd/Ctrl+K) for power users
-  - Contextual help tooltips
-  - Sticky header with minimal mode on scroll
-  
-- **Search & Discovery**
-  - Advanced search with saved filters
-  - Recently viewed books
-  - Recommended for you section
-  - Genre/category browse mode
-  - Sort options (popularity, date, rating)
-  
-- **Library Page**
-  - Grid/List view toggle
-  - Pagination with infinite scroll option
-  - Book preview on hover (cover, description, stats)
-  - Quick actions (read, add to list, assign)
-  - Filter chips for active filters
-  - Collapsible filter sidebar
+#### ⏳ Navigation & Flow Improvements (Deferred to v1.7.0+)
+- Breadcrumb navigation for deep pages
+- Quick switcher (Cmd/Ctrl+K) for power users
+- Contextual help tooltips
+- Advanced search with saved filters
+- Library page view modes (Grid/List/Compact)
+- Book preview on hover
+- Advanced filtering system
 
-#### Reading Experience
-- **Book Reader**
-  - Bookmarks with notes capability
-  - Dark mode / Reading mode themes
-  - Better resume reading (visual page preview)
-  - Reading position sync across devices
-  - Adjustable font size and spacing
-  - Progress indicator improvements
-  
-- **Quiz Interface**
-  - Progress bar during quiz
-  - Question navigator (jump to question)
-  - Review mode before submission
-  - Detailed feedback with explanations
-  - Retry mechanism for failed quizzes
+#### ⏳ Reading Experience Enhancements (Deferred to v1.7.0+)
+- Bookmarks with notes capability
+- Dark mode / Reading mode themes
+- Better resume reading (visual page preview)
+- Reading position sync across devices
+- Adjustable font size and spacing
+- Progress indicator improvements
 
-#### Component Enhancements
-- **Forms & Inputs**
-  - Better validation feedback (inline errors)
-  - Auto-save for long forms
-  - Field-level help text
-  - Progress indicators for multi-step forms
-  
-- **Tables & Lists**
-  - Column sorting and filtering
-  - Customizable column visibility
-  - Export functionality (CSV, PDF)
-  - Bulk selection improvements
-  - Row actions menu
-  
-- **Modals & Dialogs**
-  - Slide-over panels for non-critical actions
-  - Keyboard navigation support
-  - Better loading states
-  - Confirmation dialogs with context
-
-#### Visual & Interaction Design
-- **Loading States**
-  - Skeleton screens for content
-  - Progress indicators for long operations
-  - Optimistic UI updates
-  - Better error messages with recovery actions
-  
-- **Notifications & Feedback**
-  - Toast notification improvements (actions, persistence)
-  - Success animations
-  - Empty states with call-to-action
-  - Contextual onboarding tips
-  
-- **Responsive Design**
-  - Mobile-optimized dashboards
-  - Tablet-specific layouts
-  - Touch-friendly controls
-  - Improved mobile navigation
-
-#### Accessibility (WCAG 2.1 AA)
+#### ⏳ Accessibility & Performance (Deferred to v1.7.0+)
 - Keyboard navigation for all features
-- Screen reader optimization
-- Focus indicators and skip links
+- Screen reader optimization (WCAG 2.1 AA)
 - Color contrast compliance
-- Alt text for all images
-- ARIA labels and roles
-
-#### Performance Optimizations
 - Image lazy loading and optimization
 - Code splitting for faster initial load
-- Caching strategies
-- Debounced search inputs
-- Virtual scrolling for large lists
+- Caching strategies with React Query
 
-#### Extended AI Flexibility
-- Additional providers (OpenAI, Anthropic, Ollama)
-- Per-feature provider selection
-- AI usage analytics dashboard
+### v1.7.0 (Q2 2026) - Advanced Dashboard Features & UX Polish
+**Focus:** Complete deferred v1.6.0 features and add advanced functionality
 
-#### Quality Gates
-- 80% test coverage target
-- Visual regression tests (Chromatic/Percy)
-- Performance budgets
-- Accessibility audits
+#### Deferred v1.6.0 Features
+- **Student Dashboard**
+  - Personalized book recommendations (AI-powered)
+  - Reading progress charts and analytics
+  - Enhanced achievement showcase
+  - Reading goals tracker with gamification
 
-### v1.7.0 (Q2 2026) - Content & Competition
+- **Teacher Dashboard**
+  - Quick class management tools (bulk operations, CSV import)
+  - Reading assignment calendar view
+  - Advanced bulk operations interface
+
+- **Librarian Dashboard**
+  - Upload statistics with charts
+  - Popular books widget
+  - Recent uploads monitoring with real-time status
+  - Content moderation queue
+  - AI generation analytics
+
+- **Navigation & User Flow**
+  - Breadcrumb navigation system
+  - Quick switcher (Cmd/Ctrl+K)
+  - Contextual help system
+  - Notification center with real-time updates
+
+- **Library Page Redesign**
+  - View mode toggle (Grid/List/Compact)
+  - Advanced filtering system
+  - Book preview on hover
+  - Improved pagination with infinite scroll
+  - Bulk selection for librarians/teachers
+
+- **Reading Experience**
+  - Bookmark system with notes
+  - Dark mode / Reading mode themes
+  - Font customization (size, family, spacing)
+  - Better resume reading UI
+
+- **Accessibility & Performance**
+  - WCAG 2.1 AA compliance audit
+  - Performance optimization (Lighthouse score > 90)
+  - Complete keyboard navigation
+  - Screen reader optimization
+
+#### New Features
 - Class vs class competitions
 - Bulk book upload
 - Book series management
-- Advanced search
 - Reading lists/collections
-- Analytics dashboard for teachers
+- Extended AI provider support (OpenAI, Anthropic, Ollama)
 
 ### v1.8.0 (Q3 2026) - Additional Format Support
 - CBZ/CBR comic book format support

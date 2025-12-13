@@ -4,6 +4,16 @@ import { BookManagementSection } from "@/components/dashboard/BookManagementSect
 import type { ManagedBookRecord } from "@/components/dashboard/BookManager";
 import type { AccessLevelValue } from "@/constants/accessLevels";
 import { requireRole } from "@/lib/auth/roleCheck";
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  buttonVariants,
+} from "@/components/ui";
+import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 
@@ -72,19 +82,30 @@ export default async function LibrarianPage() {
   return (
     <div className="space-y-8">
       {/* Quick Actions */}
-      <div className="rounded-[28px] border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(147,118,255,0.18)]">
-        <h2 className="mb-4 text-xl font-bold text-indigo-950">
-          Quick Actions
-        </h2>
-        <div className="flex flex-wrap gap-3">
+      <Card variant="glow" padding="snug" className="border-4 border-white/70">
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="text-lg">Quick Actions</CardTitle>
+            <CardDescription>
+              Jump into the librarian tasks you need most.
+            </CardDescription>
+          </div>
+          <Badge variant="neutral" className="text-[10px]">
+            Librarian tools
+          </Badge>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
           <Link
             href="/dashboard/admin/badges"
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105"
+            className={cn(
+              buttonVariants({ variant: "secondary", size: "md" }),
+              "no-underline",
+            )}
           >
-            <span>🏅</span> Manage Book Badges
+            <span>Manage Book Badges</span>
           </Link>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       <BookManagementSection
         books={managedBooks}

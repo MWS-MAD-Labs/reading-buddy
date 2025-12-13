@@ -38,7 +38,7 @@ export default async function LibraryPage() {
       <header className="pop-in rounded-3xl border-4 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 p-6 shadow-lg">
         <div className="mb-2 inline-block rounded-2xl border-4 border-cyan-300 bg-cyan-400 px-4 py-1">
           <p className="text-sm font-black uppercase tracking-wide text-cyan-900">
-            📚 Book Collection
+            Book Collection
           </p>
         </div>
         <h1 className="text-3xl font-black text-blue-900">Library</h1>

@@ -65,7 +65,7 @@ export default async function StudentReadPage({
       <div className="rounded-2xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 p-3 shadow">
         <div className="mb-1 inline-block rounded-lg border-2 border-cyan-300 bg-cyan-400 px-3 py-0.5">
           <p className="text-xs font-black uppercase tracking-wide text-cyan-900">
-            📖 Now Reading
+            Now Reading
           </p>
         </div>
         <h1 className="text-2xl font-black text-blue-900">{book.title}</h1>
