@@ -60,8 +60,12 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest
+            type=raw,value=build-${{ github.run_number }}
             type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
             type=sha,prefix=main-
+            type=raw,value=prod-{{date 'YYYY-MM-DD-HHmm'}}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
