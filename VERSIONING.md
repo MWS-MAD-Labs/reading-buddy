@@ -139,7 +139,7 @@ Follow [SemVer](https://semver.org/):
 - `v1.1.0` - Added quiz feature
 - `v1.1.1` - Fixed quiz bug
 - `v2.0.0` - New authentication system (breaking)
-
+tes
 ### Build Numbers (Auto-incremented)
 
 GitHub Actions run number, starts at 1 and increments.
