@@ -1,11 +1,13 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { getServerEnv } from "@/lib/env";
 
 let adminClient: SupabaseClient | null = null;
 let cachedEnvVars: { url: string; key: string } | null = null;
 
 export const getSupabaseAdminClient = () => {
-  // Access env vars at runtime
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  // Get runtime env vars from server
+  const env = getServerEnv();
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
