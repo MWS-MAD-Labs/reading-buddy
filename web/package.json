@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "type-check": "tsc --noEmit",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
@@ -17,6 +19,7 @@
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:report": "playwright show-report",
     "test:all": "npm run test && npm run test:e2e",
+    "prepare": "husky",
     "render:book-images": "tsx scripts/render-book-images.ts",
     "extract:book-text": "tsx scripts/extract-book-text.ts",
     "list-books": "tsx scripts/list-books.ts",
@@ -70,9 +73,20 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.1",
     "happy-dom": "^20.0.10",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "tailwindcss": "^4",
     "tsx": "^4.7.2",
     "typescript": "^5",
     "vitest": "^4.0.13"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }
