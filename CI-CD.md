@@ -20,8 +20,12 @@ Commit & Push to GitHub
 │ GitHub Actions CI/CD                                    │
 │  ├─ ESLint (code quality)                              │
 │  ├─ TypeScript check (type safety)                     │
-│  ├─ Vitest tests (unit tests)                          │
-│  ├─ Build Docker image (only if tests pass ✅)         │
+│  ├─ Vitest tests with coverage (unit tests)            │
+│  ├─ Upload coverage to Codecov                         │
+│  ├─ Playwright E2E tests (user flows)                  │
+│  ├─ Build Next.js (for Lighthouse)                     │
+│  ├─ Lighthouse CI (performance, a11y, SEO)             │
+│  ├─ Build Docker image (only if all tests pass ✅)     │
 │  ├─ Push to GHCR with multi-tags                       │
 │  └─ Trigger Komodo Procedure webhook                   │
 └─────────────────────────────────────────────────────────┘
@@ -259,6 +263,8 @@ Required secrets in GitHub repository settings:
 | `KOMODO_WEBHOOK_SECRET` | Staging webhook signature secret | Staging workflow |
 | `KOMODO_PROD_PROCEDURE_WEBHOOK_URL` | Production procedure webhook URL | Production workflow |
 | `KOMODO_PROD_WEBHOOK_SECRET` | Production webhook signature secret | Production workflow |
+| `CODECOV_TOKEN` | Codecov upload token (optional for public repos) | Both workflows |
+| `LHCI_GITHUB_APP_TOKEN` | Lighthouse CI GitHub integration (optional) | Both workflows |
 
 ## Workflow Process
 
@@ -297,7 +303,7 @@ git push origin staging
 # → https://staging-reads.mws.web.id
 ```
 
-**Total Time:** ~6-8 minutes from push to live
+**Total Time:** ~8-12 minutes from push to live (including E2E and Lighthouse tests)
 
 ### Production Deployment Flow
 
@@ -566,12 +572,15 @@ git push origin main
 | Stage | Time |
 |-------|------|
 | Pre-commit hooks | 5-10 seconds |
-| GitHub Actions CI | 5-7 minutes |
+| ESLint + TypeScript check | 30-60 seconds |
+| Unit tests + coverage | 1-2 minutes |
+| E2E tests (Playwright) | 2-3 minutes |
+| Lighthouse CI | 2-3 minutes |
 | Docker build | 2-3 minutes |
 | Push to GHCR | 30 seconds |
 | Webhook trigger | Instant |
 | Komodo pull + deploy | 30-60 seconds |
-| **Total** | **~8-10 minutes** |
+| **Total** | **~10-15 minutes** |
 
 ## Cost Breakdown
 
@@ -613,21 +622,115 @@ git push origin main
 - Uses GitHub's infrastructure
 - Self-hosted deployment
 
+## Quality Metrics and Monitoring
+
+### Code Coverage (Codecov)
+
+**What it does:**
+- Tracks test coverage across the codebase
+- Shows which code is tested and which isn't
+- Provides coverage trends over time
+- Generates detailed coverage reports
+
+**Configuration:**
+- Provider: Vitest with v8 coverage
+- Reporters: Text, JSON, HTML
+- Excluded: Config files, types, e2e tests
+- Upload: Codecov (free for public repos)
+
+**Coverage Thresholds:**
+Current setup uses informational tracking (no hard failures).
+
+**View Coverage:**
+- Reports uploaded as GitHub Actions artifacts
+- Codecov dashboard: https://codecov.io/gh/faisalnh/reading-companion
+- Trends and historical data available
+
+**Setup Required:**
+1. Sign up at https://codecov.io with GitHub
+2. Add repository to Codecov
+3. Get Codecov token
+4. Add `CODECOV_TOKEN` to GitHub secrets
+
+### Lighthouse CI (Performance Monitoring)
+
+**What it does:**
+- Measures performance, accessibility, best practices, and SEO
+- Runs on every build before deployment
+- Provides detailed performance reports
+- Tracks performance regressions
+
+**Configuration:** `web/lighthouserc.json`
+
+```json
+{
+  "ci": {
+    "collect": {
+      "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop",
+        "onlyCategories": ["performance", "accessibility", "best-practices", "seo"]
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["warn", {"minScore": 0.8}],
+        "categories:accessibility": ["error", {"minScore": 0.9}],
+        "categories:best-practices": ["warn", {"minScore": 0.8}],
+        "categories:seo": ["warn", {"minScore": 0.8}]
+      }
+    }
+  }
+}
+```
+
+**Quality Thresholds:**
+- **Performance:** ≥80% (warning if below)
+- **Accessibility:** ≥90% (error if below, blocks deployment)
+- **Best Practices:** ≥80% (warning if below)
+- **SEO:** ≥80% (warning if below)
+
+**Reports:**
+- Uploaded as GitHub Actions artifacts
+- Temporary public storage link provided
+- View detailed metrics, suggestions, and screenshots
+
+**Benefits:**
+- Catch performance regressions early
+- Ensure accessibility compliance (WCAG)
+- Maintain SEO optimization
+- Monitor Core Web Vitals
+
+### E2E Test Coverage (Playwright)
+
+**Tests Included:**
+- `auth.spec.ts` - Authentication flows
+- `homepage.spec.ts` - Homepage functionality
+- `dashboard.spec.ts` - Dashboard features
+
+**Browser Coverage:**
+- Chromium (primary for CI speed)
+
+**Reports:**
+- HTML report generated on test failure
+- Uploaded as GitHub Actions artifacts
+- Screenshots and traces captured
+
 ## Future Enhancements
 
 ### Potential Additions
 
-1. **End-to-End Tests**
-   - Add Playwright E2E tests to CI
+1. ~~**End-to-End Tests**~~ ✅ **IMPLEMENTED**
+   - Playwright E2E tests running in CI
    - Test critical user flows
 
-2. **Code Coverage**
-   - Track test coverage
-   - Fail if coverage drops
+2. ~~**Code Coverage**~~ ✅ **IMPLEMENTED**
+   - Vitest coverage tracking
+   - Codecov integration
 
-3. **Performance Testing**
+3. ~~**Performance Testing**~~ ✅ **IMPLEMENTED**
    - Lighthouse CI for performance metrics
-   - Bundle size monitoring
+   - Quality thresholds enforced
 
 4. **Deployment Notifications**
    - Slack/Discord notifications
