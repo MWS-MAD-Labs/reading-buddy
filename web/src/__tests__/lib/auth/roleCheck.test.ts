@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { requireRole, type UserRole } from "@/lib/auth/roleCheck";
+import { requireRole } from "@/lib/auth/roleCheck";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Mock Next.js navigation
 vi.mock("next/navigation", () => ({
@@ -19,20 +20,24 @@ describe("requireRole", () => {
   });
 
   it("should redirect to login when user not authenticated", async () => {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { createSupabaseServerClient } =
+      await import("@/lib/supabase/server");
     const mockSupabase = {
       auth: {
         getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
       },
     };
 
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      mockSupabase as unknown as SupabaseClient,
+    );
 
     await expect(requireRole(["ADMIN"])).rejects.toThrow("REDIRECT: /login");
   });
 
   it("should allow access when user has required role", async () => {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { createSupabaseServerClient } =
+      await import("@/lib/supabase/server");
     const mockUser = {
       id: "user-123",
       email: "admin@example.com",
@@ -53,7 +58,9 @@ describe("requireRole", () => {
       }),
     };
 
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      mockSupabase as unknown as SupabaseClient,
+    );
 
     const result = await requireRole(["ADMIN"]);
 
@@ -63,7 +70,8 @@ describe("requireRole", () => {
   });
 
   it("should allow access when user has one of multiple allowed roles", async () => {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { createSupabaseServerClient } =
+      await import("@/lib/supabase/server");
     const mockUser = {
       id: "user-456",
       email: "teacher@example.com",
@@ -84,7 +92,9 @@ describe("requireRole", () => {
       }),
     };
 
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      mockSupabase as unknown as SupabaseClient,
+    );
 
     const result = await requireRole(["ADMIN", "LIBRARIAN", "TEACHER"]);
 
@@ -93,7 +103,8 @@ describe("requireRole", () => {
   });
 
   it("should redirect when user role is not in allowed list", async () => {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { createSupabaseServerClient } =
+      await import("@/lib/supabase/server");
     const mockUser = {
       id: "user-789",
       email: "student@example.com",
@@ -114,15 +125,18 @@ describe("requireRole", () => {
       }),
     };
 
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      mockSupabase as unknown as SupabaseClient,
+    );
 
     await expect(requireRole(["ADMIN", "LIBRARIAN"])).rejects.toThrow(
-      "REDIRECT: /dashboard?error=unauthorized"
+      "REDIRECT: /dashboard?error=unauthorized",
     );
   });
 
   it("should redirect when profile has no role", async () => {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { createSupabaseServerClient } =
+      await import("@/lib/supabase/server");
     const mockUser = {
       id: "user-000",
       email: "norole@example.com",
@@ -143,15 +157,18 @@ describe("requireRole", () => {
       }),
     };
 
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      mockSupabase as unknown as SupabaseClient,
+    );
 
     await expect(requireRole(["ADMIN"])).rejects.toThrow(
-      "REDIRECT: /dashboard?error=unauthorized"
+      "REDIRECT: /dashboard?error=unauthorized",
     );
   });
 
   it("should redirect when profile is not found", async () => {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { createSupabaseServerClient } =
+      await import("@/lib/supabase/server");
     const mockUser = {
       id: "user-999",
       email: "noprofile@example.com",
@@ -172,15 +189,18 @@ describe("requireRole", () => {
       }),
     };
 
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      mockSupabase as unknown as SupabaseClient,
+    );
 
     await expect(requireRole(["ADMIN"])).rejects.toThrow(
-      "REDIRECT: /dashboard?error=unauthorized"
+      "REDIRECT: /dashboard?error=unauthorized",
     );
   });
 
   it("should handle user without email", async () => {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { createSupabaseServerClient } =
+      await import("@/lib/supabase/server");
     const mockUser = {
       id: "user-noemail",
       email: undefined,
@@ -201,7 +221,9 @@ describe("requireRole", () => {
       }),
     };
 
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      mockSupabase as unknown as SupabaseClient,
+    );
 
     const result = await requireRole(["STUDENT"]);
 
@@ -211,7 +233,8 @@ describe("requireRole", () => {
   });
 
   it("should allow ADMIN role", async () => {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { createSupabaseServerClient } =
+      await import("@/lib/supabase/server");
     const mockUser = { id: "admin-1", email: "admin@test.com" };
 
     const mockSupabase = {
@@ -229,14 +252,17 @@ describe("requireRole", () => {
       }),
     };
 
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      mockSupabase as unknown as SupabaseClient,
+    );
 
     const result = await requireRole(["ADMIN"]);
     expect(result.role).toBe("ADMIN");
   });
 
   it("should allow LIBRARIAN role", async () => {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { createSupabaseServerClient } =
+      await import("@/lib/supabase/server");
     const mockUser = { id: "lib-1", email: "librarian@test.com" };
 
     const mockSupabase = {
@@ -254,14 +280,17 @@ describe("requireRole", () => {
       }),
     };
 
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      mockSupabase as unknown as SupabaseClient,
+    );
 
     const result = await requireRole(["LIBRARIAN"]);
     expect(result.role).toBe("LIBRARIAN");
   });
 
   it("should allow TEACHER role", async () => {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { createSupabaseServerClient } =
+      await import("@/lib/supabase/server");
     const mockUser = { id: "teacher-1", email: "teacher@test.com" };
 
     const mockSupabase = {
@@ -279,14 +308,17 @@ describe("requireRole", () => {
       }),
     };
 
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      mockSupabase as unknown as SupabaseClient,
+    );
 
     const result = await requireRole(["TEACHER"]);
     expect(result.role).toBe("TEACHER");
   });
 
   it("should allow STUDENT role", async () => {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { createSupabaseServerClient } =
+      await import("@/lib/supabase/server");
     const mockUser = { id: "student-1", email: "student@test.com" };
 
     const mockSupabase = {
@@ -304,7 +336,9 @@ describe("requireRole", () => {
       }),
     };
 
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(mockSupabase as any);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      mockSupabase as unknown as SupabaseClient,
+    );
 
     const result = await requireRole(["STUDENT"]);
     expect(result.role).toBe("STUDENT");
