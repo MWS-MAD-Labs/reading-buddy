@@ -46,6 +46,24 @@ jobs:
         env:
           NODE_ENV: test
 
+      - name: Install Playwright browsers
+        working-directory: ./web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: ./web
+        run: npm run test:e2e
+        env:
+          NODE_ENV: test
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-production
+          path: web/playwright-report/
+          retention-days: 30
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
