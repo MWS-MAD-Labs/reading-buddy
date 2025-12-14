@@ -69,7 +69,7 @@ nano .env  # Add your Supabase, MinIO, and AI credentials
 
 # 3. Set up database
 # Go to Supabase dashboard → SQL Editor
-# Run: notes/2025-12-14/deployment/DATABASE_SETUP.md
+# Run: notes/2024-12-14/deployment/DATABASE_SETUP.md
 
 # 4. Deploy with Docker
 docker-compose up --build -d
@@ -81,7 +81,7 @@ docker-compose up --build -d
 open http://localhost:3000
 ```
 
-**📖 Detailed Setup:** See `notes/2025-12-14/deployment/DATABASE_SETUP.md`
+**📖 Detailed Setup:** See `notes/2024-12-14/deployment/DATABASE_SETUP.md`
 
 ---
 
@@ -113,7 +113,7 @@ reading-buddy/
 │   ├── e2e/                 # Playwright E2E tests
 │   └── public/              # Static assets
 ├── notes/                   # Documentation (organized by date)
-│   └── 2025-12-14/
+│   └── 2024-12-14/
 │       ├── deployment/      # CI/CD, Docker, Database docs
 │       ├── development/     # Migration & implementation guides
 │       └── roadmap/         # Feature roadmap & changelog
@@ -173,7 +173,7 @@ reading-buddy/
 - Badge system
 - Supabase + MinIO architecture
 
-**📜 Full History:** See `notes/2025-12-14/roadmap/CHANGELOG.md`
+**📜 Full History:** See `notes/2024-12-14/roadmap/CHANGELOG.md`
 
 ---
 
@@ -199,7 +199,7 @@ reading-buddy/
 - Mobile app (React Native)
 - Offline reading mode
 
-**🗺️ Complete Roadmap:** See `notes/2025-12-14/roadmap/Project-Roadmap.md`
+**🗺️ Complete Roadmap:** See `notes/2024-12-14/roadmap/Project-Roadmap.md`
 
 ---
 
@@ -300,7 +300,7 @@ Every push to `staging` or `main` triggers:
 
 **Total Pipeline Time:** ~10-15 minutes
 
-**📋 Full Guide:** See `notes/2025-12-14/deployment/CI-CD.md`
+**📋 Full Guide:** See `notes/2024-12-14/deployment/CI-CD.md`
 
 ---
 
@@ -343,19 +343,19 @@ Every push to `staging` or `main` triggers:
 All documentation is organized by date in the `notes/` directory:
 
 ### Deployment Guides
-- **[CI/CD Setup](notes/2025-12-14/deployment/CI-CD.md)** - Complete pipeline documentation
-- **[Docker Guide](notes/2025-12-14/deployment/DOCKER.md)** - Container deployment
-- **[Database Setup](notes/2025-12-14/deployment/DATABASE_SETUP.md)** - Supabase configuration
-- **[Image Versioning](notes/2025-12-14/deployment/VERSIONING.md)** - Tag strategy
+- **[CI/CD Setup](notes/2024-12-14/deployment/CI-CD.md)** - Complete pipeline documentation
+- **[Docker Guide](notes/2024-12-14/deployment/DOCKER.md)** - Container deployment
+- **[Database Setup](notes/2024-12-14/deployment/DATABASE_SETUP.md)** - Supabase configuration
+- **[Image Versioning](notes/2024-12-14/deployment/VERSIONING.md)** - Tag strategy
 
 ### Development Guides
-- **[Migration Instructions](notes/2025-12-14/development/MIGRATION_INSTRUCTIONS.md)** - Data migration
-- **[MOBI/AZW Implementation](notes/2025-12-14/development/MOBI_AZW_IMPLEMENTATION.md)** - eBook formats
+- **[Migration Instructions](notes/2024-12-14/development/MIGRATION_INSTRUCTIONS.md)** - Data migration
+- **[MOBI/AZW Implementation](notes/2024-12-14/development/MOBI_AZW_IMPLEMENTATION.md)** - eBook formats
 
 ### Roadmap & Planning
-- **[Project Roadmap](notes/2025-12-14/roadmap/Project-Roadmap.md)** - Feature planning
-- **[UX Improvements](notes/2025-12-14/roadmap/UX-IMPROVEMENT-ROADMAP.md)** - UI/UX enhancements
-- **[Changelog](notes/2025-12-14/roadmap/CHANGELOG.md)** - Version history
+- **[Project Roadmap](notes/2024-12-14/roadmap/Project-Roadmap.md)** - Feature planning
+- **[UX Improvements](notes/2024-12-14/roadmap/UX-IMPROVEMENT-ROADMAP.md)** - UI/UX enhancements
+- **[Changelog](notes/2024-12-14/roadmap/CHANGELOG.md)** - Version history
 
 ### AI Guidelines
 - **[Claude Guidelines](.claude/claude.md)** - AI assistant development guide
@@ -368,7 +368,7 @@ We welcome contributions! Reading Buddy is actively developed and growing.
 
 ### Contribution Workflow
 
-1. **Check the roadmap** - See what's planned in `notes/2025-12-14/roadmap/Project-Roadmap.md`
+1. **Check the roadmap** - See what's planned in `notes/2024-12-14/roadmap/Project-Roadmap.md`
 2. **Fork repository** - Create your own fork
 3. **Create branch** - `git checkout -b feature/amazing-feature`
 4. **Make changes** - Follow code style guidelines
@@ -444,9 +444,9 @@ With requirements:
 - 📧 **Email:** support@example.com
 
 **Quick Links:**
-- [Database Setup Guide](notes/2025-12-14/deployment/DATABASE_SETUP.md) - Start here!
-- [CI/CD Documentation](notes/2025-12-14/deployment/CI-CD.md) - Deployment pipeline
-- [Project Roadmap](notes/2025-12-14/roadmap/Project-Roadmap.md) - Future features
+- [Database Setup Guide](notes/2024-12-14/deployment/DATABASE_SETUP.md) - Start here!
+- [CI/CD Documentation](notes/2024-12-14/deployment/CI-CD.md) - Deployment pipeline
+- [Project Roadmap](notes/2024-12-14/roadmap/Project-Roadmap.md) - Future features
 - [AI Guidelines](.claude/claude.md) - Development with AI
 
 ---
