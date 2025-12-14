@@ -66,6 +66,7 @@ jobs:
           NODE_ENV: test
           NEXT_PUBLIC_SUPABASE_URL: https://hbrosmlrvbkmcbyggriv.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhicm9zbWxydmJrbWNieWdncml2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTA1MTMsImV4cCI6MjA3ODA2NjUxM30.R9d8zWNLXtnO9zGu_1Zts4JP-B9XE26J6gS6Xfg5hpo
+          SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhicm9zbWxydmJrbWNieWdncml2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjQ5MDUxMywiZXhwIjoyMDc4MDY2NTEzfQ.CwbCtSXon1zPXym5YbtDo91NPzMLhMMoPfkErTmLk00
           NEXT_PUBLIC_APP_URL: https://staging-reads.mws.web.id
           NEXT_PUBLIC_RAG_API_URL: https://rag.mws.web.id/
 
