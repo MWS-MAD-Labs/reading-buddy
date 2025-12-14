@@ -86,6 +86,10 @@ jobs:
         working-directory: ./web
         run: npm run lhci
         env:
+          NEXT_PUBLIC_SUPABASE_URL: https://hbrosmlrvbkmcbyggriv.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhicm9zbWxydmJrbWNieWdncml2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTA1MTMsImV4cCI6MjA3ODA2NjUxM30.R9d8zWNLXtnO9zGu_1Zts4JP-B9XE26J6gS6Xfg5hpo
+          NEXT_PUBLIC_APP_URL: https://reads.mws.web.id
+          NEXT_PUBLIC_RAG_API_URL: https://rag.mws.web.id/
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
 
       - name: Upload Lighthouse reports
