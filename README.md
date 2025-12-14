@@ -1,177 +1,462 @@
 # Reading Buddy
 
-A modern K-12 e-library platform with gamification, AI-powered quizzes, and role-based access for students, teachers, librarians, and administrators.
+> A modern K-12 e-library platform with gamification, AI-powered quizzes, and role-based access for students, teachers, librarians, and administrators.
 
-## Features
+**Version:** 1.2.0  
+**Status:** Production Ready ✓  
+**Last Updated:** December 2025
 
-### For Students
-- Browse and read books with an interactive PDF reader
-- 3D flip-book reading experience with rendered page images
-- Track reading progress automatically
-- Take AI-generated quizzes to test comprehension
-- Complete checkpoint quizzes while reading
-- View assigned books from teachers
-- Earn badges and achievements
+---
 
-### For Teachers
+## 📚 Overview
+
+Reading Buddy transforms traditional school libraries into interactive digital learning experiences. Students read books, take AI-generated quizzes, earn badges, and track progress—while teachers monitor engagement and librarians manage the catalog.
+
+### Key Features
+
+**For Students 🎓**
+- Interactive PDF reader with 3D flip-book experience
+- Automatic reading progress tracking
+- AI-generated comprehension quizzes
+- Checkpoint quizzes at key moments
+- Badge and achievement system
+- Personalized book recommendations
+
+**For Teachers 👨‍🏫**
 - Create and manage classrooms
-- Assign books to students and classrooms
-- Assign quizzes for assessment
-- Track student reading progress in real-time
-- View quiz results and analytics
-- Monitor classroom engagement
+- Assign books and quizzes to students
+- Real-time progress monitoring
+- Quiz result analytics
+- Student engagement dashboard
+- Performance tracking
 
-### For Librarians
-- Upload books (PDF) with cover images
-- Manage book metadata (ISBN, author, publisher, etc.)
-- Set access levels for different grade groups
-- Generate AI-powered quizzes from book content
-- Create checkpoint quizzes at specific pages
-- Extract text from PDFs for better AI quiz generation
-- Generate book descriptions with AI
+**For Librarians 📖**
+- Upload and manage book catalog
+- AI-powered quiz generation from PDFs
+- Book metadata management (ISBN, authors, etc.)
+- Grade-level access controls
+- Bulk upload capabilities
+- Text extraction from PDFs
 
-### For Administrators
-- Manage user accounts and roles
-- Assign roles (Student, Teacher, Librarian, Admin)
-- System-wide oversight and analytics
-- Access all dashboards and features
+**For Administrators 🛠️**
+- User account management
+- Role assignment and permissions
+- System-wide analytics
+- Multi-role dashboard access
+- Broadcast announcements
 
-## Technology Stack
+---
 
-- **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS
-- **Backend:** Supabase (PostgreSQL + Auth)
-- **Storage:** MinIO (self-hosted S3-compatible)
-- **AI:** Configurable (Gemini 2.5 Flash cloud or local RAG + Diffuser)
-- **PDF Processing:** pdfjs-dist, react-pdf, canvas
-- **Deployment:** Docker
-
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
-- Supabase account
-- MinIO server (self-hosted)
-- Google Gemini API key
+
+- **Docker** & Docker Compose
+- **Supabase** account ([supabase.com](https://supabase.com))
+- **MinIO** server (self-hosted S3 storage)
+- **AI Provider:** Google Gemini API key OR Local RAG/Diffuser setup
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/faisalnh/reading-companion.git
-   cd reading-companion
-   ```
+```bash
+# 1. Clone repository
+git clone https://github.com/faisalnh/reading-companion.git
+cd reading-companion
 
-2. **Set up Supabase database**
-   - Create a Supabase project at [supabase.com](https://supabase.com)
-   - Run the `database-setup.sql` script in Supabase SQL Editor
-   - See [DATABASE_SETUP.md](DATABASE_SETUP.md) for detailed instructions
+# 2. Configure environment
+cp .env.example .env
+nano .env  # Add your Supabase, MinIO, and AI credentials
 
-3. **Configure environment**
-   ```bash
-   cp .env.example .env
-   nano .env  # Add your credentials (Supabase, MinIO, AI provider)
-   ```
-   - Set `AI_PROVIDER` to `cloud` (Gemini) or `local` (RAG + Diffuser) and fill in the required keys/URLs.
+# 3. Set up database
+# Go to Supabase dashboard → SQL Editor
+# Run: notes/2025-12-14/deployment/DATABASE_SETUP.md
 
-4. **Deploy with Docker**
-   ```bash
-   docker-compose up --build -d
-   ```
+# 4. Deploy with Docker
+docker-compose up --build -d
 
-5. **Create your first admin user**
-   - Sign up through the app
-   - Manually set your role to 'ADMIN' in Supabase Table Editor → profiles
+# 5. Create admin user
+# Sign up via app, then set role to 'ADMIN' in Supabase
 
-6. **Access the application**
-   Open http://localhost:3000
+# 6. Access application
+open http://localhost:3000
+```
 
-See [DATABASE_SETUP.md](DATABASE_SETUP.md) for database setup and [DOCKER.md](DOCKER.md) for deployment instructions.
+**📖 Detailed Setup:** See `notes/2025-12-14/deployment/DATABASE_SETUP.md`
 
-## Documentation
+---
 
-- [Database Setup Guide](DATABASE_SETUP.md) - **Start here!** Complete database setup instructions
-- [Project Roadmap](Project-Roadmap.md) - **Complete roadmap** from v1.0.0 to v2.0.0+ with detailed feature planning
-- [Changelog](CHANGELOG.md) - **Version history** and detailed release notes
-- [Docker Deployment](DOCKER.md) - Production deployment guide
-- [AI Provider Migration](web/docs/AI_PROVIDER_MIGRATION.md) - Configure `AI_PROVIDER` for cloud or local AI
-- [AI Development Guide](AI-Readme.md) - Architecture and development guidelines
-- [Admin Panel](web/ADMIN_PANEL.md) - Admin features documentation
+## 🏗️ Technology Stack
 
-## Development
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | Next.js 15, React 19, TypeScript, Tailwind CSS |
+| **Backend** | Supabase (PostgreSQL + Auth + RLS) |
+| **Storage** | MinIO (S3-compatible, self-hosted) |
+| **AI** | Google Gemini 2.5 Flash OR Local RAG + Diffuser |
+| **PDF** | pdfjs-dist, react-pdf, canvas rendering |
+| **Testing** | Vitest (unit), Playwright (E2E) |
+| **CI/CD** | GitHub Actions, Docker, Komodo |
+| **Monitoring** | Codecov (coverage), Lighthouse CI (performance) |
+
+---
+
+## 📂 Project Structure
+
+```
+reading-buddy/
+├── web/                      # Next.js application
+│   ├── src/
+│   │   ├── app/             # App Router pages
+│   │   ├── components/      # React components
+│   │   ├── lib/             # Utilities & helpers
+│   │   └── __tests__/       # Test files
+│   ├── e2e/                 # Playwright E2E tests
+│   └── public/              # Static assets
+├── notes/                   # Documentation (organized by date)
+│   └── 2025-12-14/
+│       ├── deployment/      # CI/CD, Docker, Database docs
+│       ├── development/     # Migration & implementation guides
+│       └── roadmap/         # Feature roadmap & changelog
+├── .claude/                 # AI assistant guidelines
+├── docker-compose.yml       # Production deployment
+└── Dockerfile              # Multi-stage build
+```
+
+---
+
+## 📦 Version History
+
+### v1.2.0 - December 2025 (Current)
+**Complete CI/CD Pipeline & Quality Automation**
+
+✨ **New Features:**
+- Full CI/CD pipeline with GitHub Actions
+- Automated testing (Unit, E2E, Coverage, Performance)
+- Code coverage tracking with Codecov
+- Lighthouse CI for performance monitoring
+- Auto-deployment via Komodo webhooks
+- Image versioning with multiple tags
+- Pre-commit hooks for code quality
+
+🔧 **Improvements:**
+- Enhanced error handling in Supabase client
+- Runtime environment variable support for Docker
+- Comprehensive test suite
+- Production-ready deployment configuration
+
+📚 **Documentation:**
+- Complete CI/CD setup guide
+- Image versioning strategy
+- Troubleshooting guides
+- AI assistant guidelines
+
+### v1.1.0 - November 2025
+**Enhanced UX & Analytics**
+
+- Student dashboard with stats cards
+- Reading journey visualization
+- Weekly challenge system
+- Leaderboard for students and staff
+- Teacher analytics dashboards
+- Librarian statistics
+- System-wide admin analytics
+
+### v1.0.0 - October 2025
+**Initial Production Release**
+
+- Core reading platform
+- AI-powered quiz generation
+- Role-based access (Student, Teacher, Librarian, Admin)
+- PDF reading with progress tracking
+- Book management system
+- Classroom management
+- Badge system
+- Supabase + MinIO architecture
+
+**📜 Full History:** See `notes/2025-12-14/roadmap/CHANGELOG.md`
+
+---
+
+## 🗺️ Roadmap
+
+### Upcoming Features
+
+**v1.3.0 - Real-time Features** (Q1 2026)
+- Live reading sessions
+- Real-time leaderboard updates
+- WebSocket-based notifications
+- Collaborative reading modes
+
+**v1.4.0 - Advanced AI** (Q2 2026)
+- Personalized quiz difficulty
+- Reading comprehension analysis
+- Book recommendation engine
+- Auto-generated summaries
+
+**v2.0.0 - Multi-language & Accessibility** (Q3 2026)
+- Multi-language support
+- Enhanced accessibility features
+- Mobile app (React Native)
+- Offline reading mode
+
+**🗺️ Complete Roadmap:** See `notes/2025-12-14/roadmap/Project-Roadmap.md`
+
+---
+
+## 🧪 Development
+
+### Local Development
 
 ```bash
 # Install dependencies
 cd web && npm install
 
-# Run development server
+# Run dev server
 npm run dev
 
-# Build for production
-npm run build
+# Run tests
+npm run test              # Unit tests
+npm run test:e2e          # E2E tests
+npm run test:coverage     # Coverage report
 
-# Run utility scripts
-npm run render:book-images  # Render PDF pages to images
-npm run extract:book-text   # Extract text from PDFs
-npm run test:quiz-generation  # Test AI quiz generation
+# Code quality
+npm run lint              # ESLint
+npm run type-check        # TypeScript
+npm run lint:fix          # Auto-fix issues
+
+# Utility scripts
+npm run render:book-images      # Render PDF pages
+npm run extract:book-text       # Extract text from PDFs
+npm run test:quiz-generation    # Test AI quiz generation
 ```
 
-## Environment Variables
+### Environment Variables
 
-See [.env.example](.env.example) for all required environment variables:
-- Supabase URL and keys (public + service role)
-- MinIO endpoint and credentials
-- AI provider switch (`AI_PROVIDER=cloud|local`)
-- Cloud: `GEMINI_API_KEY` for Gemini 2.5 Flash
-- Local: `RAG_API_URL`, `DIFFUSER_API_URL`, and `NEXT_PUBLIC_RAG_API_URL`
-- Port configuration
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-## Architecture
+# MinIO
+MINIO_ENDPOINT=minio.example.com
+MINIO_PORT=443
+MINIO_USE_SSL=true
+MINIO_ACCESS_KEY=your-access-key
+MINIO_SECRET_KEY=your-secret-key
+MINIO_BUCKET_NAME=reading-buddy
 
-Reading Buddy uses a hybrid backend architecture:
-- **Supabase**: PostgreSQL database, authentication, RLS policies
-- **MinIO**: Self-hosted object storage for PDFs and images
-- **Next.js Server Actions**: Secure API layer
-- **Google Gemini**: AI-powered quiz and description generation
+# AI Provider
+AI_PROVIDER=cloud  # or 'local'
 
-This architecture provides:
-- Developer-friendly managed backend (Supabase)
-- Low-cost, high-control storage (MinIO)
-- Secure file handling with presigned URLs
-- Scalable AI integration
+# Cloud AI (Gemini)
+GEMINI_API_KEY=your-gemini-key
 
-## Contributing
+# Local AI (RAG + Diffuser)
+RAG_API_URL=http://localhost:8000
+DIFFUSER_API_URL=http://localhost:8001
+NEXT_PUBLIC_RAG_API_URL=http://localhost:8000
 
-Reading Buddy v1.0.0 is complete! We welcome contributions for future versions.
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+PORT=3000
+```
 
-**Before contributing:**
-- Check the [Project Roadmap](Project-Roadmap.md) to see planned features
-- Review the [Changelog](CHANGELOG.md) for recent changes
-- Open a GitHub Discussion for new feature ideas
-
-**Contribution workflow:**
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-See the [Contribution Guidelines](Project-Roadmap.md#10-contribution-guidelines) in the roadmap for details.
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Credits
-
-Developed by Faisal Nur Hidayat with AI assistance from Claude (Anthropic).
-
-## Support
-
-For issues and questions:
-- GitHub Issues: https://github.com/faisalnh/reading-companion/issues
-- Documentation: See project documentation files
+**📝 Full Reference:** See `.env.example`
 
 ---
 
-**Version:** 1.0.0  
-**Status:** Production Ready ✓
+## 🚢 Deployment
+
+### Production Deployment
+
+```bash
+# Build Docker image
+docker build -t reading-companion .
+
+# Run with docker-compose
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+### CI/CD Pipeline
+
+Every push to `staging` or `main` triggers:
+
+1. ✅ **ESLint** - Code quality
+2. ✅ **TypeScript** - Type safety
+3. ✅ **Unit Tests** - Business logic (Vitest)
+4. ✅ **Code Coverage** - Track coverage trends (Codecov)
+5. ✅ **E2E Tests** - User flows (Playwright)
+6. ✅ **Lighthouse** - Performance & accessibility
+7. ✅ **Docker Build** - Multi-platform image
+8. ✅ **Push to GHCR** - GitHub Container Registry
+9. ✅ **Auto-Deploy** - Komodo webhook deployment
+
+**Total Pipeline Time:** ~10-15 minutes
+
+**📋 Full Guide:** See `notes/2025-12-14/deployment/CI-CD.md`
+
+---
+
+## 🏛️ Architecture
+
+### Hybrid Backend Approach
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   Next.js   │────▶│  Supabase    │────▶│ PostgreSQL  │
+│  Frontend   │     │  (Auth+RLS)  │     │  Database   │
+└─────────────┘     └──────────────┘     └─────────────┘
+       │
+       │
+       ▼
+┌─────────────┐     ┌──────────────┐
+│   MinIO     │────▶│  S3 Storage  │
+│  (Files)    │     │  (PDFs, Imgs)│
+└─────────────┘     └──────────────┘
+       │
+       │
+       ▼
+┌─────────────┐
+│   Gemini /  │
+│  Local RAG  │
+│    (AI)     │
+└─────────────┘
+```
+
+**Benefits:**
+- ✅ Managed database with RLS security
+- ✅ Low-cost, self-hosted file storage
+- ✅ Flexible AI provider options
+- ✅ Scalable & maintainable
+
+---
+
+## 📚 Documentation
+
+All documentation is organized by date in the `notes/` directory:
+
+### Deployment Guides
+- **[CI/CD Setup](notes/2025-12-14/deployment/CI-CD.md)** - Complete pipeline documentation
+- **[Docker Guide](notes/2025-12-14/deployment/DOCKER.md)** - Container deployment
+- **[Database Setup](notes/2025-12-14/deployment/DATABASE_SETUP.md)** - Supabase configuration
+- **[Image Versioning](notes/2025-12-14/deployment/VERSIONING.md)** - Tag strategy
+
+### Development Guides
+- **[Migration Instructions](notes/2025-12-14/development/MIGRATION_INSTRUCTIONS.md)** - Data migration
+- **[MOBI/AZW Implementation](notes/2025-12-14/development/MOBI_AZW_IMPLEMENTATION.md)** - eBook formats
+
+### Roadmap & Planning
+- **[Project Roadmap](notes/2025-12-14/roadmap/Project-Roadmap.md)** - Feature planning
+- **[UX Improvements](notes/2025-12-14/roadmap/UX-IMPROVEMENT-ROADMAP.md)** - UI/UX enhancements
+- **[Changelog](notes/2025-12-14/roadmap/CHANGELOG.md)** - Version history
+
+### AI Guidelines
+- **[Claude Guidelines](.claude/claude.md)** - AI assistant development guide
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Reading Buddy is actively developed and growing.
+
+### Contribution Workflow
+
+1. **Check the roadmap** - See what's planned in `notes/2025-12-14/roadmap/Project-Roadmap.md`
+2. **Fork repository** - Create your own fork
+3. **Create branch** - `git checkout -b feature/amazing-feature`
+4. **Make changes** - Follow code style guidelines
+5. **Run tests** - Ensure all tests pass
+6. **Commit** - `git commit -m 'feat: Add amazing feature'`
+7. **Push** - `git push origin feature/amazing-feature`
+8. **Pull Request** - Open PR with detailed description
+
+### Development Guidelines
+
+- ✅ Follow TypeScript strict mode
+- ✅ Write tests for new features
+- ✅ Use Server Actions for mutations
+- ✅ Respect Row Level Security (RLS)
+- ✅ Document complex logic
+- ✅ Update changelog
+
+**📖 Full Guidelines:** See `.claude/claude.md`
+
+---
+
+## 🔒 Security
+
+- **Row Level Security (RLS)** on all database tables
+- **Server-side validation** for all mutations
+- **Presigned URLs** for secure file access
+- **Environment variables** for sensitive data
+- **Role-based access control** throughout app
+- **No client-side secrets** - all auth server-side
+
+**Found a security issue?** Please email security@example.com (do not open public issue)
+
+---
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+This means you can:
+- ✅ Use commercially
+- ✅ Modify and distribute
+- ✅ Use privately
+- ✅ Sublicense
+
+With requirements:
+- 📝 Include original license
+- 📝 State changes made
+
+---
+
+## 👥 Credits
+
+**Developed by:** Faisal Nur Hidayat  
+**AI Assistance:** Claude (Anthropic)  
+**Contributors:** See [GitHub Contributors](https://github.com/faisalnh/reading-companion/graphs/contributors)
+
+### Acknowledgments
+
+- **Supabase** - Backend infrastructure
+- **Vercel** - Next.js framework
+- **Google** - Gemini AI
+- **MinIO** - Object storage
+- **Open Source Community** - Various libraries and tools
+
+---
+
+## 📞 Support
+
+**Need Help?**
+- 📖 **Documentation:** See `notes/` directory
+- 🐛 **Bug Reports:** [GitHub Issues](https://github.com/faisalnh/reading-companion/issues)
+- 💬 **Discussions:** [GitHub Discussions](https://github.com/faisalnh/reading-companion/discussions)
+- 📧 **Email:** support@example.com
+
+**Quick Links:**
+- [Database Setup Guide](notes/2025-12-14/deployment/DATABASE_SETUP.md) - Start here!
+- [CI/CD Documentation](notes/2025-12-14/deployment/CI-CD.md) - Deployment pipeline
+- [Project Roadmap](notes/2025-12-14/roadmap/Project-Roadmap.md) - Future features
+- [AI Guidelines](.claude/claude.md) - Development with AI
+
+---
+
+## 🌟 Star History
+
+If you find Reading Buddy useful, please consider giving it a star on GitHub! ⭐
+
+---
+
+**Made with ❤️ for K-12 education**
+
+*Reading Buddy - Making reading engaging, trackable, and fun!*
