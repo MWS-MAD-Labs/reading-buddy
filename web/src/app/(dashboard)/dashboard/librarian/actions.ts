@@ -941,44 +941,56 @@ export const updateQuizMetadata = async (input: {
 export const renderBookImages = async (bookId: number) => {
   "use server";
 
-  const supabase = getSupabaseAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user || !user.userId) {
+    return { error: "Not authenticated" };
+  }
 
   // Check if book exists
-  const { data: book, error: bookError } = await supabase
-    .from("books")
-    .select("id, title")
-    .eq("id", bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT id, title FROM books WHERE id = $1`,
+    [bookId],
+  );
 
-  if (bookError || !book) {
+  if (bookResult.rows.length === 0) {
     return { error: "Book not found" };
   }
 
+  const book = bookResult.rows[0];
+
   // Create or update render job
-  const { data: existingJob } = await supabase
-    .from("book_render_jobs")
-    .select("id, status")
-    .eq("book_id", bookId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const existingJobResult = await queryWithContext(
+    user.userId,
+    `SELECT id, status FROM book_render_jobs
+     WHERE book_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [bookId],
+  );
 
   let jobId: number;
 
-  if (existingJob && existingJob.status === "pending") {
-    jobId = existingJob.id;
+  if (
+    existingJobResult.rows.length > 0 &&
+    existingJobResult.rows[0].status === "pending"
+  ) {
+    jobId = existingJobResult.rows[0].id;
   } else {
-    const { data: newJob, error: jobError } = await supabase
-      .from("book_render_jobs")
-      .insert({ book_id: bookId, status: "pending" })
-      .select("id")
-      .single();
+    const newJobResult = await queryWithContext(
+      user.userId,
+      `INSERT INTO book_render_jobs (book_id, status)
+       VALUES ($1, $2)
+       RETURNING id`,
+      [bookId, "pending"],
+    );
 
-    if (jobError || !newJob) {
+    if (newJobResult.rows.length === 0) {
       return { error: "Failed to create render job" };
     }
 
-    jobId = newJob.id;
+    jobId = newJobResult.rows[0].id;
   }
 
   // Trigger rendering in background (non-blocking)
@@ -1005,14 +1017,22 @@ export const renderBookImages = async (bookId: number) => {
 export const checkRenderStatus = async (bookId: number) => {
   "use server";
 
-  const supabase = getSupabaseAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user || !user.userId) {
+    return { completed: false, message: "Not authenticated" };
+  }
 
   // Check book's page_images_count
-  const { data: book } = await supabase
-    .from("books")
-    .select("page_images_count, page_images_rendered_at")
-    .eq("id", bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT page_images_count, page_images_rendered_at
+     FROM books
+     WHERE id = $1`,
+    [bookId],
+  );
+
+  const book = bookResult.rows[0];
 
   if (book?.page_images_count && book.page_images_count > 0) {
     return {
