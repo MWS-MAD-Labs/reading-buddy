@@ -64,11 +64,11 @@ export async function getLibrarianStats(userId: string): Promise<{
 
     const books = booksResult.rows;
     const byFormat = {
-      pdf: books.filter((b) => b.file_format === "pdf").length,
-      epub: books.filter((b) => b.file_format === "epub").length,
-      mobi: books.filter((b) => b.file_format === "mobi").length,
-      azw: books.filter((b) => b.file_format === "azw").length,
-      azw3: books.filter((b) => b.file_format === "azw3").length,
+      pdf: books.filter((b: any) => b.file_format === "pdf").length,
+      epub: books.filter((b: any) => b.file_format === "epub").length,
+      mobi: books.filter((b: any) => b.file_format === "mobi").length,
+      azw: books.filter((b: any) => b.file_format === "azw").length,
+      azw3: books.filter((b: any) => b.file_format === "azw3").length,
     };
 
     const formatEntries = Object.entries(byFormat);
@@ -122,7 +122,7 @@ export async function getLibrarianStats(userId: string): Promise<{
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const recentBooks = books.filter((b) => {
+    const recentBooks = books.filter((b: any) => {
       const createdAt = new Date(b.created_at);
       return createdAt >= thirtyDaysAgo;
     });
@@ -139,7 +139,7 @@ export async function getLibrarianStats(userId: string): Promise<{
       [],
     );
 
-    const recentUploads = recentUploadsResult.rows.map((book) => ({
+    const recentUploads = recentUploadsResult.rows.map((book: any) => ({
       id: book.id.toString(),
       title: book.title,
       uploadedAt: book.created_at,
@@ -150,8 +150,8 @@ export async function getLibrarianStats(userId: string): Promise<{
     }));
 
     // Calculate success rate
-    const failedUploads = recentBooks.filter((b) => {
-      const book = books.find((book) => book.created_at === b.created_at);
+    const failedUploads = recentBooks.filter((b: any) => {
+      const book = books.find((book: any) => book.created_at === b.created_at);
       return book && book.text_extraction_error;
     }).length;
     const successRate =
@@ -192,7 +192,7 @@ export async function getLibrarianStats(userId: string): Promise<{
       [],
     );
 
-    const mostRead = mostReadResult.rows.map((book) => ({
+    const mostRead = mostReadResult.rows.map((book: any) => ({
       id: book.id.toString(),
       title: book.title,
       author: book.author ?? "Unknown author",
@@ -218,7 +218,7 @@ export async function getLibrarianStats(userId: string): Promise<{
       [],
     );
 
-    const mostQuizzed = mostQuizzedResult.rows.map((book) => ({
+    const mostQuizzed = mostQuizzedResult.rows.map((book: any) => ({
       id: book.id.toString(),
       title: book.title,
       author: book.author ?? "Unknown author",

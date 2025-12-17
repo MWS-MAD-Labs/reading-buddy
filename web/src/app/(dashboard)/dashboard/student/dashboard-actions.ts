@@ -42,7 +42,7 @@ export async function getStudentDashboardData(
     const supabase = getSupabaseAdminClient();
 
     // 1. Get gamification stats
-    const gamificationStats = await getGamificationStats(supabase, userId);
+    const gamificationStats = await getGamificationStats(userId, userId);
 
     // 2. Get current reading book (most recent)
     const { data: currentReading } = await supabase

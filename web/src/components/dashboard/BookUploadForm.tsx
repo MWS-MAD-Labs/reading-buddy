@@ -672,7 +672,7 @@ export const BookUploadForm = ({
           />
           {normalizedGenreOptions.length ? (
             <datalist id={genreListId}>
-              {normalizedGenreOptions.map((option) => (
+              {normalizedGenreOptions.map((option: any) => (
                 <option key={option} value={option} />
               ))}
             </datalist>
@@ -693,7 +693,7 @@ export const BookUploadForm = ({
           />
           {normalizedLanguageOptions.length ? (
             <datalist id={languageListId}>
-              {normalizedLanguageOptions.map((option) => (
+              {normalizedLanguageOptions.map((option: any) => (
                 <option key={option} value={option} />
               ))}
             </datalist>
@@ -748,7 +748,7 @@ export const BookUploadForm = ({
         <fieldset className="space-y-2 text-base font-bold text-purple-700 md:col-span-2">
           <legend>Access</legend>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {ACCESS_LEVEL_OPTIONS.map((option) => (
+            {ACCESS_LEVEL_OPTIONS.map((option: any) => (
               <label
                 key={option.value}
                 className="flex items-center gap-2 rounded-xl border border-indigo-100 bg-white/70 px-3 py-2 text-sm text-indigo-900"

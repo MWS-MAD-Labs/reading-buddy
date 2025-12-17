@@ -16,7 +16,7 @@ import { promisify } from "util";
 import { tmpdir } from "os";
 import { join } from "path";
 import { randomUUID } from "crypto";
-import { Pool } from "pg";
+import { query } from "@/lib/db";
 
 const execAsync = promisify(exec);
 
@@ -101,8 +101,8 @@ async function convertEpubHandler(
     } catch (error) {
       console.error("Calibre conversion error:", error);
       // Cleanup temp files
-      await unlink(epubPath).catch(() => { });
-      await unlink(pdfPath).catch(() => { });
+      await unlink(epubPath).catch(() => {});
+      await unlink(pdfPath).catch(() => {});
 
       return NextResponse.json(
         {
@@ -135,18 +135,52 @@ async function convertEpubHandler(
     const pdfPublicUrl = buildPublicObjectUrl(pdfObjectKey);
 
     // 6. Update database with converted PDF URL
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    console.log(
+      `[EPUB Conversion] About to update database for book ${bookId}`,
+    );
+    console.log(`[EPUB Conversion] New PDF URL: ${pdfPublicUrl}`);
+
     try {
-      await pool.query(
-        'UPDATE books SET pdf_url = $1 WHERE id = $2',
-        [pdfPublicUrl, bookId]
+      // First, verify the book exists
+      const checkResult = await query(
+        "SELECT id, title, pdf_url, original_file_url FROM books WHERE id = $1",
+        [bookId],
       );
-      console.log(`Updated book ${bookId} with pdf_url: ${pdfPublicUrl}`);
+
+      if (checkResult.rows.length === 0) {
+        console.error(
+          `[EPUB Conversion] ERROR: Book ${bookId} not found in database!`,
+        );
+        throw new Error(`Book ${bookId} not found`);
+      }
+
+      console.log(`[EPUB Conversion] Book found:`, checkResult.rows[0]);
+
+      // Now update the pdf_url
+      const result = await query(
+        "UPDATE books SET pdf_url = $1 WHERE id = $2 RETURNING id, pdf_url",
+        [pdfPublicUrl, bookId],
+      );
+
+      console.log(
+        `[EPUB Conversion] ✅ Successfully updated book ${bookId} with pdf_url: ${pdfPublicUrl}`,
+      );
+      console.log(`[EPUB Conversion] Update result:`, result.rows[0]);
+      console.log(`[EPUB Conversion] Rows affected: ${result.rowCount}`);
+
+      if (result.rowCount === 0) {
+        console.error(
+          `[EPUB Conversion] ERROR: No rows updated for book ${bookId}!`,
+        );
+      }
     } catch (updateError) {
-      console.error("Error updating book:", updateError);
+      console.error("[EPUB Conversion] Database update error:", updateError);
+      console.error("[EPUB Conversion] Update details:", {
+        bookId,
+        pdfPublicUrl,
+      });
       // Don't fail the request, PDF is already uploaded
-    } finally {
-      await pool.end();
+      throw updateError; // Re-throw to see the error in the response
     }
 
     // 7. Cleanup temp files

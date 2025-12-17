@@ -1,4 +1,4 @@
-import { Pool, PoolClient, QueryResult } from "pg";
+import { Pool, PoolClient, QueryResult, QueryResultRow } from "pg";
 
 // Create connection pool
 const pool = new Pool({
@@ -29,7 +29,7 @@ export async function getDbClient(): Promise<PoolClient> {
  * Execute a query directly (without RLS context)
  * Use this for admin operations or non-user-specific queries
  */
-export async function query<T = any>(
+export async function query<T extends QueryResultRow = any>(
   text: string,
   params?: any[],
 ): Promise<QueryResult<T>> {
@@ -52,7 +52,7 @@ export async function query<T = any>(
  * @param text - SQL query
  * @param params - Query parameters
  */
-export async function queryWithContext<T = any>(
+export async function queryWithContext<T extends QueryResultRow = any>(
   userId: string,
   text: string,
   params?: any[],

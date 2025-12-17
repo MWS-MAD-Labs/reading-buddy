@@ -43,7 +43,7 @@ export default async function StudentDashboardPage() {
     : null;
 
   // Get recent badges (last 3 earned)
-  const recentBadges = earnedBadges.slice(0, 3).map((sb) => ({
+  const recentBadges = earnedBadges.slice(0, 3).map((sb: any) => ({
     badge: sb.badge,
     earnedAt: sb.earned_at,
   }));
@@ -67,7 +67,7 @@ export default async function StudentDashboardPage() {
     [profileId],
   );
 
-  const assignments = assignmentsResult.rows.map((row) => ({
+  const assignments = assignmentsResult.rows.map((row: any) => ({
     book_id: row.book_id,
     current_page: row.current_page,
     updated_at: row.updated_at,
@@ -83,7 +83,7 @@ export default async function StudentDashboardPage() {
   console.log("Student ID:", profileId);
   console.log("Assignments count:", assignments.length);
 
-  const assignedBookIds = assignments.map((assignment) => assignment.book_id);
+  const assignedBookIds = assignments.map((assignment: any) => assignment.book_id);
 
   // Get student's classes
   const studentClassesResult = await queryWithContext(
@@ -92,7 +92,7 @@ export default async function StudentDashboardPage() {
     [profileId],
   );
 
-  const classIds = studentClassesResult.rows.map((c) => c.class_id);
+  const classIds = studentClassesResult.rows.map((c: any) => c.class_id);
 
   // Get which classrooms assigned each book (for display purposes)
   const bookClassrooms: Map<number, string[]> = new Map();
@@ -106,7 +106,7 @@ export default async function StudentDashboardPage() {
       [classIds, assignedBookIds],
     );
 
-    classBookResult.rows.forEach((item) => {
+    classBookResult.rows.forEach((item: any) => {
       const className = item.name ?? "Unknown class";
       if (!bookClassrooms.has(item.book_id)) {
         bookClassrooms.set(item.book_id, []);
@@ -132,7 +132,7 @@ export default async function StudentDashboardPage() {
       [classIds],
     );
 
-    classrooms = classRowsResult.rows.map((row) => ({
+    classrooms = classRowsResult.rows.map((row: any) => ({
       id: row.id,
       name: row.name,
       teacher_name: row.teacher_name ?? "Unknown teacher",
@@ -181,7 +181,7 @@ export default async function StudentDashboardPage() {
 
         {assignments?.length ? (
           <ul className="grid gap-5 md:grid-cols-2">
-            {assignments.map((assignment) => {
+            {assignments.map((assignment: any) => {
               const book = assignment.books;
               return (
                 <li
@@ -257,7 +257,7 @@ export default async function StudentDashboardPage() {
         </div>
         {classrooms.length ? (
           <ul className="space-y-3">
-            {classrooms.map((classroom) => (
+            {classrooms.map((classroom: any) => (
               <li
                 key={classroom.id}
                 className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-indigo-100 bg-white/80 p-4 text-indigo-900 shadow-[0_12px_30px_rgba(79,70,229,0.15)]"

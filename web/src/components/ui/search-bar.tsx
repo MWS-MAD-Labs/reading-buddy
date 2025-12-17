@@ -83,7 +83,7 @@ export function SearchBar({
 
     // Add to recent searches
     if (showRecentSearches && typeof window !== "undefined") {
-      const updated = [suggestion, ...recentSearches.filter((s) => s !== suggestion)].slice(0, 5);
+      const updated = [suggestion, ...recentSearches.filter((s: any) => s !== suggestion)].slice(0, 5);
       setRecentSearches(updated);
       localStorage.setItem("recent-searches", JSON.stringify(updated));
     }
@@ -98,7 +98,7 @@ export function SearchBar({
   };
 
   const displaySuggestions = query
-    ? suggestions.filter((s) => s.toLowerCase().includes(query.toLowerCase()))
+    ? suggestions.filter((s: any) => s.toLowerCase().includes(query.toLowerCase()))
     : showRecentSearches
       ? recentSearches
       : [];

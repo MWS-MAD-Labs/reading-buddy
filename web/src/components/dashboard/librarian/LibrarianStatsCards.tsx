@@ -252,7 +252,7 @@ export function LibrarianStatsCards({
             </div>
 
             <div className="space-y-2">
-              {uploadStatistics.recentUploads.slice(0, 5).map((upload) => (
+              {uploadStatistics.recentUploads.slice(0, 5).map((upload: any) => (
                 <div
                   key={upload.id}
                   className="flex items-center justify-between rounded-2xl border-2 border-indigo-100 bg-white/80 p-3"

@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useState, useTransition, useEffect, useRef, type ChangeEvent } from "react";
+import {
+  useMemo,
+  useState,
+  useTransition,
+  useEffect,
+  useRef,
+  type ChangeEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
@@ -156,7 +163,10 @@ export const BookManager = ({
     id: number;
     anchor: HTMLElement;
   } | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Calculate menu position when actionMenu changes
@@ -193,14 +203,14 @@ export const BookManager = ({
       if (menuRef.current?.contains(target)) return;
 
       // Ignore clicks on any action button (they handle their own state)
-      if (target.closest('[data-action-button]')) return;
+      if (target.closest("[data-action-button]")) return;
 
       setActionMenu(null);
     };
 
     // Use mousedown for faster response
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [actionMenu]);
 
   const sortedBooks = useMemo(
@@ -221,8 +231,8 @@ export const BookManager = ({
       Array.from(
         new Set(
           books
-            .map((book) => book.author)
-            .filter((value) => Boolean(value && value.trim())),
+            .map((book: any) => book.author)
+            .filter((value: any) => Boolean(value && value.trim())),
         ),
       ).sort((a, b) => a.localeCompare(b)),
     [books],
@@ -232,8 +242,8 @@ export const BookManager = ({
       Array.from(
         new Set(
           books
-            .map((book) => book.publisher)
-            .filter((value) => Boolean(value && value.trim())),
+            .map((book: any) => book.publisher)
+            .filter((value: any) => Boolean(value && value.trim())),
         ),
       ).sort((a, b) => a.localeCompare(b)),
     [books],
@@ -243,8 +253,8 @@ export const BookManager = ({
       Array.from(
         new Set(
           books
-            .map((book) => book.publicationYear)
-            .filter((value) => Number.isFinite(value)),
+            .map((book: any) => book.publicationYear)
+            .filter((value: any) => Number.isFinite(value)),
         ),
       ).sort((a, b) => b - a),
     [books],
@@ -252,7 +262,7 @@ export const BookManager = ({
 
   const filteredBooks = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return sortedBooks.filter((book) => {
+    return sortedBooks.filter((book: any) => {
       if (genreFilter !== "ALL" && book.genre !== genreFilter) {
         return false;
       }
@@ -440,7 +450,7 @@ export const BookManager = ({
                   onChange={(event) => setAuthorFilter(event.target.value)}
                 >
                   <option value="ALL">All authors</option>
-                  {authorOptions.map((option) => (
+                  {authorOptions.map((option: any) => (
                     <option value={option} key={option}>
                       {option}
                     </option>
@@ -455,7 +465,7 @@ export const BookManager = ({
                   onChange={(event) => setPublisherFilter(event.target.value)}
                 >
                   <option value="ALL">All publishers</option>
-                  {publisherOptions.map((option) => (
+                  {publisherOptions.map((option: any) => (
                     <option value={option} key={option}>
                       {option}
                     </option>
@@ -470,7 +480,7 @@ export const BookManager = ({
                   onChange={(event) => setYearFilter(event.target.value)}
                 >
                   <option value="ALL">All years</option>
-                  {yearOptions.map((option) => (
+                  {yearOptions.map((option: any) => (
                     <option value={String(option)} key={option}>
                       {option}
                     </option>
@@ -485,7 +495,7 @@ export const BookManager = ({
                   onChange={(event) => setGenreFilter(event.target.value)}
                 >
                   <option value="ALL">All genres</option>
-                  {genreOptions.map((option) => (
+                  {genreOptions.map((option: any) => (
                     <option value={option} key={option}>
                       {option}
                     </option>
@@ -500,7 +510,7 @@ export const BookManager = ({
                   onChange={(event) => setLanguageFilter(event.target.value)}
                 >
                   <option value="ALL">All languages</option>
-                  {languageOptions.map((option) => (
+                  {languageOptions.map((option: any) => (
                     <option value={option} key={option}>
                       {option}
                     </option>
@@ -519,7 +529,7 @@ export const BookManager = ({
                   }
                 >
                   <option value="ALL">All access levels</option>
-                  {ACCESS_LEVEL_OPTIONS.map((option) => (
+                  {ACCESS_LEVEL_OPTIONS.map((option: any) => (
                     <option value={option.value} key={option.value}>
                       {option.label}
                     </option>
@@ -539,7 +549,7 @@ export const BookManager = ({
             <>
               {/* Mobile Card View */}
               <div className="space-y-4 lg:hidden">
-                {filteredBooks.map((book) => (
+                {filteredBooks.map((book: any) => (
                   <div
                     key={book.id}
                     className="rounded-3xl border-4 border-blue-300 bg-white p-5 shadow-lg transition-all hover:shadow-xl"
@@ -598,15 +608,18 @@ export const BookManager = ({
                           Access Levels:
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {book.accessLevels.map((level) => {
-                            const badge = ACCESS_BADGES[level];
+                          {book.accessLevels.map((level: any) => {
+                            const badge =
+                              ACCESS_BADGES[
+                                level as keyof typeof ACCESS_BADGES
+                              ];
                             return (
                               <span
                                 key={`${book.id}-${level}`}
                                 className={clsx(
                                   "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
                                   badge?.color ??
-                                  "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                    "bg-indigo-100 text-indigo-600 border-indigo-300",
                                 )}
                               >
                                 {badge?.label ?? level.slice(0, 2)}
@@ -708,7 +721,7 @@ export const BookManager = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredBooks.map((book) => (
+                    {filteredBooks.map((book: any) => (
                       <tr
                         key={book.id}
                         className="border-b-2 border-blue-100 bg-transparent hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50"
@@ -733,15 +746,18 @@ export const BookManager = ({
                         <td className="px-4 py-3 text-xs">
                           {book.accessLevels.length ? (
                             <div className="flex flex-wrap gap-2">
-                              {book.accessLevels.map((level) => {
-                                const badge = ACCESS_BADGES[level];
+                              {book.accessLevels.map((level: any) => {
+                                const badge =
+                                  ACCESS_BADGES[
+                                    level as keyof typeof ACCESS_BADGES
+                                  ];
                                 return (
                                   <span
                                     key={`${book.id}-${level}`}
                                     className={clsx(
                                       "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
                                       badge?.color ??
-                                      "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                        "bg-indigo-100 text-indigo-600 border-indigo-300",
                                     )}
                                   >
                                     {badge?.label ?? level.slice(0, 2)}

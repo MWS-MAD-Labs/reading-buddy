@@ -28,7 +28,7 @@ export default async function ClassroomManagementPage() {
   // Get my classrooms (where I'm the teacher)
   const myClassrooms = classroomsData
     ? await Promise.all(
-        classroomsData.map(async (c) => {
+        classroomsData.map(async (c: any) => {
           const { count } = await supabaseAdmin
             .from("class_students")
             .select("*", { count: "exact", head: true })
@@ -50,7 +50,7 @@ export default async function ClassroomManagementPage() {
 
   const allClassrooms = allClassroomsData
     ? await Promise.all(
-        allClassroomsData.map(async (c) => {
+        allClassroomsData.map(async (c: any) => {
           // Get student count
           const { count: studentCount } = await supabaseAdmin
             .from("class_students")
@@ -93,7 +93,7 @@ export default async function ClassroomManagementPage() {
   }
 
   const allTeachers =
-    allTeachersData?.map((t) => ({
+    allTeachersData?.map((t: any) => ({
       id: t.id,
       full_name: t.full_name ?? "",
     })) ?? [];

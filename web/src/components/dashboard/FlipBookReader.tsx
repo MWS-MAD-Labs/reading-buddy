@@ -275,7 +275,7 @@ export const FlipBookReader = ({
 
     // Preload images with slight delay to prioritize current page
     const timeoutId = setTimeout(() => {
-      imagesToPreload.forEach((url) => {
+      imagesToPreload.forEach((url: any) => {
         const img = new window.Image();
         img.src = url;
       });

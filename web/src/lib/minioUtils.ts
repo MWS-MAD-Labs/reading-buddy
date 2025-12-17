@@ -51,7 +51,7 @@ export const getObjectKeyFromPublicUrl = (publicUrl: string | null | undefined) 
     const pathParts = parsed.pathname
       .split('/')
       .filter(Boolean)
-      .map((segment) => decodeSegment(segment));
+      .map((segment: any) => decodeSegment(segment));
     if (!pathParts.length) {
       return null;
     }

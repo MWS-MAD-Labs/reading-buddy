@@ -41,7 +41,7 @@ export default async function LibrarianPage() {
   );
 
   // Get access levels for each book
-  const bookIds = booksResult.rows.map((book) => book.id);
+  const bookIds = booksResult.rows.map((book: any) => book.id);
   let accessLevelsMap: Record<number, AccessLevelValue[]> = {};
 
   if (bookIds.length > 0) {
@@ -51,7 +51,7 @@ export default async function LibrarianPage() {
       [bookIds],
     );
 
-    accessResult.rows.forEach((row) => {
+    accessResult.rows.forEach((row: any) => {
       if (!accessLevelsMap[row.book_id]) {
         accessLevelsMap[row.book_id] = [];
       }
@@ -59,46 +59,48 @@ export default async function LibrarianPage() {
     });
   }
 
-  const managedBooks: ManagedBookRecord[] = booksResult.rows.map((book) => ({
-    id: book.id,
-    isbn: book.isbn ?? "",
-    title: book.title ?? "",
-    author: book.author ?? "",
-    publisher: book.publisher ?? "",
-    publicationYear:
-      book.publication_year ??
-      (book.created_at
-        ? new Date(book.created_at).getFullYear()
-        : CURRENT_YEAR),
-    genre: book.genre ?? "",
-    language: book.language ?? "",
-    description: book.description,
-    pageCount: book.page_count ?? null,
-    pdfUrl: book.pdf_url,
-    coverUrl: book.cover_url,
-    createdAt: book.created_at,
-    accessLevels: accessLevelsMap[book.id] ?? [],
-    pageImagesCount: book.page_images_count ?? null,
-    pageImagesRenderedAt: book.page_images_rendered_at ?? null,
-    textExtractedAt: book.text_extracted_at ?? null,
-    textExtractionError: book.text_extraction_error ?? null,
-    textExtractionAttempts: book.text_extraction_attempts ?? 0,
-    lastExtractionAttemptAt: book.last_extraction_attempt_at ?? null,
-  }));
+  const managedBooks: ManagedBookRecord[] = booksResult.rows.map(
+    (book: any) => ({
+      id: book.id,
+      isbn: book.isbn ?? "",
+      title: book.title ?? "",
+      author: book.author ?? "",
+      publisher: book.publisher ?? "",
+      publicationYear:
+        book.publication_year ??
+        (book.created_at
+          ? new Date(book.created_at).getFullYear()
+          : CURRENT_YEAR),
+      genre: book.genre ?? "",
+      language: book.language ?? "",
+      description: book.description,
+      pageCount: book.page_count ?? null,
+      pdfUrl: book.pdf_url,
+      coverUrl: book.cover_url,
+      createdAt: book.created_at,
+      accessLevels: accessLevelsMap[book.id] ?? [],
+      pageImagesCount: book.page_images_count ?? null,
+      pageImagesRenderedAt: book.page_images_rendered_at ?? null,
+      textExtractedAt: book.text_extracted_at ?? null,
+      textExtractionError: book.text_extraction_error ?? null,
+      textExtractionAttempts: book.text_extraction_attempts ?? 0,
+      lastExtractionAttemptAt: book.last_extraction_attempt_at ?? null,
+    }),
+  );
 
   const genreOptions = Array.from(
     new Set(
       managedBooks
-        .map((book) => book.genre)
-        .filter((value) => Boolean(value && value.trim())),
+        .map((book: any) => book.genre)
+        .filter((value: any) => Boolean(value && value.trim())),
     ),
   ).sort((a, b) => a.localeCompare(b));
 
   const languageOptions = Array.from(
     new Set(
       managedBooks
-        .map((book) => book.language)
-        .filter((value) => Boolean(value && value.trim())),
+        .map((book: any) => book.language)
+        .filter((value: any) => Boolean(value && value.trim())),
     ),
   ).sort((a, b) => a.localeCompare(b));
 

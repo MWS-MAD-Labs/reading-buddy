@@ -62,7 +62,7 @@ export function StudentLeaderboard({
       {/* Leaderboard List */}
       {displayEntries.length > 0 ? (
         <div className="space-y-3">
-          {displayEntries.map((entry) => {
+          {displayEntries.map((entry: any) => {
             const rankIcon = getRankIcon(entry.rank);
             return (
               <div

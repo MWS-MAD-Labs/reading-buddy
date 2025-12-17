@@ -97,7 +97,7 @@ export const MobileNav = ({ userRole }: MobileNavProps) => {
   }, []);
 
   // Filter links based on user role
-  const visibleLinks = navLinks.filter((link) => {
+  const visibleLinks = navLinks.filter((link: any) => {
     if (!userRole) return false;
     return link.roles.includes(userRole);
   });
@@ -163,7 +163,7 @@ export const MobileNav = ({ userRole }: MobileNavProps) => {
           {/* Navigation Links */}
           <nav className="flex-1 overflow-y-auto p-4">
             <ul className="space-y-3">
-              {visibleLinks.map((link) => {
+              {visibleLinks.map((link: any) => {
                 const isActive =
                   pathname === link.href ||
                   pathname.startsWith(`${link.href}/`);

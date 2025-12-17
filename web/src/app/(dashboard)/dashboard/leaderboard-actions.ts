@@ -68,17 +68,19 @@ export async function getStudentLeaderboard(
     const totalParticipants = parseInt(countResult.rows[0]?.count || "0");
 
     // Map to leaderboard entries
-    const entries: LeaderboardEntry[] = result.rows.map((profile, index) => ({
-      rank: index + 1,
-      userId: profile.id,
-      name: profile.full_name || "Anonymous Student",
-      xp: profile.xp || 0,
-      level: profile.level || 1,
-      booksCompleted: profile.total_books_completed || 0,
-      pagesRead: profile.total_pages_read || 0,
-      readingStreak: profile.reading_streak || 0,
-      isCurrentUser: profile.id === currentProfileId,
-    }));
+    const entries: LeaderboardEntry[] = result.rows.map(
+      (profile: any, index: number) => ({
+        rank: index + 1,
+        userId: profile.id,
+        name: profile.full_name || "Anonymous Student",
+        xp: profile.xp || 0,
+        level: profile.level || 1,
+        booksCompleted: profile.total_books_completed || 0,
+        pagesRead: profile.total_pages_read || 0,
+        readingStreak: profile.reading_streak || 0,
+        isCurrentUser: profile.id === currentProfileId,
+      }),
+    );
 
     // Find current user's entry
     const currentUserEntry = entries.find((e) => e.isCurrentUser) || null;
@@ -148,19 +150,21 @@ export async function getStaffLeaderboard(
     const totalParticipants = parseInt(countResult.rows[0]?.count || "0");
 
     // Map to leaderboard entries
-    const entries: LeaderboardEntry[] = result.rows.map((profile, index) => ({
-      rank: index + 1,
-      userId: profile.id,
-      name:
-        profile.full_name ||
-        `Anonymous ${profile.role?.toLowerCase() || "staff"}`,
-      xp: profile.xp || 0,
-      level: profile.level || 1,
-      booksCompleted: profile.total_books_completed || 0,
-      pagesRead: profile.total_pages_read || 0,
-      readingStreak: profile.reading_streak || 0,
-      isCurrentUser: profile.id === currentProfileId,
-    }));
+    const entries: LeaderboardEntry[] = result.rows.map(
+      (profile: any, index: number) => ({
+        rank: index + 1,
+        userId: profile.id,
+        name:
+          profile.full_name ||
+          `Anonymous ${profile.role?.toLowerCase() || "staff"}`,
+        xp: profile.xp || 0,
+        level: profile.level || 1,
+        booksCompleted: profile.total_books_completed || 0,
+        pagesRead: profile.total_pages_read || 0,
+        readingStreak: profile.reading_streak || 0,
+        isCurrentUser: profile.id === currentProfileId,
+      }),
+    );
 
     // Find current user's entry
     const currentUserEntry = entries.find((e) => e.isCurrentUser) || null;

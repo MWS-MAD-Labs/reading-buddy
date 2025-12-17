@@ -20,7 +20,7 @@ export default async function LibraryPage() {
     [],
   );
 
-  const libraryBooks: LibraryBook[] = result.rows.map((book) => ({
+  const libraryBooks: LibraryBook[] = result.rows.map((book: any) => ({
     id: book.id,
     title: book.title ?? "Untitled book",
     author: book.author ?? "Unknown author",

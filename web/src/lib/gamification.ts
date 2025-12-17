@@ -194,7 +194,7 @@ export async function evaluateBadges(
     [studentId],
   );
 
-  const earnedBadgeIds = new Set(earnedResult.rows.map((b) => b.badge_id));
+  const earnedBadgeIds = new Set(earnedResult.rows.map((b: any) => b.badge_id));
 
   // Evaluate each badge
   const newBadges: Badge[] = [];
@@ -419,7 +419,7 @@ async function awardBookSpecificBadges(
     [studentId],
   );
 
-  const earnedBadgeIds = new Set(earnedResult.rows.map((b) => b.badge_id));
+  const earnedBadgeIds = new Set(earnedResult.rows.map((b: any) => b.badge_id));
 
   const newBadges: Badge[] = [];
   let totalXpAwarded = 0;
@@ -579,7 +579,7 @@ export async function getStudentBadges(
     [studentId],
   );
 
-  return result.rows.map((row) => ({
+  return result.rows.map((row: any) => ({
     id: row.id,
     student_id: row.student_id,
     badge_id: row.badge_id,
@@ -631,7 +631,7 @@ export async function getBadgesWithProgress(
   );
 
   const earnedMap = new Map(
-    earnedResult.rows.map((b) => [b.badge_id, b.earned_at]),
+    earnedResult.rows.map((b: any) => [b.badge_id, b.earned_at]),
   );
 
   // Get student stats
@@ -650,7 +650,7 @@ export async function getBadgesWithProgress(
     readingStreak: profile?.reading_streak ?? 0,
   };
 
-  return badges.map((badge) => {
+  return badges.map((badge: any) => {
     const earned = earnedMap.has(badge.id);
     const earnedAt = earnedMap.get(badge.id) ?? null;
     const { currentValue, targetValue, progress } = calculateBadgeProgress(

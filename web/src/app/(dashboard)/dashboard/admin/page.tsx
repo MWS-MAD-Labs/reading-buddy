@@ -21,7 +21,7 @@ export default async function AdminDashboardPage() {
     ORDER BY p.updated_at DESC
   `);
 
-  const users = result.rows.map((row) => ({
+  const users = result.rows.map((row: any) => ({
     id: row.id,
     full_name: row.full_name,
     role: row.role,

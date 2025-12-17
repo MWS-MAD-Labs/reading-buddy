@@ -12,7 +12,7 @@ type AddUserParams = {
 };
 
 export async function addUser(params: AddUserParams): Promise<void> {
-  await transaction(async (client) => {
+  await transaction(async (client: any) => {
     // Hash password
     const passwordHash = await bcrypt.hash(params.password, 10);
 
@@ -84,7 +84,7 @@ export async function updateUserAccessLevel(
 }
 
 export async function deleteUser(userId: string): Promise<void> {
-  await transaction(async (client) => {
+  await transaction(async (client: any) => {
     // Get user_id from profile
     const profileResult = await client.query(
       "SELECT user_id FROM profiles WHERE id = $1",
@@ -208,7 +208,7 @@ export async function getUsersWithEmails(): Promise<{
 
     return {
       success: true,
-      users: result.rows.map((row) => ({
+      users: result.rows.map((row: any) => ({
         id: row.id,
         full_name: row.full_name,
         role: row.role,
@@ -239,7 +239,7 @@ export async function cleanupOrphanedProfiles(): Promise<{
       RETURNING id
     `);
 
-    const orphanedIds = result.rows.map((row) => row.id);
+    const orphanedIds = result.rows.map((row: any) => row.id);
 
     return {
       success: true,

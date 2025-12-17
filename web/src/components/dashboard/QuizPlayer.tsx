@@ -34,7 +34,7 @@ export const QuizPlayer = ({
   classId,
 }: QuizPlayerProps) => {
   const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(
-    quizData.questions.map(() => null),
+    quizData.questions.map((_: any) => null),
   );
   const [status, setStatus] = useState<"idle" | "submitting" | "completed">(
     "idle",
@@ -74,7 +74,7 @@ export const QuizPlayer = ({
     try {
       await submitQuizAttempt({
         quizId,
-        answers: selectedAnswers.map((answer) => Number(answer)),
+        answers: selectedAnswers.map((answer: any) => Number(answer)),
         score: correctAnswers,
         totalQuestions: quizData.questions.length,
       });

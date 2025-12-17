@@ -41,7 +41,7 @@ export const submitQuizAttempt = async (input: {
   // Award XP and evaluate badges for quiz completion
   const totalQuestions = input.totalQuestions || input.answers.length;
   const result = await onQuizCompleted(
-    supabaseAdmin,
+    user.id,
     user.id,
     input.quizId,
     input.score,

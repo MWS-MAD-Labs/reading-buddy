@@ -72,6 +72,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jszip": "^3.4.0",
     "@types/node": "^20",
+    "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.1",

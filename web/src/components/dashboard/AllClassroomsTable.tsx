@@ -96,7 +96,7 @@ export const AllClassroomsTable = ({ classrooms, currentUserId }: AllClassroomsT
             </thead>
             <tbody className="divide-y divide-indigo-50">
               {classrooms.length > 0 ? (
-                classrooms.map((classroom) => {
+                classrooms.map((classroom: any) => {
                   const isMyClass = classroom.teacher_id === currentUserId;
                   return (
                     <tr

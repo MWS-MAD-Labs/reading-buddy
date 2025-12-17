@@ -132,7 +132,7 @@ function ClassHeatmapCard({ analytics }: { analytics: ClassAnalytics }) {
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-2 gap-2">
-        {metrics.map((metric) => (
+        {metrics.map((metric: any) => (
           <MetricCell key={metric.label} {...metric} />
         ))}
       </div>

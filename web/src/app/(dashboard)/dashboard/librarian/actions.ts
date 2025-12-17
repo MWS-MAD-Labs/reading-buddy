@@ -402,7 +402,7 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
 
   const bookResult = await queryWithContext(
     user.userId,
-    `SELECT id, title, author, genre, description, pdf_url, original_file_url, page_text_content, text_extracted_at 
+    `SELECT id, title, author, genre, description, pdf_url, original_file_url, page_text_content, text_extracted_at
      FROM books WHERE id = $1`,
     [input.bookId],
   );
@@ -417,17 +417,17 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
   const textContent =
     book.text_extracted_at && book.page_text_content
       ? (book.page_text_content as {
-        pages: {
-          pageNumber: number;
-          text: string;
-          wordCount?: number;
-        }[];
-        totalWords: number;
-      })
+          pages: {
+            pageNumber: number;
+            text: string;
+            wordCount?: number;
+          }[];
+          totalWords: number;
+        })
       : null;
 
   const pages =
-    textContent?.pages?.map((page) => ({
+    textContent?.pages?.map((page: any) => ({
       pageNumber: page.pageNumber,
       text: page.text,
       wordCount: page.wordCount,
@@ -456,8 +456,8 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
 
   const quizResult = await queryWithContext(
     user.userId,
-    `INSERT INTO quizzes (book_id, created_by_id, questions) 
-     VALUES ($1, $2, $3) 
+    `INSERT INTO quizzes (book_id, created_by_id, questions)
+     VALUES ($1, $2, $3)
      RETURNING id`,
     [book.id, user.userId, JSON.stringify(quizPayload)],
   );
@@ -503,7 +503,7 @@ export const generateQuizForBookWithContent = async (input: {
   // Fetch book data including extracted text
   const bookResult = await queryWithContext(
     user.userId,
-    `SELECT id, title, author, genre, description, page_count, page_text_content, text_extracted_at, pdf_url, original_file_url 
+    `SELECT id, title, author, genre, description, page_count, page_text_content, text_extracted_at, pdf_url, original_file_url
      FROM books WHERE id = $1`,
     [input.bookId],
   );
@@ -517,10 +517,10 @@ export const generateQuizForBookWithContent = async (input: {
   const textContent =
     book.text_extracted_at && book.page_text_content
       ? (book.page_text_content as {
-        pages: { pageNumber: number; text: string; wordCount?: number }[];
-        totalPages: number;
-        totalWords: number;
-      })
+          pages: { pageNumber: number; text: string; wordCount?: number }[];
+          totalPages: number;
+          totalWords: number;
+        })
       : null;
 
   const questionCount = input.questionCount ?? 5;
@@ -600,7 +600,7 @@ export const generateQuizForBookWithContent = async (input: {
   const quizResult = await queryWithContext(
     user.userId,
     `INSERT INTO quizzes (
-      book_id, created_by_id, questions, quiz_type, 
+      book_id, created_by_id, questions, quiz_type,
       page_range_start, page_range_end, checkpoint_page
     ) VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING id`,
@@ -751,7 +751,7 @@ export const getAllQuizzesGroupedByBook = async () => {
   // We need to manually join since we are not using Supabase nested resources
   const result = await queryWithContext(
     user.userId,
-    `SELECT qs.*, b.id as book_id_joined, b.title as book_title, b.author as book_author 
+    `SELECT qs.*, b.id as book_id_joined, b.title as book_title, b.author as book_author
      FROM quiz_statistics qs
      JOIN books b ON qs.book_id = b.id
      ORDER BY qs.created_at DESC`,
@@ -992,10 +992,10 @@ export const checkRenderStatus = async (bookId: number) => {
   // Check latest render job status
   const jobResult = await queryWithContext(
     user.userId,
-    `SELECT status, error_message, processed_pages, total_pages 
-     FROM book_render_jobs 
-     WHERE book_id = $1 
-     ORDER BY created_at DESC 
+    `SELECT status, error_message, processed_pages, total_pages
+     FROM book_render_jobs
+     WHERE book_id = $1
+     ORDER BY created_at DESC
      LIMIT 1`,
     [bookId],
   );
@@ -1068,12 +1068,12 @@ export const generateBookDescription = async (input: {
     const textContent =
       bookRecord?.text_extracted_at && bookRecord.page_text_content
         ? (bookRecord.page_text_content as {
-          pages: { pageNumber: number; text: string }[];
-          totalWords: number;
-        })
+            pages: { pageNumber: number; text: string }[];
+            totalWords: number;
+          })
         : null;
 
-    const pagesFromText = textContent?.pages?.map((page) => ({
+    const pagesFromText = textContent?.pages?.map((page: any) => ({
       pageNumber: page.pageNumber,
       text: page.text,
       wordCount:
@@ -1084,12 +1084,12 @@ export const generateBookDescription = async (input: {
     const previewPage =
       !pagesFromText?.length && input.textPreview
         ? [
-          {
-            pageNumber: 0,
-            text: input.textPreview,
-            wordCount: input.textPreview.split(/\s+/).length,
-          },
-        ]
+            {
+              pageNumber: 0,
+              text: input.textPreview,
+              wordCount: input.textPreview.split(/\s+/).length,
+            },
+          ]
         : null;
 
     const pdfUrl =
@@ -1167,7 +1167,7 @@ export const extractBookText = async (bookId: number) => {
   // Update attempt tracking before processing
   await queryWithContext(
     user.userId,
-    `UPDATE books SET 
+    `UPDATE books SET
       text_extraction_attempts = COALESCE(text_extraction_attempts, 0) + 1,
       last_extraction_attempt_at = NOW()
      WHERE id = $1`,
@@ -1229,7 +1229,7 @@ export const extractBookText = async (bookId: number) => {
     // Save to database - clear any previous errors
     await queryWithContext(
       user.userId,
-      `UPDATE books SET 
+      `UPDATE books SET
         page_text_content = $1,
         text_extracted_at = NOW(),
         text_extraction_method = $2,
@@ -1306,22 +1306,43 @@ export const convertEpubToImages = async (bookId: number) => {
   try {
     // Step 1: Convert EPUB to PDF using Calibre
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    console.log(
+      `[convertEpubToImages] Calling API: ${baseUrl}/api/convert-epub`,
+    );
+    console.log(`[convertEpubToImages] Request body:`, { bookId, epubUrl });
+
     const response = await fetch(`${baseUrl}/api/convert-epub`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bookId, epubUrl }),
     });
 
+    console.log(`[convertEpubToImages] Response status:`, response.status);
     const result = await response.json();
+    console.log(`[convertEpubToImages] Response body:`, result);
 
     if (!result.success) {
+      console.error(`[convertEpubToImages] Conversion failed:`, result.error);
       return {
         success: false,
         message: result.error || "EPUB to PDF conversion failed",
       };
     }
 
-    console.log(`EPUB converted to PDF: ${result.pdfUrl}`);
+    console.log(
+      `[convertEpubToImages] ✅ EPUB converted to PDF: ${result.pdfUrl}`,
+    );
+
+    // Verify the database was updated
+    const verifyResult = await queryWithContext(
+      user.userId,
+      `SELECT id, title, pdf_url, original_file_url, file_format FROM books WHERE id = $1`,
+      [bookId],
+    );
+    console.log(
+      `[convertEpubToImages] Book state after conversion:`,
+      verifyResult.rows[0],
+    );
 
     // Step 2: Trigger PDF rendering using existing pipeline
     const renderResult = await renderBookImages(bookId);

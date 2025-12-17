@@ -60,11 +60,11 @@ export const BulkUploadModal = ({
       // Parse CSV text into rows
       const rows = text.split("\n").slice(1); // Skip header
       const users = rows
-        .filter((row) => row.trim())
-        .map((row) => {
+        .filter((row: any) => row.trim())
+        .map((row: any) => {
           const [email, password, fullName, role, accessLevel] = row
             .split(",")
-            .map((s) => s.trim());
+            .map((s: any) => s.trim());
           return {
             email,
             password,

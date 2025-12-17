@@ -48,8 +48,8 @@ export const ClassQuizList = ({
   const [selectedQuizId, setSelectedQuizId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState<string>('');
 
-  const assignedQuizIds = new Set(assignedQuizzes.map((q) => q.quiz_id));
-  const unassignedQuizzes = availableQuizzes.filter((q) => !assignedQuizIds.has(q.id));
+  const assignedQuizIds = new Set(assignedQuizzes.map((q: any) => q.quiz_id));
+  const unassignedQuizzes = availableQuizzes.filter((q: any) => !assignedQuizIds.has(q.id));
 
   const handleAssign = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -131,7 +131,7 @@ export const ClassQuizList = ({
             className="w-full rounded-2xl border border-purple-200 bg-white/90 px-4 py-3 text-slate-900 shadow-[0_12px_30px_rgba(168,85,247,0.25)] focus:outline-none focus:ring-2 focus:ring-purple-300"
           >
             <option value="">Select a quiz...</option>
-            {unassignedQuizzes.map((quiz) => (
+            {unassignedQuizzes.map((quiz: any) => (
               <option key={quiz.id} value={quiz.id}>
                 {formatQuizLabel(quiz)} - {quiz.question_count} questions
               </option>
@@ -157,7 +157,7 @@ export const ClassQuizList = ({
       {error && <p className="text-sm font-semibold text-rose-500">{error}</p>}
 
       <div className="mt-4 space-y-3">
-        {assignedQuizzes.map((quiz) => (
+        {assignedQuizzes.map((quiz: any) => (
           <div
             key={quiz.assignment_id}
             className="flex flex-col gap-3 rounded-2xl border border-purple-100 bg-white/90 p-4 shadow-[0_16px_40px_rgba(168,85,247,0.15)] md:flex-row md:items-center md:justify-between"

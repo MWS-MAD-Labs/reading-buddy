@@ -75,10 +75,10 @@ export const LoginForm = ({ broadcast }: LoginFormProps) => {
 
     try {
       // Use NextAuth for Google OAuth
-      const result = await signIn("google", {
+      const result = (await signIn("google", {
         callbackUrl: "/dashboard",
         redirect: true,
-      });
+      })) as any;
 
       if (result?.error) {
         setError(result.error);

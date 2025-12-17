@@ -210,9 +210,7 @@ export default async function DashboardHomePage() {
   // Fetch stats based on role
   // Admin sees all stats from all roles
   const adminStatsResult =
-    role === "ADMIN" && user && user.userId
-      ? await getSystemStats(user.userId)
-      : null;
+    role === "ADMIN" && user && user.userId ? await getSystemStats() : null;
   const librarianStatsResult =
     (role === "LIBRARIAN" || role === "ADMIN") && user && user.userId
       ? await getLibrarianStats(user.userId)
@@ -427,7 +425,7 @@ export default async function DashboardHomePage() {
       )}
 
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {links.map((card) => (
+        {links.map((card: any) => (
           <Link
             key={`${card.href}-${card.title}`}
             href={card.href}

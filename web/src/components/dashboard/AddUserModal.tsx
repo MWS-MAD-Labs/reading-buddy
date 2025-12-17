@@ -131,7 +131,7 @@ export const AddUserModal = ({ onClose, onSuccess, onError }: AddUserModalProps)
               onChange={(e) => setRole(e.target.value as UserRole)}
               className="w-full rounded-2xl border-2 border-violet-200 bg-white px-4 py-3 text-sm font-bold text-violet-900 outline-none transition-all focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
             >
-              {ROLES.map((r) => (
+              {ROLES.map((r: any) => (
                 <option key={r} value={r}>
                   {r}
                 </option>
@@ -152,7 +152,7 @@ export const AddUserModal = ({ onClose, onSuccess, onError }: AddUserModalProps)
                 className="w-full rounded-2xl border-2 border-violet-200 bg-white px-4 py-3 text-sm font-bold text-violet-900 outline-none transition-all focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
               >
                 <option value="">Not Set</option>
-                {ACCESS_LEVEL_OPTIONS.map((option) => (
+                {ACCESS_LEVEL_OPTIONS.map((option: any) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

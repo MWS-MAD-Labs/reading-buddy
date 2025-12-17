@@ -75,10 +75,10 @@ export const LoginFormNextAuth = ({ broadcast }: LoginFormProps) => {
 
     try {
       // Use NextAuth for Google OAuth
-      const result = await signIn("google", {
+      const result = (await signIn("google", {
         callbackUrl: "/dashboard",
         redirect: true,
-      });
+      })) as any;
 
       if (result?.error) {
         setError(result.error);
@@ -98,31 +98,38 @@ export const LoginFormNextAuth = ({ broadcast }: LoginFormProps) => {
         <Card
           className={cn(
             "relative overflow-hidden border-2 transition-all duration-200 hover:shadow-md",
-            toneStyles[broadcast.tone].border
+            toneStyles[broadcast.tone].border,
           )}
         >
           <div
             className={cn(
               "absolute inset-0 opacity-50",
-              toneStyles[broadcast.tone].bg
+              toneStyles[broadcast.tone].bg,
             )}
           />
           <CardContent className="relative p-6">
             <div className="mb-3 flex items-center justify-between">
-              <CardTitle className={cn("text-lg", toneStyles[broadcast.tone].text)}>
+              <CardTitle
+                className={cn("text-lg", toneStyles[broadcast.tone].text)}
+              >
                 {broadcast.title}
               </CardTitle>
               <Badge
                 variant="outline"
                 className={cn(
                   "ml-2 border-current",
-                  toneStyles[broadcast.tone].text
+                  toneStyles[broadcast.tone].text,
                 )}
               >
                 {broadcast.tone}
               </Badge>
             </div>
-            <p className={cn("mb-3 text-sm leading-relaxed", toneStyles[broadcast.tone].text)}>
+            <p
+              className={cn(
+                "mb-3 text-sm leading-relaxed",
+                toneStyles[broadcast.tone].text,
+              )}
+            >
               {broadcast.body}
             </p>
             {broadcast.linkLabel && broadcast.linkUrl && (
@@ -130,7 +137,7 @@ export const LoginFormNextAuth = ({ broadcast }: LoginFormProps) => {
                 href={broadcast.linkUrl}
                 className={cn(
                   "inline-flex items-center text-sm font-medium underline-offset-4 hover:underline",
-                  toneStyles[broadcast.tone].text
+                  toneStyles[broadcast.tone].text,
                 )}
               >
                 {broadcast.linkLabel}
@@ -164,7 +171,7 @@ export const LoginFormNextAuth = ({ broadcast }: LoginFormProps) => {
           </div>
 
           {error && (
-            <Alert variant="destructive" className="mb-4">
+            <Alert variant="error" className="mb-4">
               {error}
             </Alert>
           )}

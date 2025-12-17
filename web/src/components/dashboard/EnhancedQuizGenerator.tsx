@@ -80,7 +80,7 @@ export const EnhancedQuizGenerator = ({ books }: EnhancedQuizGeneratorProps) => 
         `Auto-Checkpoint Suggestion for "${result.bookTitle}":\n\n` +
         `Total Pages: ${result.totalPages}\n` +
         `Suggested Checkpoints: ${result.suggestedCheckpoints.length}\n\n` +
-        result.suggestedCheckpoints.map((c) => `• Page ${c.page}: ${c.preview}`).join('\n') +
+        result.suggestedCheckpoints.map((c: any) => `• Page ${c.page}: ${c.preview}`).join('\n') +
         `\n\n${result.hasExtractedText ? '✅ Text extracted - ready to generate!' : '⚠️ Extract text first for better quizzes'}`
       );
 
@@ -121,7 +121,7 @@ export const EnhancedQuizGenerator = ({ books }: EnhancedQuizGeneratorProps) => 
               }
             }}
           >
-            {books.map((book) => (
+            {books.map((book: any) => (
               <option key={book.id} value={book.id}>
                 {book.title} {book.text_extracted_at ? '✅' : '⚠️'}
               </option>

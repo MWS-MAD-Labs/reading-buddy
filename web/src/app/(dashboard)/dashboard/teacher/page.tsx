@@ -31,7 +31,7 @@ export default async function TeacherDashboardPage() {
   );
 
   const classrooms = await Promise.all(
-    classroomsResult.rows.map(async (c) => {
+    classroomsResult.rows.map(async (c: any) => {
       const countResult = await queryWithContext(
         userId,
         `SELECT COUNT(*) as count FROM class_students WHERE class_id = $1`,
@@ -53,7 +53,7 @@ export default async function TeacherDashboardPage() {
     [],
   );
 
-  const allTeachers = allTeachersResult.rows.map((t) => ({
+  const allTeachers = allTeachersResult.rows.map((t: any) => ({
     id: t.id,
     full_name: t.full_name ?? "",
   }));

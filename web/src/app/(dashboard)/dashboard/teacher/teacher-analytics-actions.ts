@@ -70,7 +70,7 @@ export async function getTeacherClassAnalytics(
 
   // Get analytics for each class
   const analytics = await Promise.all(
-    classesResult.rows.map(async (classroom) => {
+    classesResult.rows.map(async (classroom: any) => {
       // Get analytics using a single complex query
       const analyticsResult = await queryWithContext(
         userId,
@@ -165,7 +165,7 @@ export async function getClassStudentPerformance(
     [classId],
   );
 
-  return result.rows.map((row) => ({
+  return result.rows.map((row: any) => ({
     studentId: row.student_id,
     studentName: row.student_name ?? "Unknown Student",
     xp: parseInt(row.xp || "0"),
@@ -246,7 +246,7 @@ export async function getTeacherBookAssignments(
     [teacherId],
   );
 
-  return result.rows.map((row) => ({
+  return result.rows.map((row: any) => ({
     bookId: row.book_id,
     bookTitle: row.book_title,
     bookAuthor: row.book_author ?? "Unknown",
@@ -309,7 +309,7 @@ export async function getTeacherQuizAssignments(
     [teacherId],
   );
 
-  return result.rows.map((row) => ({
+  return result.rows.map((row: any) => ({
     quizId: row.quiz_id,
     quizTitle: row.quiz_title ?? "Quiz",
     bookTitle: row.book_title ?? "Unknown Book",

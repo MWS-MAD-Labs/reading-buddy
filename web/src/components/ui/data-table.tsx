@@ -102,7 +102,7 @@ export function DataTable<TData, TValue>({
               <tr className="border-b-4 border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <React.Fragment key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
+                    {headerGroup.headers.map((header: any) => (
                       <th
                         key={header.id}
                         className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-indigo-600"
@@ -142,7 +142,7 @@ export function DataTable<TData, TValue>({
             </thead>
             <tbody>
               {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
+                table.getRowModel().rows.map((row: any) => (
                   <tr
                     key={row.id}
                     className={cn(
@@ -151,7 +151,7 @@ export function DataTable<TData, TValue>({
                     )}
                     onClick={() => onRowClick?.(row.original)}
                   >
-                    {row.getVisibleCells().map((cell) => (
+                    {row.getVisibleCells().map((cell: any) => (
                       <td
                         key={cell.id}
                         className="px-6 py-4 text-sm font-semibold text-indigo-900"

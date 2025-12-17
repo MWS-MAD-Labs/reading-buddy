@@ -147,7 +147,7 @@ export const getPublishedQuizzesByBook = async (bookId: number) => {
     [bookId],
   );
 
-  return result.rows.map((quiz) => ({
+  return result.rows.map((quiz: any) => ({
     id: quiz.id,
     quiz_type: quiz.quiz_type,
     status: "published",
@@ -282,7 +282,7 @@ export const getClassQuizAssignments = async (classId: number) => {
     [classId],
   );
 
-  return result.rows.map((row) => ({
+  return result.rows.map((row: any) => ({
     assignment_id: row.assignment_id,
     class_id: row.class_id,
     quiz_id: row.quiz_id,
