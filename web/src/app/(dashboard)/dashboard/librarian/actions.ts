@@ -134,69 +134,76 @@ export const saveBookMetadata = async (input: {
   fileFormat?: "pdf" | "epub" | "mobi" | "azw" | "azw3";
   fileSizeBytes?: number;
 }) => {
-  await ensureLibrarianOrAdmin();
+  const user = await ensureLibrarianOrAdmin();
 
   if (!input.accessLevels?.length) {
     throw new Error("At least one access level is required.");
   }
 
-  const supabaseAdmin = getSupabaseAdminClient();
-
-  const { data: insertedBook, error } = await supabaseAdmin
-    .from("books")
-    .insert({
-      isbn: input.isbn,
-      title: input.title,
-      author: input.author,
-      publisher: input.publisher,
-      publication_year: input.publicationYear,
-      genre: input.genre,
-      language: input.language,
-      description: input.description,
-      page_count: input.pageCount,
-      pdf_url: input.pdfUrl,
-      cover_url: input.coverUrl,
-      file_format: input.fileFormat || "pdf",
-      original_file_url: input.pdfUrl,
-      file_size_bytes: input.fileSizeBytes,
-    })
-    .select("id")
-    .single();
-
-  if (error || !insertedBook) {
-    console.error("Book insert error:", error);
-    throw error ?? new Error("Unable to insert book.");
-  }
-
-  const { error: accessInsertError } = await supabaseAdmin
-    .from("book_access")
-    .insert(
-      input.accessLevels.map((level) => ({
-        book_id: insertedBook.id,
-        access_level: level,
-      })),
+  try {
+    // Insert book and return id
+    const bookResult = await queryWithContext(
+      user.userId,
+      `INSERT INTO books (
+        isbn, title, author, publisher, publication_year,
+        genre, language, description, page_count, pdf_url, cover_url,
+        file_format, original_file_url, file_size_bytes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING id`,
+      [
+        input.isbn,
+        input.title,
+        input.author,
+        input.publisher,
+        input.publicationYear ?? null,
+        input.genre,
+        input.language,
+        input.description ?? null,
+        input.pageCount,
+        input.pdfUrl,
+        input.coverUrl,
+        input.fileFormat || "pdf",
+        input.pdfUrl,
+        input.fileSizeBytes ?? null,
+      ],
     );
 
-  if (accessInsertError) {
-    console.error("Book access insert error:", accessInsertError);
-    throw accessInsertError;
+    if (bookResult.rows.length === 0) {
+      throw new Error("Unable to insert book.");
+    }
+
+    const insertedBook = bookResult.rows[0];
+
+    // Insert book access levels
+    const accessValues = input.accessLevels
+      .map((level, idx) => `($1, $${idx + 2})`)
+      .join(", ");
+
+    await queryWithContext(
+      user.userId,
+      `INSERT INTO book_access (book_id, access_level) VALUES ${accessValues}`,
+      [insertedBook.id, ...input.accessLevels],
+    );
+
+    // Queue render job
+    try {
+      await queryWithContext(
+        user.userId,
+        `INSERT INTO book_render_jobs (book_id, status) VALUES ($1, $2)`,
+        [insertedBook.id, "pending"],
+      );
+    } catch (jobError) {
+      console.error("Unable to queue render job:", jobError);
+    }
+
+    revalidatePath("/dashboard/library");
+    revalidatePath("/dashboard/librarian");
+
+    return { bookId: insertedBook.id };
+  } catch (error) {
+    console.error("Book save error:", error);
+    throw error;
   }
-
-  const { error: jobInsertError } = await supabaseAdmin
-    .from("book_render_jobs")
-    .insert({
-      book_id: insertedBook.id,
-      status: "pending",
-    });
-
-  if (jobInsertError) {
-    console.error("Unable to queue render job:", jobInsertError.message);
-  }
-
-  revalidatePath("/dashboard/library");
-  revalidatePath("/dashboard/librarian");
-
-  return { bookId: insertedBook.id };
 };
 
 export const updateBookMetadata = async (input: {
