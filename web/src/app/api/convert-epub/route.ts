@@ -4,7 +4,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getMinioClient, getMinioBucketName } from "@/lib/minio";
 import {
   getObjectKeyFromPublicUrl,
@@ -17,6 +16,7 @@ import { promisify } from "util";
 import { tmpdir } from "os";
 import { join } from "path";
 import { randomUUID } from "crypto";
+import { Pool } from "pg";
 
 const execAsync = promisify(exec);
 
@@ -101,8 +101,8 @@ async function convertEpubHandler(
     } catch (error) {
       console.error("Calibre conversion error:", error);
       // Cleanup temp files
-      await unlink(epubPath).catch(() => {});
-      await unlink(pdfPath).catch(() => {});
+      await unlink(epubPath).catch(() => { });
+      await unlink(pdfPath).catch(() => { });
 
       return NextResponse.json(
         {
@@ -135,17 +135,18 @@ async function convertEpubHandler(
     const pdfPublicUrl = buildPublicObjectUrl(pdfObjectKey);
 
     // 6. Update database with converted PDF URL
-    const supabase = getSupabaseAdminClient();
-    const { error: updateError } = await supabase
-      .from("books")
-      .update({
-        pdf_url: pdfPublicUrl,
-      })
-      .eq("id", bookId);
-
-    if (updateError) {
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    try {
+      await pool.query(
+        'UPDATE books SET pdf_url = $1 WHERE id = $2',
+        [pdfPublicUrl, bookId]
+      );
+      console.log(`Updated book ${bookId} with pdf_url: ${pdfPublicUrl}`);
+    } catch (updateError) {
       console.error("Error updating book:", updateError);
       // Don't fail the request, PDF is already uploaded
+    } finally {
+      await pool.end();
     }
 
     // 7. Cleanup temp files

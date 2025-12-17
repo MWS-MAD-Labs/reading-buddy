@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition, type ChangeEvent } from "react";
+import { useMemo, useState, useTransition, useEffect, useRef, type ChangeEvent } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import {
@@ -151,7 +152,56 @@ export const BookManager = ({
   const [isDeleting, startDeleteTransition] = useTransition();
   const [renderingBookId, setRenderingBookId] = useState<number | null>(null);
   const [extractingBookId, setExtractingBookId] = useState<number | null>(null);
-  const [actionMenuBookId, setActionMenuBookId] = useState<number | null>(null);
+  const [actionMenu, setActionMenu] = useState<{
+    id: number;
+    anchor: HTMLElement;
+  } | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Calculate menu position when actionMenu changes
+  useEffect(() => {
+    if (!actionMenu?.anchor) {
+      setMenuPosition(null);
+      return;
+    }
+
+    // Use requestAnimationFrame to ensure layout is complete
+    const rafId = requestAnimationFrame(() => {
+      const rect = actionMenu.anchor.getBoundingClientRect();
+      const top = rect.bottom + 4;
+      const left = rect.right - 176;
+
+      // Ensure it doesn't go off-screen
+      const finalTop = Math.min(top, window.innerHeight - 300);
+      const finalLeft = Math.max(16, left);
+
+      setMenuPosition({ top: finalTop, left: finalLeft });
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [actionMenu]);
+
+  // Click outside handler
+  useEffect(() => {
+    if (!actionMenu) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      // Ignore clicks on the menu itself
+      if (menuRef.current?.contains(target)) return;
+
+      // Ignore clicks on any action button (they handle their own state)
+      if (target.closest('[data-action-button]')) return;
+
+      setActionMenu(null);
+    };
+
+    // Use mousedown for faster response
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [actionMenu]);
 
   const sortedBooks = useMemo(
     () =>
@@ -556,7 +606,7 @@ export const BookManager = ({
                                 className={clsx(
                                   "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
                                   badge?.color ??
-                                    "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                  "bg-indigo-100 text-indigo-600 border-indigo-300",
                                 )}
                               >
                                 {badge?.label ?? level.slice(0, 2)}
@@ -691,7 +741,7 @@ export const BookManager = ({
                                     className={clsx(
                                       "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
                                       badge?.color ??
-                                        "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                      "bg-indigo-100 text-indigo-600 border-indigo-300",
                                     )}
                                   >
                                     {badge?.label ?? level.slice(0, 2)}
@@ -707,97 +757,23 @@ export const BookManager = ({
                           <div className="flex items-center justify-end">
                             <button
                               type="button"
-                              onClick={() =>
-                                setActionMenuBookId((prev) =>
-                                  prev === book.id ? null : book.id,
+                              data-action-button
+                              onClick={(e) =>
+                                setActionMenu((prev) =>
+                                  prev?.id === book.id
+                                    ? null
+                                    : { id: book.id, anchor: e.currentTarget },
                                 )
                               }
                               className="h-10 w-10 rounded-full border border-indigo-200 bg-white/80 text-lg font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50"
                               aria-haspopup="true"
-                              aria-expanded={actionMenuBookId === book.id}
+                              aria-expanded={actionMenu?.id === book.id}
                               aria-label="Open actions"
                             >
                               ⋯
                             </button>
                           </div>
-                          {actionMenuBookId === book.id ? (
-                            <div className="absolute right-2 top-1/2 z-10 w-44 -translate-y-1/2 rounded-2xl border border-indigo-100 bg-white p-2 text-sm font-semibold text-indigo-800 shadow-lg transition-transform duration-150 ease-out animate-[actionPop_160ms_ease-out_forwards]">
-                              <div className="flex flex-col gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActionMenuBookId(null);
-                                    setQuizManagementBook(book);
-                                  }}
-                                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
-                                >
-                                  <span aria-hidden>📝</span>
-                                  <span>Quizzes</span>
-                                </button>
-                                {!book.pageImagesCount && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActionMenuBookId(null);
-                                      void handleRender(book);
-                                    }}
-                                    disabled={renderingBookId === book.id}
-                                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
-                                  >
-                                    <span aria-hidden>🎨</span>
-                                    <span>
-                                      {renderingBookId === book.id
-                                        ? "Rendering…"
-                                        : "Render"}
-                                    </span>
-                                  </button>
-                                )}
-                                {!book.textExtractedAt && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActionMenuBookId(null);
-                                      void handleExtractText(book);
-                                    }}
-                                    disabled={extractingBookId === book.id}
-                                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
-                                  >
-                                    <span aria-hidden>🧾</span>
-                                    <span>
-                                      {extractingBookId === book.id
-                                        ? "Extracting…"
-                                        : "Extract text"}
-                                    </span>
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActionMenuBookId(null);
-                                    handleEdit(book);
-                                  }}
-                                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
-                                >
-                                  <span aria-hidden>✏️</span>
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActionMenuBookId(null);
-                                    handleDelete(book);
-                                  }}
-                                  disabled={
-                                    isDeleting && deletePendingId === book.id
-                                  }
-                                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
-                                >
-                                  <span aria-hidden>🗑️</span>
-                                  <span>Delete</span>
-                                </button>
-                              </div>
-                            </div>
-                          ) : null}
+                          {/* Inline dropdown removed in favor of Portal */}
                         </td>
                       </tr>
                     ))}
@@ -808,6 +784,97 @@ export const BookManager = ({
           )}
         </CardContent>
       </Card>
+
+      {/* Action Menu Portal */}
+      {actionMenu &&
+        menuPosition &&
+        (() => {
+          const book = books.find((b) => b.id === actionMenu.id);
+          if (!book) return null;
+
+          return createPortal(
+            <div
+              ref={menuRef}
+              className="fixed z-50 w-44 rounded-2xl border border-indigo-100 bg-white p-2 text-sm font-semibold text-indigo-800 shadow-xl animate-in fade-in zoom-in-95 duration-100"
+              style={{
+                top: menuPosition.top,
+                left: menuPosition.left,
+              }}
+            >
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActionMenu(null);
+                    setQuizManagementBook(book);
+                  }}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
+                >
+                  <span aria-hidden>📝</span>
+                  <span>Quizzes</span>
+                </button>
+                {!book.pageImagesCount && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionMenu(null);
+                      void handleRender(book);
+                    }}
+                    disabled={renderingBookId === book.id}
+                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
+                  >
+                    <span aria-hidden>🎨</span>
+                    <span>
+                      {renderingBookId === book.id ? "Rendering…" : "Render"}
+                    </span>
+                  </button>
+                )}
+                {!book.textExtractedAt && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionMenu(null);
+                      void handleExtractText(book);
+                    }}
+                    disabled={extractingBookId === book.id}
+                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
+                  >
+                    <span aria-hidden>🧾</span>
+                    <span>
+                      {extractingBookId === book.id
+                        ? "Extracting…"
+                        : "Extract text"}
+                    </span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActionMenu(null);
+                    handleEdit(book);
+                  }}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
+                >
+                  <span aria-hidden>✏️</span>
+                  <span>Edit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActionMenu(null);
+                    handleDelete(book);
+                  }}
+                  disabled={isDeleting && deletePendingId === book.id}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                >
+                  <span aria-hidden>🗑️</span>
+                  <span>Delete</span>
+                </button>
+              </div>
+            </div>,
+            document.body,
+          );
+        })()}
 
       {/* Quiz Management Modal */}
       {quizManagementBook && (
