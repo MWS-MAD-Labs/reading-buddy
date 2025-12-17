@@ -1313,20 +1313,22 @@ export const extractBookText = async (bookId: number) => {
 export const convertEpubToImages = async (bookId: number) => {
   "use server";
 
-  await ensureLibrarianOrAdmin();
-
-  const supabase = getSupabaseAdminClient();
+  const user = await ensureLibrarianOrAdmin();
 
   // Get book details
-  const { data: book, error: bookError } = await supabase
-    .from("books")
-    .select("id, title, file_format, original_file_url, pdf_url")
-    .eq("id", bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT id, title, file_format, original_file_url, pdf_url
+     FROM books
+     WHERE id = $1`,
+    [bookId],
+  );
 
-  if (bookError || !book) {
+  if (bookResult.rows.length === 0) {
     return { success: false, message: "Book not found" };
   }
+
+  const book = bookResult.rows[0];
 
   if (book.file_format !== "epub") {
     return { success: false, message: "Book is not an EPUB file" };
