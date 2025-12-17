@@ -214,67 +214,85 @@ export const updateBookMetadata = async (input: {
   coverUrl?: string;
   pageCount?: number | null;
 }) => {
-  await ensureLibrarianOrAdmin();
-
-  const supabaseAdmin = getSupabaseAdminClient();
-
-  const updateData: Record<string, unknown> = {
-    isbn: input.isbn,
-    title: input.title,
-    author: input.author,
-    publisher: input.publisher,
-    publication_year: input.publicationYear,
-    genre: input.genre,
-    language: input.language,
-    description: input.description ?? null,
-  };
-
-  // Add optional fields if provided
-  if (input.pdfUrl !== undefined) {
-    updateData.pdf_url = input.pdfUrl;
-  }
-  if (input.coverUrl !== undefined) {
-    updateData.cover_url = input.coverUrl;
-  }
-  if (input.pageCount !== undefined) {
-    updateData.page_count = input.pageCount;
-  }
-
-  const { error } = await supabaseAdmin
-    .from("books")
-    .update(updateData)
-    .eq("id", input.id);
-
-  if (error) {
-    console.error("Book update error:", error);
-    throw error;
-  }
+  const user = await ensureLibrarianOrAdmin();
 
   if (!input.accessLevels?.length) {
     throw new Error("At least one access level is required.");
   }
 
-  const { error: deleteAccessError } = await supabaseAdmin
-    .from("book_access")
-    .delete()
-    .eq("book_id", input.id);
-  if (deleteAccessError) {
-    console.error("Book access delete error:", deleteAccessError);
-    throw deleteAccessError;
+  // Build dynamic UPDATE query
+  const setParts: string[] = [
+    "isbn = $2",
+    "title = $3",
+    "author = $4",
+    "publisher = $5",
+    "publication_year = $6",
+    "genre = $7",
+    "language = $8",
+    "description = $9",
+    "updated_at = NOW()",
+  ];
+
+  const params: any[] = [
+    input.id,
+    input.isbn,
+    input.title,
+    input.author,
+    input.publisher,
+    input.publicationYear,
+    input.genre,
+    input.language,
+    input.description ?? null,
+  ];
+
+  let paramIndex = params.length + 1;
+
+  if (input.pdfUrl !== undefined) {
+    setParts.push(`pdf_url = $${paramIndex}`);
+    params.push(input.pdfUrl);
+    paramIndex++;
+  }
+  if (input.coverUrl !== undefined) {
+    setParts.push(`cover_url = $${paramIndex}`);
+    params.push(input.coverUrl);
+    paramIndex++;
+  }
+  if (input.pageCount !== undefined) {
+    setParts.push(`page_count = $${paramIndex}`);
+    params.push(input.pageCount);
+    paramIndex++;
   }
 
-  const { error: insertAccessError } = await supabaseAdmin
-    .from("book_access")
-    .insert(
-      input.accessLevels.map((level) => ({
-        book_id: input.id,
-        access_level: level,
-      })),
+  try {
+    // Update book metadata
+    await queryWithContext(
+      user.userId,
+      `UPDATE books SET ${setParts.join(", ")} WHERE id = $1`,
+      params,
     );
 
-  if (insertAccessError) {
-    console.error("Book access insert error:", insertAccessError);
-    throw insertAccessError;
+    // Delete existing access levels
+    await queryWithContext(
+      user.userId,
+      `DELETE FROM book_access WHERE book_id = $1`,
+      [input.id],
+    );
+
+    // Insert new access levels
+    if (input.accessLevels.length > 0) {
+      const accessValues = input.accessLevels
+        .map((level, idx) => `($1, $${idx + 2})`)
+        .join(", ");
+
+      await queryWithContext(
+        user.userId,
+        `INSERT INTO book_access (book_id, access_level) VALUES ${accessValues}`,
+        [input.id, ...input.accessLevels],
+      );
+    }
+  } catch (error) {
+    console.error("Book update error:", error);
+    throw error;
   }
 
   revalidatePath("/dashboard/library");
