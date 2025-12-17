@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useState, useTransition, type ChangeEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type ChangeEvent,
+} from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import {
@@ -152,6 +159,47 @@ export const BookManager = ({
   const [renderingBookId, setRenderingBookId] = useState<number | null>(null);
   const [extractingBookId, setExtractingBookId] = useState<number | null>(null);
   const [actionMenuBookId, setActionMenuBookId] = useState<number | null>(null);
+  const [actionMenuPosition, setActionMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const [menuMounted, setMenuMounted] = useState(false);
+
+  useEffect(() => {
+    setMenuMounted(true);
+    return () => setMenuMounted(false);
+  }, []);
+
+  useEffect(() => {
+    if (actionMenuBookId === null) {
+      setActionMenuPosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const trigger = document.querySelector<HTMLButtonElement>(
+        `[data-action-menu-trigger="${actionMenuBookId}"]`,
+      );
+      if (!trigger) {
+        setActionMenuBookId(null);
+        return;
+      }
+
+      const rect = trigger.getBoundingClientRect();
+      setActionMenuPosition({
+        top: rect.top + rect.height / 2,
+        left: rect.right,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [actionMenuBookId]);
 
   const sortedBooks = useMemo(
     () =>
@@ -713,6 +761,7 @@ export const BookManager = ({
                                 )
                               }
                               className="h-10 w-10 rounded-full border border-indigo-200 bg-white/80 text-lg font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+                              data-action-menu-trigger={book.id}
                               aria-haspopup="true"
                               aria-expanded={actionMenuBookId === book.id}
                               aria-label="Open actions"
@@ -720,84 +769,96 @@ export const BookManager = ({
                               ⋯
                             </button>
                           </div>
-                          {actionMenuBookId === book.id ? (
-                            <div className="absolute right-2 top-1/2 z-10 w-44 -translate-y-1/2 rounded-2xl border border-indigo-100 bg-white p-2 text-sm font-semibold text-indigo-800 shadow-lg transition-transform duration-150 ease-out animate-[actionPop_160ms_ease-out_forwards]">
-                              <div className="flex flex-col gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActionMenuBookId(null);
-                                    setQuizManagementBook(book);
+                          {menuMounted &&
+                          actionMenuBookId === book.id &&
+                          actionMenuPosition
+                            ? createPortal(
+                                <div
+                                  className="fixed z-50 w-44 rounded-2xl border border-indigo-100 bg-white p-2 text-sm font-semibold text-indigo-800 shadow-lg transition-transform duration-150 ease-out animate-[actionPop_160ms_ease-out_forwards]"
+                                  style={{
+                                    top: actionMenuPosition.top,
+                                    left: actionMenuPosition.left,
                                   }}
-                                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
                                 >
-                                  <span aria-hidden>📝</span>
-                                  <span>Quizzes</span>
-                                </button>
-                                {!book.pageImagesCount && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActionMenuBookId(null);
-                                      void handleRender(book);
-                                    }}
-                                    disabled={renderingBookId === book.id}
-                                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
-                                  >
-                                    <span aria-hidden>🎨</span>
-                                    <span>
-                                      {renderingBookId === book.id
-                                        ? "Rendering…"
-                                        : "Render"}
-                                    </span>
-                                  </button>
-                                )}
-                                {!book.textExtractedAt && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActionMenuBookId(null);
-                                      void handleExtractText(book);
-                                    }}
-                                    disabled={extractingBookId === book.id}
-                                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
-                                  >
-                                    <span aria-hidden>🧾</span>
-                                    <span>
-                                      {extractingBookId === book.id
-                                        ? "Extracting…"
-                                        : "Extract text"}
-                                    </span>
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActionMenuBookId(null);
-                                    handleEdit(book);
-                                  }}
-                                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
-                                >
-                                  <span aria-hidden>✏️</span>
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActionMenuBookId(null);
-                                    handleDelete(book);
-                                  }}
-                                  disabled={
-                                    isDeleting && deletePendingId === book.id
-                                  }
-                                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
-                                >
-                                  <span aria-hidden>🗑️</span>
-                                  <span>Delete</span>
-                                </button>
-                              </div>
-                            </div>
-                          ) : null}
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActionMenuBookId(null);
+                                        setQuizManagementBook(book);
+                                      }}
+                                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
+                                    >
+                                      <span aria-hidden>📝</span>
+                                      <span>Quizzes</span>
+                                    </button>
+                                    {!book.pageImagesCount && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActionMenuBookId(null);
+                                          void handleRender(book);
+                                        }}
+                                        disabled={renderingBookId === book.id}
+                                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
+                                      >
+                                        <span aria-hidden>🎨</span>
+                                        <span>
+                                          {renderingBookId === book.id
+                                            ? "Rendering…"
+                                            : "Render"}
+                                        </span>
+                                      </button>
+                                    )}
+                                    {!book.textExtractedAt && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActionMenuBookId(null);
+                                          void handleExtractText(book);
+                                        }}
+                                        disabled={extractingBookId === book.id}
+                                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
+                                      >
+                                        <span aria-hidden>🧾</span>
+                                        <span>
+                                          {extractingBookId === book.id
+                                            ? "Extracting…"
+                                            : "Extract text"}
+                                        </span>
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActionMenuBookId(null);
+                                        handleEdit(book);
+                                      }}
+                                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
+                                    >
+                                      <span aria-hidden>✏️</span>
+                                      <span>Edit</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActionMenuBookId(null);
+                                        handleDelete(book);
+                                      }}
+                                      disabled={
+                                        isDeleting &&
+                                        deletePendingId === book.id
+                                      }
+                                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                                    >
+                                      <span aria-hidden>🗑️</span>
+                                      <span>Delete</span>
+                                    </button>
+                                  </div>
+                                </div>,
+                                document.body,
+                              )
+                            : null}
                         </td>
                       </tr>
                     ))}
@@ -842,11 +903,11 @@ export const BookManager = ({
         @keyframes actionPop {
           from {
             opacity: 0;
-            transform: translateY(-50%) scale(0.96);
+            transform: translate(-100%, -50%) scale(0.96);
           }
           to {
             opacity: 1;
-            transform: translateY(-50%) scale(1);
+            transform: translate(-100%, -50%) scale(1);
           }
         }
       `}</style>
