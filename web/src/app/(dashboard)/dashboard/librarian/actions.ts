@@ -3,8 +3,8 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getMinioBucketName, getMinioClient } from "@/lib/minio";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/server";
+import { queryWithContext } from "@/lib/db";
 import {
   buildPublicObjectUrl,
   getObjectKeyFromPublicUrl,
@@ -18,72 +18,65 @@ import { checkRateLimit } from "@/lib/middleware/withRateLimit";
 import { AIService } from "@/lib/ai";
 
 export const checkCurrentUserRole = async () => {
-  const supabase = await createSupabaseServerClient();
+  const user = await getCurrentUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!user || !user.userId) {
     return { error: "Not signed in" };
   }
 
-  // Query without .single() first to check for duplicates
-  const { data: profiles, error: profileError } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id);
+  try {
+    // Query profiles to check for duplicates
+    const result = await queryWithContext(
+      user.userId,
+      `SELECT role, full_name FROM profiles WHERE user_id = $1`,
+      [user.userId],
+    );
 
-  const hasDuplicates = profiles && profiles.length > 1;
-  const profile = profiles?.[0]; // Take the first one if multiple exist
+    const profiles = result.rows;
+    const hasDuplicates = profiles && profiles.length > 1;
+    const profile = profiles?.[0]; // Take the first one if multiple exist
 
-  return {
-    userId: user.id,
-    email: user.email,
-    profile,
-    profileError: profileError ? profileError.message : null,
-    hasDuplicates,
-    profileCount: profiles?.length || 0,
-  };
+    return {
+      userId: user.userId,
+      email: user.email,
+      profile,
+      profileError: null,
+      hasDuplicates,
+      profileCount: profiles?.length || 0,
+    };
+  } catch (error) {
+    return {
+      userId: user.userId,
+      email: user.email,
+      profile: null,
+      profileError: error instanceof Error ? error.message : "Unknown error",
+      hasDuplicates: false,
+      profileCount: 0,
+    };
+  }
 };
 
 const ensureLibrarianOrAdmin = async () => {
-  // Get user from server client (this won't modify cookies in server actions)
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId || !user.profileId) {
     throw new Error("You must be signed in to manage books.");
   }
 
-  // Use admin client to check role to avoid RLS issues
-  const adminClient = getSupabaseAdminClient();
-  const { data: profiles, error: profileError } = await adminClient
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id);
+  // Query profile to check role
+  const result = await queryWithContext(
+    user.userId,
+    `SELECT role FROM profiles WHERE id = $1`,
+    [user.profileId],
+  );
 
-  if (profileError) {
-    throw new Error(
-      `Profile query failed: ${profileError.message}. Please contact admin.`,
-    );
-  }
-
-  if (!profiles || profiles.length === 0) {
+  if (result.rows.length === 0) {
     throw new Error(
       "No profile found for your account. Please contact admin to set up your profile.",
     );
   }
 
-  if (profiles.length > 1) {
-    console.warn(
-      `Warning: User ${user.id} has ${profiles.length} duplicate profiles. Using the first one.`,
-    );
-  }
-
-  const profile = profiles[0];
+  const profile = result.rows[0];
 
   if (!profile || !["LIBRARIAN", "ADMIN"].includes(profile.role)) {
     throw new Error(
@@ -389,9 +382,7 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
   const pdfUrl = book.original_file_url || book.pdf_url || undefined;
 
   if (!pages.length && !pdfUrl) {
-    throw new Error(
-      "No extracted text or PDF available for quiz generation.",
-    );
+    throw new Error("No extracted text or PDF available for quiz generation.");
   }
 
   const aiResult = await AIService.generateQuiz({
@@ -628,9 +619,8 @@ export const autoGenerateCheckpoints = async (input: {
   }
 
   // Import helper functions
-  const { suggestCheckpoints, suggestQuestionCount } = await import(
-    "@/lib/pdf-extractor"
-  );
+  const { suggestCheckpoints, suggestQuestionCount } =
+    await import("@/lib/pdf-extractor");
 
   // Determine checkpoint pages
   const checkpointPages =
@@ -1053,34 +1043,31 @@ export const generateBookDescription = async (input: {
 }) => {
   "use server";
 
-  await ensureLibrarianOrAdmin();
+  const user = await ensureLibrarianOrAdmin();
 
   try {
-    const supabase = getSupabaseAdminClient();
-    let bookRecord:
-      | {
-          title: string | null;
-          pdf_url: string | null;
-          original_file_url: string | null;
-          page_text_content: any;
-          text_extracted_at: string | null;
-        }
-      | null = null;
+    let bookRecord: {
+      title: string | null;
+      pdf_url: string | null;
+      original_file_url: string | null;
+      page_text_content: any;
+      text_extracted_at: string | null;
+    } | null = null;
 
     if (input.bookId) {
-      const { data: book, error } = await supabase
-        .from("books")
-        .select(
-          "title, pdf_url, original_file_url, page_text_content, text_extracted_at",
-        )
-        .eq("id", input.bookId)
-        .single();
+      const result = await queryWithContext(
+        user.userId,
+        `SELECT title, pdf_url, original_file_url, page_text_content, text_extracted_at
+         FROM books
+         WHERE id = $1`,
+        [input.bookId],
+      );
 
-      if (error) {
-        throw new Error(`Book lookup failed: ${error.message}`);
+      if (result.rows.length === 0) {
+        throw new Error(`Book not found with ID: ${input.bookId}`);
       }
 
-      bookRecord = book;
+      bookRecord = result.rows[0];
     }
 
     const textContent =
@@ -1094,8 +1081,9 @@ export const generateBookDescription = async (input: {
     const pagesFromText = textContent?.pages?.map((page) => ({
       pageNumber: page.pageNumber,
       text: page.text,
-      wordCount: (page as { wordCount?: number }).wordCount
-        ?? page.text.split(/\s+/).length,
+      wordCount:
+        (page as { wordCount?: number }).wordCount ??
+        page.text.split(/\s+/).length,
     }));
 
     const previewPage =
