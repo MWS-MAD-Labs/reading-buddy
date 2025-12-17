@@ -64,9 +64,9 @@ export const FlipBookReader = ({
     const handleFullscreenChange = () => {
       const isCurrentlyFullscreen = Boolean(
         document.fullscreenElement ||
-          (document as any).webkitFullscreenElement ||
-          (document as any).mozFullScreenElement ||
-          (document as any).msFullscreenElement,
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement,
       );
       setIsFullscreen(isCurrentlyFullscreen);
     };
@@ -260,12 +260,13 @@ export const FlipBookReader = ({
 
   // Preload nearby pages when current page changes
   useEffect(() => {
-    const preloadRange = 2; // Reduced to 2 pages ahead and behind for faster loading
+    const preloadBehind = 2; // 2 pages down (behind)
+    const preloadAhead = 3; // 3 pages up (ahead)
     const imagesToPreload: string[] = [];
 
     for (
-      let i = Math.max(1, currentPage - preloadRange);
-      i <= Math.min(pageImages.count, currentPage + preloadRange);
+      let i = Math.max(1, currentPage - preloadBehind);
+      i <= Math.min(pageImages.count, currentPage + preloadAhead);
       i++
     ) {
       const imageUrl = `${pageImages.baseUrl}/page-${padPageNumber(i)}.jpg`;
@@ -495,14 +496,20 @@ export const FlipBookReader = ({
             const imageUrl = `${pageImages.baseUrl}/page-${padPageNumber(pageNumber)}.jpg`;
 
             // Calculate distance from current page for lazy loading
-            const distanceFromCurrent = Math.abs(pageNumber - currentPage);
+            const distanceBehind = currentPage - pageNumber;
+            const distanceAhead = pageNumber - currentPage;
 
             // Optimized load strategy for better performance:
-            // - Current page and next/previous 2 pages: load eagerly
-            // - Pages 3-5 away: lazy load
-            // - Pages 5+ away: don't load yet (use placeholder)
-            const shouldLoad = distanceFromCurrent <= 5;
-            const isNearby = distanceFromCurrent <= 2;
+            // - Current page: load eagerly
+            // - 3 pages ahead: load eagerly
+            // - 2 pages behind: load eagerly
+            // - Beyond that: use placeholder
+            const shouldLoad =
+              (distanceAhead >= 0 && distanceAhead <= 3) ||
+              (distanceBehind >= 0 && distanceBehind <= 2);
+            const isNearby =
+              (distanceAhead >= 0 && distanceAhead <= 1) ||
+              (distanceBehind >= 0 && distanceBehind <= 1);
 
             return (
               <article
