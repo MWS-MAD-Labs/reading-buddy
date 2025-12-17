@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/server";
+import { queryWithContext } from "@/lib/db";
 import { BookManagementSection } from "@/components/dashboard/BookManagementSection";
 import type { ManagedBookRecord } from "@/components/dashboard/BookManager";
 import type { AccessLevelValue } from "@/constants/accessLevels";
@@ -23,45 +24,67 @@ export default async function LibrarianPage() {
   // Only ADMIN and LIBRARIAN users can access this page
   await requireRole(["ADMIN", "LIBRARIAN"]);
 
-  const supabase = await createSupabaseServerClient();
-  const { data: bookRows } = await supabase
-    .from("books")
-    .select(
-      "id, isbn, title, author, publisher, publication_year, genre, language, description, page_count, pdf_url, cover_url, created_at, page_images_count, page_images_rendered_at, text_extracted_at, text_extraction_error, text_extraction_attempts, last_extraction_attempt_at, book_access(access_level)",
-    )
-    .order("created_at", { ascending: false });
+  const user = await getCurrentUser();
 
-  const managedBooks: ManagedBookRecord[] =
-    bookRows?.map((book) => ({
-      id: book.id,
-      isbn: book.isbn ?? "",
-      title: book.title ?? "",
-      author: book.author ?? "",
-      publisher: book.publisher ?? "",
-      publicationYear:
-        book.publication_year ??
-        (book.created_at
-          ? new Date(book.created_at).getFullYear()
-          : CURRENT_YEAR),
-      genre: book.genre ?? "",
-      language: book.language ?? "",
-      description: book.description,
-      pageCount: book.page_count ?? null,
-      pdfUrl: book.pdf_url,
-      coverUrl: book.cover_url,
-      createdAt: book.created_at,
-      accessLevels:
-        book.book_access?.map(
-          (entry: { access_level: AccessLevelValue }) =>
-            entry.access_level as AccessLevelValue,
-        ) ?? [],
-      pageImagesCount: book.page_images_count ?? null,
-      pageImagesRenderedAt: book.page_images_rendered_at ?? null,
-      textExtractedAt: book.text_extracted_at ?? null,
-      textExtractionError: book.text_extraction_error ?? null,
-      textExtractionAttempts: book.text_extraction_attempts ?? 0,
-      lastExtractionAttemptAt: book.last_extraction_attempt_at ?? null,
-    })) ?? [];
+  // Get all books with their access levels
+  const booksResult = await queryWithContext(
+    user.userId!,
+    `SELECT
+      b.id, b.isbn, b.title, b.author, b.publisher, b.publication_year,
+      b.genre, b.language, b.description, b.page_count, b.pdf_url, b.cover_url,
+      b.created_at, b.page_images_count, b.page_images_rendered_at,
+      b.text_extracted_at, b.text_extraction_error, b.text_extraction_attempts,
+      b.last_extraction_attempt_at
+    FROM books b
+    ORDER BY b.created_at DESC`,
+    [],
+  );
+
+  // Get access levels for each book
+  const bookIds = booksResult.rows.map((book) => book.id);
+  let accessLevelsMap: Record<number, AccessLevelValue[]> = {};
+
+  if (bookIds.length > 0) {
+    const accessResult = await queryWithContext(
+      user.userId!,
+      `SELECT book_id, access_level FROM book_access WHERE book_id = ANY($1)`,
+      [bookIds],
+    );
+
+    accessResult.rows.forEach((row) => {
+      if (!accessLevelsMap[row.book_id]) {
+        accessLevelsMap[row.book_id] = [];
+      }
+      accessLevelsMap[row.book_id].push(row.access_level as AccessLevelValue);
+    });
+  }
+
+  const managedBooks: ManagedBookRecord[] = booksResult.rows.map((book) => ({
+    id: book.id,
+    isbn: book.isbn ?? "",
+    title: book.title ?? "",
+    author: book.author ?? "",
+    publisher: book.publisher ?? "",
+    publicationYear:
+      book.publication_year ??
+      (book.created_at
+        ? new Date(book.created_at).getFullYear()
+        : CURRENT_YEAR),
+    genre: book.genre ?? "",
+    language: book.language ?? "",
+    description: book.description,
+    pageCount: book.page_count ?? null,
+    pdfUrl: book.pdf_url,
+    coverUrl: book.cover_url,
+    createdAt: book.created_at,
+    accessLevels: accessLevelsMap[book.id] ?? [],
+    pageImagesCount: book.page_images_count ?? null,
+    pageImagesRenderedAt: book.page_images_rendered_at ?? null,
+    textExtractedAt: book.text_extracted_at ?? null,
+    textExtractionError: book.text_extraction_error ?? null,
+    textExtractionAttempts: book.text_extraction_attempts ?? 0,
+    lastExtractionAttemptAt: book.last_extraction_attempt_at ?? null,
+  }));
 
   const genreOptions = Array.from(
     new Set(
