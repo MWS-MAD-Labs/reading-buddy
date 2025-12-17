@@ -606,7 +606,7 @@ export const generateQuizForBookWithContent = async (input: {
     RETURNING id`,
     [
       book.id,
-      user.userId,
+      user.profileId,
       JSON.stringify(quizPayload),
       input.quizType,
       input.pageRangeStart ?? null,

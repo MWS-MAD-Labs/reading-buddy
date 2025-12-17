@@ -287,14 +287,15 @@ const processJob = async (job: JobRecord) => {
       unlinkSync(localFilePath);
     }
 
-    // Update book record
+    // Update book record - also update page_count for EPUBs/MOBIs
     await pool.query(
       `UPDATE books
        SET page_images_prefix = $1,
            page_images_count = $2,
-           page_images_rendered_at = $3
-       WHERE id = $4`,
-      [pagePrefix, totalPages, new Date().toISOString(), book.id],
+           page_images_rendered_at = $3,
+           page_count = $4
+       WHERE id = $5`,
+      [pagePrefix, totalPages, new Date().toISOString(), totalPages, book.id],
     );
 
     await pool.query(
