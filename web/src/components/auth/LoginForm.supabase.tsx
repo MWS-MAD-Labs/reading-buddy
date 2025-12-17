@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { signIn } from "next-auth/react";
+import { useSupabaseBrowser } from "@/components/providers/SupabaseProvider";
 import type { LoginBroadcast } from "@/lib/broadcasts";
 import {
   Alert,
@@ -66,6 +66,7 @@ const GoogleLogo = () => (
 );
 
 export const LoginForm = ({ broadcast }: LoginFormProps) => {
+  const supabase = useSupabaseBrowser();
   const [error, setError] = useState<string | null>(null);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
@@ -74,19 +75,20 @@ export const LoginForm = ({ broadcast }: LoginFormProps) => {
     setIsGoogleLoading(true);
 
     try {
-      // Use NextAuth for Google OAuth
-      const result = await signIn("google", {
-        callbackUrl: "/dashboard",
-        redirect: true,
+      const origin = window.location.origin;
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${origin}/auth/callback`,
+          queryParams: {
+            hd: "millennia21.id", // Restrict to millennia21.id workspace
+          },
+        },
       });
-
-      if (result?.error) {
-        setError(result.error);
-        setIsGoogleLoading(false);
-      }
     } catch (err) {
-      console.error("Login error:", err);
-      setError("An unexpected error occurred. Please try again.");
+      const message =
+        err instanceof Error ? err.message : "Google sign-in failed.";
+      setError(message);
       setIsGoogleLoading(false);
     }
   };

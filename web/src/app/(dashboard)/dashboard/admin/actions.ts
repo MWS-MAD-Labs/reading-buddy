@@ -1,6 +1,7 @@
 "use server";
 
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { query, transaction } from "@/lib/db";
+import bcrypt from "bcryptjs";
 
 type AddUserParams = {
   email: string;
@@ -11,41 +12,25 @@ type AddUserParams = {
 };
 
 export async function addUser(params: AddUserParams): Promise<void> {
-  const supabase = getSupabaseAdminClient();
+  await transaction(async (client) => {
+    // Hash password
+    const passwordHash = await bcrypt.hash(params.password, 10);
 
-  // Create auth user
-  const { data: authData, error: authError } =
-    await supabase.auth.admin.createUser({
-      email: params.email,
-      password: params.password,
-      email_confirm: true,
-    });
+    // Create user
+    const userResult = await client.query(
+      "INSERT INTO users (email, password_hash, name) VALUES ($1, $2, $3) RETURNING id",
+      [params.email, passwordHash, params.fullName],
+    );
 
-  if (authError) {
-    console.error("Error creating auth user:", authError);
-    throw new Error(`Failed to create user: ${authError.message}`);
-  }
+    const userId = userResult.rows[0].id;
 
-  if (!authData.user) {
-    throw new Error("User creation failed: No user returned");
-  }
-
-  // Update profile with role and other details
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .update({
-      full_name: params.fullName,
-      role: params.role,
-      access_level: params.accessLevel,
-    })
-    .eq("id", authData.user.id);
-
-  if (profileError) {
-    console.error("Error updating profile:", profileError);
-    // Try to clean up the auth user if profile update fails
-    await supabase.auth.admin.deleteUser(authData.user.id);
-    throw new Error(`Failed to update user profile: ${profileError.message}`);
-  }
+    // Create profile
+    await client.query(
+      `INSERT INTO profiles (user_id, email, full_name, role, access_level, xp, level, reading_streak, longest_streak)
+       VALUES ($1, $2, $3, $4, $5, 0, 1, 0, 0)`,
+      [userId, params.email, params.fullName, params.role, params.accessLevel],
+    );
+  });
 }
 
 type UpdateUserDataParams = {
@@ -58,20 +43,15 @@ type UpdateUserDataParams = {
 export async function updateUserData(
   params: UpdateUserDataParams,
 ): Promise<void> {
-  const supabase = getSupabaseAdminClient();
+  const result = await query(
+    `UPDATE profiles
+     SET full_name = $1, role = $2, access_level = $3, updated_at = NOW()
+     WHERE id = $4`,
+    [params.fullName, params.role, params.accessLevel, params.userId],
+  );
 
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      full_name: params.fullName,
-      role: params.role,
-      access_level: params.accessLevel,
-    })
-    .eq("id", params.userId);
-
-  if (error) {
-    console.error("Error updating user data:", error);
-    throw new Error(`Failed to update user: ${error.message}`);
+  if (result.rowCount === 0) {
+    throw new Error("User not found");
   }
 }
 
@@ -79,16 +59,13 @@ export async function updateUserRole(
   userId: string,
   newRole: "STUDENT" | "TEACHER" | "LIBRARIAN" | "ADMIN",
 ): Promise<void> {
-  const supabase = getSupabaseAdminClient();
+  const result = await query(
+    `UPDATE profiles SET role = $1, updated_at = NOW() WHERE id = $2`,
+    [newRole, userId],
+  );
 
-  const { error } = await supabase
-    .from("profiles")
-    .update({ role: newRole })
-    .eq("id", userId);
-
-  if (error) {
-    console.error("Error updating user role:", error);
-    throw new Error(`Failed to update role: ${error.message}`);
+  if (result.rowCount === 0) {
+    throw new Error("User not found");
   }
 }
 
@@ -96,29 +73,36 @@ export async function updateUserAccessLevel(
   userId: string,
   accessLevel: string | null,
 ): Promise<void> {
-  const supabase = getSupabaseAdminClient();
+  const result = await query(
+    `UPDATE profiles SET access_level = $1, updated_at = NOW() WHERE id = $2`,
+    [accessLevel, userId],
+  );
 
-  const { error } = await supabase
-    .from("profiles")
-    .update({ access_level: accessLevel })
-    .eq("id", userId);
-
-  if (error) {
-    console.error("Error updating access level:", error);
-    throw new Error(`Failed to update access level: ${error.message}`);
+  if (result.rowCount === 0) {
+    throw new Error("User not found");
   }
 }
 
 export async function deleteUser(userId: string): Promise<void> {
-  const supabase = getSupabaseAdminClient();
+  await transaction(async (client) => {
+    // Get user_id from profile
+    const profileResult = await client.query(
+      "SELECT user_id FROM profiles WHERE id = $1",
+      [userId],
+    );
 
-  // Delete from auth (this should cascade to profiles via database trigger)
-  const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+    if (profileResult.rows.length === 0) {
+      throw new Error("Profile not found");
+    }
 
-  if (authError) {
-    console.error("Error deleting user:", authError);
-    throw new Error(`Failed to delete user: ${authError.message}`);
-  }
+    const authUserId = profileResult.rows[0].user_id;
+
+    // Delete profile (will cascade to related records via DB constraints)
+    await client.query("DELETE FROM profiles WHERE id = $1", [userId]);
+
+    // Delete auth user
+    await client.query("DELETE FROM users WHERE id = $1", [authUserId]);
+  });
 }
 
 type BulkUploadResult = {
@@ -139,7 +123,6 @@ type BulkUserRow = {
 export async function bulkUploadUsers(
   users: BulkUserRow[],
 ): Promise<BulkUploadResult> {
-  const supabase = getSupabaseAdminClient();
   const result: BulkUploadResult = {
     success: true,
     created: 0,
@@ -149,34 +132,13 @@ export async function bulkUploadUsers(
 
   for (const user of users) {
     try {
-      // Create auth user
-      const { data: authData, error: authError } =
-        await supabase.auth.admin.createUser({
-          email: user.email,
-          password: user.password,
-          email_confirm: true,
-        });
-
-      if (authError || !authData.user) {
-        throw new Error(authError?.message || "Failed to create user");
-      }
-
-      // Update profile
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          full_name: user.fullName || null,
-          role: user.role,
-          access_level: user.accessLevel || null,
-        })
-        .eq("id", authData.user.id);
-
-      if (profileError) {
-        // Clean up auth user if profile update fails
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        throw new Error(profileError.message);
-      }
-
+      await addUser({
+        email: user.email,
+        password: user.password,
+        fullName: user.fullName || null,
+        role: user.role,
+        accessLevel: user.accessLevel || null,
+      });
       result.created++;
     } catch (error) {
       result.failed++;
@@ -232,45 +194,28 @@ export async function getUsersWithEmails(): Promise<{
   error?: string;
 }> {
   try {
-    const supabase = getSupabaseAdminClient();
+    const result = await query(`
+      SELECT
+        p.id,
+        p.full_name,
+        p.role,
+        p.access_level,
+        p.email,
+        p.updated_at
+      FROM profiles p
+      ORDER BY p.updated_at DESC
+    `);
 
-    // Get all profiles
-    const { data: profiles, error: profilesError } = await supabase
-      .from("profiles")
-      .select("id, full_name, role, access_level, updated_at")
-      .order("updated_at", { ascending: false });
-
-    if (profilesError) {
-      console.error("Error fetching profiles:", profilesError);
-      return { success: false, error: "Failed to fetch profiles" };
-    }
-
-    if (!profiles || profiles.length === 0) {
-      return { success: true, users: [] };
-    }
-
-    // Fetch emails individually (more reliable than listUsers)
-    const usersWithEmails = await Promise.all(
-      profiles.map(async (profile) => {
-        try {
-          const { data: userData } = await supabase.auth.admin.getUserById(
-            profile.id,
-          );
-          return {
-            ...profile,
-            email: userData?.user?.email || null,
-          };
-        } catch (error) {
-          console.error(`Error fetching user ${profile.id}:`, error);
-          return {
-            ...profile,
-            email: null,
-          };
-        }
-      }),
-    );
-
-    return { success: true, users: usersWithEmails };
+    return {
+      success: true,
+      users: result.rows.map((row) => ({
+        id: row.id,
+        full_name: row.full_name,
+        role: row.role,
+        access_level: row.access_level,
+        email: row.email,
+      })),
+    };
   } catch (error) {
     console.error("Error in getUsersWithEmails:", error);
     return {
@@ -287,57 +232,14 @@ export async function cleanupOrphanedProfiles(): Promise<{
   error?: string;
 }> {
   try {
-    const supabase = getSupabaseAdminClient();
+    // Find profiles without corresponding users
+    const result = await query(`
+      DELETE FROM profiles
+      WHERE user_id NOT IN (SELECT id FROM users)
+      RETURNING id
+    `);
 
-    // Get all profiles
-    const { data: profiles, error: profilesError } = await supabase
-      .from("profiles")
-      .select("id");
-
-    if (profilesError || !profiles) {
-      return {
-        success: false,
-        removed: 0,
-        orphanedIds: [],
-        error: "Failed to fetch profiles",
-      };
-    }
-
-    const orphanedIds: string[] = [];
-
-    // Check each profile to see if auth user exists
-    for (const profile of profiles) {
-      try {
-        const { error: userError } = await supabase.auth.admin.getUserById(
-          profile.id,
-        );
-
-        if (userError) {
-          // This profile doesn't have a corresponding auth user
-          orphanedIds.push(profile.id);
-        }
-      } catch (error) {
-        // If we get an error, consider it orphaned
-        orphanedIds.push(profile.id);
-      }
-    }
-
-    // Delete orphaned profiles
-    if (orphanedIds.length > 0) {
-      const { error: deleteError } = await supabase
-        .from("profiles")
-        .delete()
-        .in("id", orphanedIds);
-
-      if (deleteError) {
-        return {
-          success: false,
-          removed: 0,
-          orphanedIds,
-          error: `Found ${orphanedIds.length} orphaned profiles but failed to delete them`,
-        };
-      }
-    }
+    const orphanedIds = result.rows.map((row) => row.id);
 
     return {
       success: true,
@@ -361,46 +263,64 @@ export async function getSystemStats(): Promise<{
   error?: string;
 }> {
   try {
-    const supabase = getSupabaseAdminClient();
-
     // 1. Get user counts by role
-    const { data: profiles, error: profilesError } = await supabase
-      .from("profiles")
-      .select("role");
-
-    if (profilesError) {
-      console.error("Error fetching profiles:", profilesError);
-      return { success: false, error: "Failed to fetch user counts" };
-    }
+    const userCountsResult = await query(`
+      SELECT
+        role,
+        COUNT(*) as count
+      FROM profiles
+      GROUP BY role
+    `);
 
     const userCounts = {
-      students: profiles.filter((p) => p.role === "STUDENT").length,
-      teachers: profiles.filter((p) => p.role === "TEACHER").length,
-      librarians: profiles.filter((p) => p.role === "LIBRARIAN").length,
-      admins: profiles.filter((p) => p.role === "ADMIN").length,
-      total: profiles.length,
+      students: 0,
+      teachers: 0,
+      librarians: 0,
+      admins: 0,
+      total: 0,
     };
 
-    // 2. Get book stats with format breakdown
-    const { data: books, error: booksError } = await supabase
-      .from("books")
-      .select("file_format");
+    for (const row of userCountsResult.rows) {
+      const count = parseInt(row.count);
+      userCounts.total += count;
 
-    if (booksError) {
-      console.error("Error fetching books:", booksError);
-      return { success: false, error: "Failed to fetch book stats" };
+      if (row.role === "STUDENT") userCounts.students = count;
+      else if (row.role === "TEACHER") userCounts.teachers = count;
+      else if (row.role === "LIBRARIAN") userCounts.librarians = count;
+      else if (row.role === "ADMIN") userCounts.admins = count;
     }
 
+    // 2. Get book stats with format breakdown
+    const bookStatsResult = await query(`
+      SELECT
+        file_format,
+        COUNT(*) as count
+      FROM books
+      GROUP BY file_format
+    `);
+
     const bookStats = {
-      total: books.length,
+      total: 0,
       byFormat: {
-        pdf: books.filter((b) => b.file_format === "pdf").length,
-        epub: books.filter((b) => b.file_format === "epub").length,
-        mobi: books.filter((b) => b.file_format === "mobi").length,
-        azw: books.filter((b) => b.file_format === "azw").length,
-        azw3: books.filter((b) => b.file_format === "azw3").length,
+        pdf: 0,
+        epub: 0,
+        mobi: 0,
+        azw: 0,
+        azw3: 0,
       },
     };
+
+    for (const row of bookStatsResult.rows) {
+      const count = parseInt(row.count);
+      bookStats.total += count;
+
+      const format = row.file_format?.toLowerCase();
+      if (format === "pdf") bookStats.byFormat.pdf = count;
+      else if (format === "epub") bookStats.byFormat.epub = count;
+      else if (format === "mobi") bookStats.byFormat.mobi = count;
+      else if (format === "azw") bookStats.byFormat.azw = count;
+      else if (format === "azw3") bookStats.byFormat.azw3 = count;
+    }
 
     // 3. Get active readers (read in last 7 days)
     const sevenDaysAgo = new Date();
@@ -408,27 +328,21 @@ export async function getSystemStats(): Promise<{
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-    const { data: recentReaders, error: recentReadersError } = await supabase
-      .from("profiles")
-      .select("id, last_read_date")
-      .gte("last_read_date", sevenDaysAgo.toISOString());
+    const activeReadersResult = await query(
+      `
+      SELECT
+        (SELECT COUNT(*) FROM profiles WHERE last_read_date >= $1) as current_count,
+        (SELECT COUNT(*) FROM profiles WHERE last_read_date >= $2 AND last_read_date < $1) as previous_count
+    `,
+      [sevenDaysAgo.toISOString(), fourteenDaysAgo.toISOString()],
+    );
 
-    const { data: previousReaders, error: previousReadersError } =
-      await supabase
-        .from("profiles")
-        .select("id")
-        .gte("last_read_date", fourteenDaysAgo.toISOString())
-        .lt("last_read_date", sevenDaysAgo.toISOString());
-
-    if (recentReadersError || previousReadersError) {
-      console.error(
-        "Error fetching active readers:",
-        recentReadersError || previousReadersError,
-      );
-    }
-
-    const currentCount = recentReaders?.length || 0;
-    const previousCount = previousReaders?.length || 0;
+    const currentCount = parseInt(
+      activeReadersResult.rows[0].current_count || "0",
+    );
+    const previousCount = parseInt(
+      activeReadersResult.rows[0].previous_count || "0",
+    );
     const percentageChange =
       previousCount > 0
         ? ((currentCount - previousCount) / previousCount) * 100
@@ -446,38 +360,18 @@ export async function getSystemStats(): Promise<{
     firstDayOfMonth.setDate(1);
     firstDayOfMonth.setHours(0, 0, 0, 0);
 
-    const { data: quizzes, error: quizzesError } = await supabase
-      .from("quizzes")
-      .select("id, created_at")
-      .gte("created_at", firstDayOfMonth.toISOString());
+    const quizzesResult = await query(
+      `SELECT COUNT(*) as count FROM quizzes WHERE created_at >= $1`,
+      [firstDayOfMonth.toISOString()],
+    );
 
-    if (quizzesError) {
-      console.error("Error fetching quizzes:", quizzesError);
-    }
-
-    // Count descriptions by checking books with description
-    let descriptionsCount = 0;
-    try {
-      const { count, error: descriptionsError } = await supabase
-        .from("books")
-        .select("id", { count: "exact", head: true })
-        .not("description", "is", null);
-
-      if (descriptionsError) {
-        console.warn("Unable to fetch descriptions count:", descriptionsError);
-      } else {
-        descriptionsCount = count || 0;
-      }
-    } catch (error) {
-      console.warn(
-        "Supabase threw while fetching descriptions count:",
-        error instanceof Error ? error.message : error,
-      );
-    }
+    const descriptionsResult = await query(
+      `SELECT COUNT(*) as count FROM books WHERE description IS NOT NULL AND description != ''`,
+    );
 
     const aiUsage = {
-      quizzesGenerated: quizzes?.length || 0,
-      descriptionsGenerated: descriptionsCount || 0,
+      quizzesGenerated: parseInt(quizzesResult.rows[0].count || "0"),
+      descriptionsGenerated: parseInt(descriptionsResult.rows[0].count || "0"),
       currentProvider:
         (process.env.AI_PROVIDER as "cloud" | "local") || "local",
     };

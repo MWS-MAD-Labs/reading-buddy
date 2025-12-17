@@ -1,6 +1,6 @@
 "use server";
 
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { queryWithContext } from "@/lib/db";
 
 export type ClassAnalytics = {
   classId: number;
@@ -54,97 +54,82 @@ export type QuizAssignment = {
  * Get analytics overview for all teacher's classes
  */
 export async function getTeacherClassAnalytics(
+  userId: string,
   teacherId: string,
 ): Promise<ClassAnalytics[]> {
-  const supabase = getSupabaseAdminClient();
-
   // Get all classes for this teacher
-  const { data: classes, error: classesError } = await supabase
-    .from("classes")
-    .select("id, name")
-    .eq("teacher_id", teacherId);
+  const classesResult = await queryWithContext(
+    userId,
+    `SELECT id, name FROM classes WHERE teacher_id = $1`,
+    [teacherId],
+  );
 
-  if (classesError || !classes) {
-    console.error("Error fetching classes:", classesError);
+  if (!classesResult.rows || classesResult.rows.length === 0) {
     return [];
   }
 
   // Get analytics for each class
   const analytics = await Promise.all(
-    classes.map(async (classroom) => {
-      // Get all students in this class
-      const { data: classStudents } = await supabase
-        .from("class_students")
-        .select("student_id")
-        .eq("class_id", classroom.id);
-
-      const studentIds = classStudents?.map((cs) => cs.student_id) ?? [];
-
-      if (studentIds.length === 0) {
-        return {
-          classId: classroom.id,
-          className: classroom.name,
-          totalStudents: 0,
-          activeStudents: 0,
-          averageXP: 0,
-          totalBooksRead: 0,
-          totalPagesRead: 0,
-          averageLevel: 0,
-          quizCompletionRate: 0,
-        };
-      }
-
-      // Get student profiles with gamification data
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select(
-          "xp, level, total_books_completed, total_pages_read, last_read_date",
+    classesResult.rows.map(async (classroom) => {
+      // Get analytics using a single complex query
+      const analyticsResult = await queryWithContext(
+        userId,
+        `
+        WITH class_students_list AS (
+          SELECT student_id FROM class_students WHERE class_id = $1
+        ),
+        student_stats AS (
+          SELECT
+            COUNT(*) as total_students,
+            COALESCE(AVG(p.xp), 0) as avg_xp,
+            COALESCE(AVG(p.level), 1) as avg_level,
+            COALESCE(SUM(p.total_books_completed), 0) as total_books,
+            COALESCE(SUM(p.total_pages_read), 0) as total_pages,
+            COUNT(CASE WHEN p.last_read_date >= CURRENT_DATE - INTERVAL '7 days' THEN 1 END) as active_students
+          FROM class_students_list csl
+          LEFT JOIN profiles p ON csl.student_id = p.id
+        ),
+        quiz_completion AS (
+          SELECT COUNT(DISTINCT qa.student_id) as students_with_quizzes
+          FROM class_students_list csl
+          LEFT JOIN quiz_attempts qa ON csl.student_id = qa.student_id
         )
-        .in("id", studentIds);
-
-      // Get quiz attempts for completion rate
-      const { data: quizAttempts } = await supabase
-        .from("quiz_attempts")
-        .select("student_id")
-        .in("student_id", studentIds);
-
-      const studentsWithQuizzes = new Set(
-        quizAttempts?.map((qa) => qa.student_id) ?? [],
+        SELECT
+          ss.total_students,
+          ss.active_students,
+          ROUND(ss.avg_xp) as average_xp,
+          ss.total_books as total_books_read,
+          ss.total_pages as total_pages_read,
+          ROUND(ss.avg_level) as average_level,
+          CASE
+            WHEN ss.total_students > 0 THEN ROUND((qc.students_with_quizzes::NUMERIC / ss.total_students) * 100)
+            ELSE 0
+          END as quiz_completion_rate
+        FROM student_stats ss, quiz_completion qc
+        `,
+        [classroom.id],
       );
 
-      // Calculate active students (read in last 7 days)
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const activeStudents =
-        profiles?.filter((p) => {
-          if (!p.last_read_date) return false;
-          return new Date(p.last_read_date) >= sevenDaysAgo;
-        }).length ?? 0;
-
-      // Calculate averages
-      const totalXP = profiles?.reduce((sum, p) => sum + (p.xp ?? 0), 0) ?? 0;
-      const totalLevel =
-        profiles?.reduce((sum, p) => sum + (p.level ?? 1), 0) ?? 0;
-      const totalBooks =
-        profiles?.reduce((sum, p) => sum + (p.total_books_completed ?? 0), 0) ??
-        0;
-      const totalPages =
-        profiles?.reduce((sum, p) => sum + (p.total_pages_read ?? 0), 0) ?? 0;
-
-      const studentCount = studentIds.length;
+      const stats = analyticsResult.rows[0] || {
+        total_students: 0,
+        active_students: 0,
+        average_xp: 0,
+        total_books_read: 0,
+        total_pages_read: 0,
+        average_level: 0,
+        quiz_completion_rate: 0,
+      };
 
       return {
         classId: classroom.id,
         className: classroom.name,
-        totalStudents: studentCount,
-        activeStudents,
-        averageXP: Math.round(totalXP / studentCount),
-        totalBooksRead: totalBooks,
-        totalPagesRead: totalPages,
-        averageLevel: Math.round(totalLevel / studentCount),
-        quizCompletionRate: Math.round(
-          (studentsWithQuizzes.size / studentCount) * 100,
-        ),
+        totalStudents: parseInt(stats.total_students || "0"),
+        activeStudents: parseInt(stats.active_students || "0"),
+        averageXP: parseInt(stats.average_xp || "0"),
+        totalBooksRead: parseInt(stats.total_books_read || "0"),
+        totalPagesRead: parseInt(stats.total_pages_read || "0"),
+        averageLevel: parseInt(stats.average_level || "0"),
+        quizCompletionRate: parseInt(stats.quiz_completion_rate || "0"),
       };
     }),
   );
@@ -156,44 +141,40 @@ export async function getTeacherClassAnalytics(
  * Get detailed student performance for a specific class
  */
 export async function getClassStudentPerformance(
+  userId: string,
   classId: number,
 ): Promise<StudentPerformance[]> {
-  const supabase = getSupabaseAdminClient();
+  const result = await queryWithContext(
+    userId,
+    `
+    SELECT
+      p.id as student_id,
+      p.full_name as student_name,
+      COALESCE(p.xp, 0) as xp,
+      COALESCE(p.level, 1) as level,
+      COALESCE(p.total_books_completed, 0) as books_completed,
+      COALESCE(p.total_pages_read, 0) as pages_read,
+      COALESCE(p.total_quizzes_completed, 0) as quizzes_completed,
+      COALESCE(p.reading_streak, 0) as reading_streak,
+      p.last_read_date
+    FROM class_students cs
+    JOIN profiles p ON cs.student_id = p.id
+    WHERE cs.class_id = $1
+    ORDER BY p.xp DESC
+    `,
+    [classId],
+  );
 
-  // Get all students in this class
-  const { data: classStudents } = await supabase
-    .from("class_students")
-    .select("student_id")
-    .eq("class_id", classId);
-
-  const studentIds = classStudents?.map((cs) => cs.student_id) ?? [];
-
-  if (studentIds.length === 0) {
-    return [];
-  }
-
-  // Get student profiles with gamification data
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select(
-      "id, full_name, xp, level, total_books_completed, total_pages_read, total_quizzes_completed, reading_streak, last_read_date",
-    )
-    .in("id", studentIds);
-
-  if (!profiles) {
-    return [];
-  }
-
-  return profiles.map((profile) => ({
-    studentId: profile.id,
-    studentName: profile.full_name ?? "Unknown Student",
-    xp: profile.xp ?? 0,
-    level: profile.level ?? 1,
-    booksCompleted: profile.total_books_completed ?? 0,
-    pagesRead: profile.total_pages_read ?? 0,
-    quizzesCompleted: profile.total_quizzes_completed ?? 0,
-    readingStreak: profile.reading_streak ?? 0,
-    lastReadDate: profile.last_read_date,
+  return result.rows.map((row) => ({
+    studentId: row.student_id,
+    studentName: row.student_name ?? "Unknown Student",
+    xp: parseInt(row.xp || "0"),
+    level: parseInt(row.level || "1"),
+    booksCompleted: parseInt(row.books_completed || "0"),
+    pagesRead: parseInt(row.pages_read || "0"),
+    quizzesCompleted: parseInt(row.quizzes_completed || "0"),
+    readingStreak: parseInt(row.reading_streak || "0"),
+    lastReadDate: row.last_read_date,
   }));
 }
 
@@ -201,231 +182,141 @@ export async function getClassStudentPerformance(
  * Get book assignments for teacher's classes
  */
 export async function getTeacherBookAssignments(
+  userId: string,
   teacherId: string,
 ): Promise<BookAssignment[]> {
-  const supabase = getSupabaseAdminClient();
-
-  // Get all classes for this teacher
-  const { data: classes } = await supabase
-    .from("classes")
-    .select("id, name")
-    .eq("teacher_id", teacherId);
-
-  if (!classes || classes.length === 0) {
-    return [];
-  }
-
-  const classIds = classes.map((c) => c.id);
-
-  // Get all books assigned to these classes
-  const { data: classBooks } = await supabase
-    .from("class_books")
-    .select(
-      "book_id, class_id, books(id, title, author, cover_url, page_count)",
-    )
-    .in("class_id", classIds);
-
-  if (!classBooks || classBooks.length === 0) {
-    return [];
-  }
-
-  // Group by book
-  const bookMap = new Map<number, { book: any; classIds: number[] }>();
-
-  classBooks.forEach((cb) => {
-    const bookData = Array.isArray(cb.books) ? cb.books[0] : cb.books;
-    if (!bookData) return;
-
-    if (!bookMap.has(cb.book_id)) {
-      bookMap.set(cb.book_id, {
-        book: bookData,
-        classIds: [cb.class_id],
-      });
-    } else {
-      bookMap.get(cb.book_id)!.classIds.push(cb.class_id);
-    }
-  });
-
-  // Calculate statistics for each book
-  const assignments = await Promise.all(
-    Array.from(bookMap.entries()).map(
-      async ([bookId, { book, classIds: assignedClassIds }]) => {
-        // Get all students in these classes
-        const { data: classStudents } = await supabase
-          .from("class_students")
-          .select("student_id")
-          .in("class_id", assignedClassIds);
-
-        const studentIds = [
-          ...new Set(classStudents?.map((cs) => cs.student_id) ?? []),
-        ];
-        const totalStudents = studentIds.length;
-
-        if (totalStudents === 0) {
-          return {
-            bookId,
-            bookTitle: book.title,
-            bookAuthor: book.author ?? "Unknown",
-            bookCoverUrl: book.cover_url,
-            assignedClasses: classes
-              .filter((c) => assignedClassIds.includes(c.id))
-              .map((c) => c.name),
-            totalStudents: 0,
-            studentsStarted: 0,
-            studentsCompleted: 0,
-            averageProgress: 0,
-            completionRate: 0,
-          };
-        }
-
-        // Get student progress
-        const { data: studentBooks } = await supabase
-          .from("student_books")
-          .select("student_id, current_page, completed_at")
-          .eq("book_id", bookId)
-          .in("student_id", studentIds);
-
-        const studentsStarted = studentBooks?.length ?? 0;
-        const studentsCompleted =
-          studentBooks?.filter((sb) => sb.completed_at).length ?? 0;
-
-        // Calculate average progress
-        const totalProgress =
-          studentBooks?.reduce((sum, sb) => {
-            const progress =
-              book.page_count > 0
-                ? (sb.current_page / book.page_count) * 100
-                : 0;
-            return sum + Math.min(progress, 100);
-          }, 0) ?? 0;
-
-        const averageProgress =
-          studentsStarted > 0 ? Math.round(totalProgress / studentsStarted) : 0;
-        const completionRate =
-          totalStudents > 0
-            ? Math.round((studentsCompleted / totalStudents) * 100)
-            : 0;
-
-        return {
-          bookId,
-          bookTitle: book.title,
-          bookAuthor: book.author ?? "Unknown",
-          bookCoverUrl: book.cover_url,
-          assignedClasses: classes
-            .filter((c) => assignedClassIds.includes(c.id))
-            .map((c) => c.name),
-          totalStudents,
-          studentsStarted,
-          studentsCompleted,
-          averageProgress,
-          completionRate,
-        };
-      },
+  const result = await queryWithContext(
+    userId,
+    `
+    WITH teacher_classes AS (
+      SELECT id, name FROM classes WHERE teacher_id = $1
     ),
+    book_assignments AS (
+      SELECT
+        b.id as book_id,
+        b.title as book_title,
+        b.author as book_author,
+        b.cover_url as book_cover_url,
+        b.page_count,
+        cb.class_id,
+        tc.name as class_name,
+        (SELECT COUNT(DISTINCT student_id) FROM class_students WHERE class_id = cb.class_id) as total_students
+      FROM class_books cb
+      JOIN books b ON cb.book_id = b.id
+      JOIN teacher_classes tc ON cb.class_id = tc.id
+    ),
+    book_progress AS (
+      SELECT
+        ba.book_id,
+        ba.book_title,
+        ba.book_author,
+        ba.book_cover_url,
+        ba.page_count,
+        ARRAY_AGG(DISTINCT ba.class_name) as assigned_classes,
+        SUM(ba.total_students) as total_students,
+        COUNT(DISTINCT sb.student_id) as students_started,
+        COUNT(DISTINCT CASE WHEN sb.completed_at IS NOT NULL THEN sb.student_id END) as students_completed,
+        CASE
+          WHEN ba.page_count > 0 AND COUNT(sb.student_id) > 0
+          THEN ROUND(AVG(LEAST((sb.current_page::NUMERIC / ba.page_count) * 100, 100)))
+          ELSE 0
+        END as average_progress
+      FROM book_assignments ba
+      LEFT JOIN class_students cs ON cs.class_id = ba.class_id
+      LEFT JOIN student_books sb ON sb.book_id = ba.book_id AND sb.student_id = cs.student_id
+      GROUP BY ba.book_id, ba.book_title, ba.book_author, ba.book_cover_url, ba.page_count
+    )
+    SELECT
+      book_id,
+      book_title,
+      book_author,
+      book_cover_url,
+      assigned_classes,
+      total_students,
+      students_started,
+      students_completed,
+      average_progress,
+      CASE
+        WHEN total_students > 0 THEN ROUND((students_completed::NUMERIC / total_students) * 100)
+        ELSE 0
+      END as completion_rate
+    FROM book_progress
+    ORDER BY total_students DESC
+    `,
+    [teacherId],
   );
 
-  return assignments.sort((a, b) => b.totalStudents - a.totalStudents);
+  return result.rows.map((row) => ({
+    bookId: row.book_id,
+    bookTitle: row.book_title,
+    bookAuthor: row.book_author ?? "Unknown",
+    bookCoverUrl: row.book_cover_url,
+    assignedClasses: row.assigned_classes || [],
+    totalStudents: parseInt(row.total_students || "0"),
+    studentsStarted: parseInt(row.students_started || "0"),
+    studentsCompleted: parseInt(row.students_completed || "0"),
+    averageProgress: parseInt(row.average_progress || "0"),
+    completionRate: parseInt(row.completion_rate || "0"),
+  }));
 }
 
 /**
  * Get quiz assignments for teacher's classes
  */
 export async function getTeacherQuizAssignments(
+  userId: string,
   teacherId: string,
 ): Promise<QuizAssignment[]> {
-  const supabase = getSupabaseAdminClient();
-
-  // Get all classes for this teacher
-  const { data: classes } = await supabase
-    .from("classes")
-    .select("id, name")
-    .eq("teacher_id", teacherId);
-
-  if (!classes || classes.length === 0) {
-    return [];
-  }
-
-  const classIds = classes.map((c) => c.id);
-
-  // Get all quizzes assigned to these classes
-  const { data: quizzes } = await supabase
-    .from("quizzes")
-    .select("id, title, book_id, class_id, books(title)")
-    .in("class_id", classIds)
-    .eq("quiz_type", "classroom");
-
-  if (!quizzes || quizzes.length === 0) {
-    return [];
-  }
-
-  // Calculate statistics for each quiz
-  const assignments = await Promise.all(
-    quizzes.map(async (quiz) => {
-      const bookData = Array.isArray(quiz.books) ? quiz.books[0] : quiz.books;
-      const bookTitle = bookData?.title ?? "Unknown Book";
-
-      // Get students in this class
-      const { data: classStudents } = await supabase
-        .from("class_students")
-        .select("student_id")
-        .eq("class_id", quiz.class_id);
-
-      const studentIds = classStudents?.map((cs) => cs.student_id) ?? [];
-      const totalStudents = studentIds.length;
-
-      if (totalStudents === 0) {
-        return {
-          quizId: quiz.id,
-          quizTitle: quiz.title,
-          bookTitle,
-          assignedClasses: [
-            classes.find((c) => c.id === quiz.class_id)?.name ?? "Unknown",
-          ],
-          totalStudents: 0,
-          studentsAttempted: 0,
-          averageScore: 0,
-          passRate: 0,
-        };
-      }
-
-      // Get quiz attempts
-      const { data: attempts } = await supabase
-        .from("quiz_attempts")
-        .select("student_id, score")
-        .eq("quiz_id", quiz.id)
-        .in("student_id", studentIds);
-
-      const uniqueStudents = new Set(attempts?.map((a) => a.student_id) ?? []);
-      const studentsAttempted = uniqueStudents.size;
-
-      const totalScore =
-        attempts?.reduce((sum, a) => sum + (a.score ?? 0), 0) ?? 0;
-      const averageScore =
-        attempts && attempts.length > 0
-          ? Math.round(totalScore / attempts.length)
-          : 0;
-
-      const passingAttempts =
-        attempts?.filter((a) => (a.score ?? 0) >= 70).length ?? 0;
-      const passRate =
-        attempts && attempts.length > 0
-          ? Math.round((passingAttempts / attempts.length) * 100)
-          : 0;
-
-      return {
-        quizId: quiz.id,
-        quizTitle: quiz.title,
-        bookTitle,
-        assignedClasses: [
-          classes.find((c) => c.id === quiz.class_id)?.name ?? "Unknown",
-        ],
-        totalStudents,
-        studentsAttempted,
-        averageScore,
-        passRate,
-      };
-    }),
+  const result = await queryWithContext(
+    userId,
+    `
+    WITH teacher_classes AS (
+      SELECT id, name FROM classes WHERE teacher_id = $1
+    ),
+    quiz_data AS (
+      SELECT
+        q.id as quiz_id,
+        b.title as book_title,
+        cb.class_id,
+        tc.name as class_name,
+        (SELECT COUNT(*) FROM class_students WHERE class_id = cb.class_id) as total_students
+      FROM quizzes q
+      JOIN books b ON q.book_id = b.id
+      JOIN class_books cb ON cb.book_id = q.book_id
+      JOIN teacher_classes tc ON cb.class_id = tc.id
+      WHERE q.quiz_type = 'classroom'
+    ),
+    quiz_stats AS (
+      SELECT
+        qd.quiz_id,
+        qd.book_title,
+        qd.book_title as quiz_title,
+        ARRAY_AGG(DISTINCT qd.class_name) as assigned_classes,
+        SUM(DISTINCT qd.total_students) as total_students,
+        COUNT(DISTINCT qa.student_id) as students_attempted,
+        COALESCE(ROUND(AVG(qa.score)), 0) as average_score,
+        CASE
+          WHEN COUNT(qa.id) > 0 THEN ROUND((COUNT(CASE WHEN qa.score >= 70 THEN 1 END)::NUMERIC / COUNT(qa.id)) * 100)
+          ELSE 0
+        END as pass_rate
+      FROM quiz_data qd
+      LEFT JOIN quiz_attempts qa ON qa.quiz_id = qd.quiz_id
+      GROUP BY qd.quiz_id, qd.book_title
+    )
+    SELECT * FROM quiz_stats
+    ORDER BY total_students DESC
+    `,
+    [teacherId],
   );
 
-  return assignments.sort((a, b) => b.totalStudents - a.totalStudents);
+  return result.rows.map((row) => ({
+    quizId: row.quiz_id,
+    quizTitle: row.quiz_title ?? "Quiz",
+    bookTitle: row.book_title ?? "Unknown Book",
+    assignedClasses: row.assigned_classes || [],
+    totalStudents: parseInt(row.total_students || "0"),
+    studentsAttempted: parseInt(row.students_attempted || "0"),
+    averageScore: parseInt(row.average_score || "0"),
+    passRate: parseInt(row.pass_rate || "0"),
+  }));
 }

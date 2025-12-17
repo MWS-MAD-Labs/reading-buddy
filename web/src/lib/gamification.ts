@@ -1,11 +1,22 @@
 /**
- * Gamification System
+ * Gamification System (Server-Side)
  *
- * Handles XP awards, badge evaluation, streak tracking, and level calculations.
+ * Handles XP awards, badge evaluation, streak tracking with database operations.
  * This is the core engine for the Reading Buddy gamification system.
+ *
+ * NOTE: This file uses database operations and can only be imported in Server Components/Actions.
+ * For client-safe utilities, import from "@/lib/gamification-utils" instead.
  */
 
-import { SupabaseClient } from "@supabase/supabase-js";
+import { query, queryWithContext } from "@/lib/db";
+import {
+  XP_REWARDS,
+  calculateLevel,
+  xpForLevel,
+  xpToNextLevel,
+  levelProgressPercent,
+  getLevelTitle,
+} from "@/lib/gamification-utils";
 import type {
   Badge,
   BadgeCriteria,
@@ -14,76 +25,18 @@ import type {
   ProfileGamificationStats,
 } from "@/types/database";
 
-// ============================================================================
-// XP Constants
-// ============================================================================
-
-export const XP_REWARDS = {
-  PAGE_READ: 1,
-  BOOK_COMPLETED: 100,
-  QUIZ_COMPLETED: 50,
-  QUIZ_PERFECT: 100, // Bonus for 100% score
-  QUIZ_HIGH_SCORE: 25, // Bonus for 90%+ score
-  STREAK_DAILY: 10, // Daily streak bonus
-  STREAK_WEEKLY: 50, // 7-day streak bonus
-  STREAK_MONTHLY: 200, // 30-day streak bonus
-} as const;
+// Re-export utils for convenience
+export {
+  XP_REWARDS,
+  calculateLevel,
+  xpForLevel,
+  xpToNextLevel,
+  levelProgressPercent,
+  getLevelTitle,
+};
 
 // ============================================================================
-// Level Calculation
-// ============================================================================
-
-/**
- * Calculate level from XP using a square root formula
- * Level thresholds: 0-49=1, 50-199=2, 200-449=3, 450-799=4, etc.
- */
-export function calculateLevel(xp: number): number {
-  return Math.min(Math.floor(Math.sqrt(xp / 50)) + 1, 100);
-}
-
-/**
- * Calculate XP required to reach a specific level
- */
-export function xpForLevel(level: number): number {
-  return (level - 1) * (level - 1) * 50;
-}
-
-/**
- * Get XP needed for next level
- */
-export function xpToNextLevel(currentXp: number): number {
-  const currentLevel = calculateLevel(currentXp);
-  const nextLevelXp = xpForLevel(currentLevel + 1);
-  return nextLevelXp - currentXp;
-}
-
-/**
- * Get progress percentage to next level
- */
-export function levelProgressPercent(currentXp: number): number {
-  const currentLevel = calculateLevel(currentXp);
-  const currentLevelXp = xpForLevel(currentLevel);
-  const nextLevelXp = xpForLevel(currentLevel + 1);
-  const progressInLevel = currentXp - currentLevelXp;
-  const levelRange = nextLevelXp - currentLevelXp;
-  return Math.round((progressInLevel / levelRange) * 100);
-}
-
-/**
- * Get title/rank based on level
- */
-export function getLevelTitle(level: number): string {
-  if (level >= 50) return "Reading Legend";
-  if (level >= 40) return "Master Reader";
-  if (level >= 30) return "Expert Reader";
-  if (level >= 20) return "Avid Reader";
-  if (level >= 10) return "Book Explorer";
-  if (level >= 5) return "Rising Reader";
-  return "Beginner Reader";
-}
-
-// ============================================================================
-// XP Award Functions
+// XP Award Functions (using database functions)
 // ============================================================================
 
 interface AwardXPResult {
@@ -95,64 +48,35 @@ interface AwardXPResult {
 
 /**
  * Award XP to a student and update their level
+ * Uses the database function award_xp() defined in 04-functions.sql
  */
 export async function awardXP(
-  supabase: SupabaseClient,
+  userId: string,
   studentId: string,
   amount: number,
   source: XPSource,
   sourceId?: string,
   description?: string,
 ): Promise<AwardXPResult> {
-  // Get current XP and level
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("xp, level")
-    .eq("id", studentId)
-    .single();
+  // Use the database function for XP award
+  const result = await queryWithContext(
+    userId,
+    `SELECT * FROM award_xp($1, $2, $3, $4, $5)`,
+    [studentId, amount, source, sourceId || null, description || null],
+  );
 
-  if (profileError || !profile) {
-    throw new Error(`Failed to get profile: ${profileError?.message}`);
-  }
-
-  const oldXp = profile.xp ?? 0;
-  const oldLevel = profile.level ?? 1;
-  const newXp = oldXp + amount;
-  const newLevel = calculateLevel(newXp);
-
-  // Update profile
-  const { error: updateError } = await supabase
-    .from("profiles")
-    .update({ xp: newXp, level: newLevel })
-    .eq("id", studentId);
-
-  if (updateError) {
-    throw new Error(`Failed to update XP: ${updateError.message}`);
-  }
-
-  // Record transaction
-  const { error: txError } = await supabase.from("xp_transactions").insert({
-    student_id: studentId,
-    amount,
-    source,
-    source_id: sourceId,
-    description,
-  });
-
-  if (txError) {
-    console.error("Failed to record XP transaction:", txError);
-  }
+  const row = result.rows[0];
 
   return {
-    newXp,
-    newLevel,
-    leveledUp: newLevel > oldLevel,
+    newXp: row.new_xp,
+    newLevel: row.new_level,
+    leveledUp: row.level_up,
     xpAwarded: amount,
   };
 }
 
 // ============================================================================
-// Streak Functions
+// Streak Functions (using database functions)
 // ============================================================================
 
 interface UpdateStreakResult {
@@ -164,61 +88,24 @@ interface UpdateStreakResult {
 
 /**
  * Update reading streak for a student
+ * Uses the database function update_reading_streak() defined in 04-functions.sql
  */
 export async function updateReadingStreak(
-  supabase: SupabaseClient,
+  userId: string,
   studentId: string,
 ): Promise<UpdateStreakResult> {
-  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  // Use the database function for streak update
+  const result = await queryWithContext(
+    userId,
+    `SELECT * FROM update_reading_streak($1)`,
+    [studentId],
+  );
 
-  // Get current streak info
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("reading_streak, longest_streak, last_read_date")
-    .eq("id", studentId)
-    .single();
+  const row = result.rows[0];
+  const currentStreak = row.current_streak;
+  const isNewStreak = row.is_new_streak;
 
-  if (profileError || !profile) {
-    throw new Error(`Failed to get profile: ${profileError?.message}`);
-  }
-
-  const lastRead = profile.last_read_date;
-  let currentStreak = profile.reading_streak ?? 0;
-  let longestStreak = profile.longest_streak ?? 0;
-  let isNewStreak = false;
   let streakBonusXp = 0;
-
-  if (!lastRead) {
-    // First read ever
-    currentStreak = 1;
-    isNewStreak = true;
-  } else {
-    const lastReadDate = new Date(lastRead);
-    const todayDate = new Date(today);
-    const yesterday = new Date(todayDate);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    const lastReadStr = lastReadDate.toISOString().split("T")[0];
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-    if (lastReadStr === today) {
-      // Already read today, no change
-      isNewStreak = false;
-    } else if (lastReadStr === yesterdayStr) {
-      // Consecutive day - extend streak
-      currentStreak += 1;
-      isNewStreak = true;
-    } else {
-      // Streak broken - start new
-      currentStreak = 1;
-      isNewStreak = true;
-    }
-  }
-
-  // Update longest streak if needed
-  if (currentStreak > longestStreak) {
-    longestStreak = currentStreak;
-  }
 
   // Calculate streak bonus XP
   if (isNewStreak) {
@@ -232,24 +119,10 @@ export async function updateReadingStreak(
     }
   }
 
-  // Update profile
-  const { error: updateError } = await supabase
-    .from("profiles")
-    .update({
-      reading_streak: currentStreak,
-      longest_streak: longestStreak,
-      last_read_date: today,
-    })
-    .eq("id", studentId);
-
-  if (updateError) {
-    throw new Error(`Failed to update streak: ${updateError.message}`);
-  }
-
   // Award streak bonus XP if applicable
   if (streakBonusXp > 0) {
     await awardXP(
-      supabase,
+      userId,
       studentId,
       streakBonusXp,
       "streak_bonus",
@@ -258,9 +131,16 @@ export async function updateReadingStreak(
     );
   }
 
+  // Get longest streak from profile
+  const profileResult = await queryWithContext(
+    userId,
+    `SELECT longest_streak FROM profiles WHERE id = $1`,
+    [studentId],
+  );
+
   return {
     currentStreak,
-    longestStreak,
+    longestStreak: profileResult.rows[0]?.longest_streak || currentStreak,
     isNewStreak,
     streakBonusXp,
   };
@@ -279,7 +159,7 @@ interface EvaluateBadgesResult {
  * Evaluate and award badges for a student based on their current stats
  */
 export async function evaluateBadges(
-  supabase: SupabaseClient,
+  userId: string,
   studentId: string,
   context?: {
     bookId?: number;
@@ -288,39 +168,33 @@ export async function evaluateBadges(
   },
 ): Promise<EvaluateBadgesResult> {
   // Get student's current stats
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select(
-      "total_books_completed, total_pages_read, total_quizzes_completed, total_perfect_quizzes, reading_streak",
-    )
-    .eq("id", studentId)
-    .single();
+  const profileResult = await queryWithContext(
+    userId,
+    `SELECT total_books_completed, total_pages_read, total_quizzes_completed,
+            total_perfect_quizzes, reading_streak
+     FROM profiles WHERE id = $1`,
+    [studentId],
+  );
 
-  if (profileError || !profile) {
-    throw new Error(`Failed to get profile: ${profileError?.message}`);
+  const profile = profileResult.rows[0];
+  if (!profile) {
+    throw new Error("Profile not found");
   }
 
   // Get all active badges
-  const { data: badges, error: badgesError } = await supabase
-    .from("badges")
-    .select("*")
-    .eq("is_active", true);
-
-  if (badgesError || !badges) {
-    throw new Error(`Failed to get badges: ${badgesError?.message}`);
-  }
+  const badgesResult = await query(
+    `SELECT * FROM badges WHERE is_active = true`,
+  );
+  const badges = badgesResult.rows;
 
   // Get student's earned badges
-  const { data: earnedBadges, error: earnedError } = await supabase
-    .from("student_badges")
-    .select("badge_id")
-    .eq("student_id", studentId);
+  const earnedResult = await queryWithContext(
+    userId,
+    `SELECT badge_id FROM student_badges WHERE student_id = $1`,
+    [studentId],
+  );
 
-  if (earnedError) {
-    throw new Error(`Failed to get earned badges: ${earnedError.message}`);
-  }
-
-  const earnedBadgeIds = new Set(earnedBadges?.map((b) => b.badge_id) ?? []);
+  const earnedBadgeIds = new Set(earnedResult.rows.map((b) => b.badge_id));
 
   // Evaluate each badge
   const newBadges: Badge[] = [];
@@ -342,22 +216,25 @@ export async function evaluateBadges(
 
     if (earned) {
       // Award the badge
-      const { error: insertError } = await supabase
-        .from("student_badges")
-        .insert({
-          student_id: studentId,
-          badge_id: badge.id,
-          book_id: context?.bookId,
-          quiz_id: context?.quizId,
-        });
+      try {
+        await queryWithContext(
+          userId,
+          `INSERT INTO student_badges (student_id, badge_id, book_id, quiz_id)
+           VALUES ($1, $2, $3, $4)`,
+          [
+            studentId,
+            badge.id,
+            context?.bookId || null,
+            context?.quizId || null,
+          ],
+        );
 
-      if (!insertError) {
-        newBadges.push(badge);
+        newBadges.push(badge as Badge);
 
         // Award XP for the badge
         if (badge.xp_reward > 0) {
           await awardXP(
-            supabase,
+            userId,
             studentId,
             badge.xp_reward,
             "badge_earned",
@@ -366,6 +243,8 @@ export async function evaluateBadges(
           );
           totalXpAwarded += badge.xp_reward;
         }
+      } catch (error) {
+        console.error(`Failed to award badge ${badge.id}:`, error);
       }
     }
   }
@@ -437,37 +316,25 @@ function evaluateBadgeCriteria(
  * Update student stats when they complete a page
  */
 export async function onPageRead(
-  supabase: SupabaseClient,
+  userId: string,
   studentId: string,
   bookId: number,
   pageNumber: number,
 ): Promise<void> {
   // Update total pages read
-  const { error: updateError } = await supabase.rpc("increment_pages_read", {
-    p_student_id: studentId,
-    p_amount: 1,
-  });
-
-  if (updateError) {
-    // Fallback if RPC doesn't exist
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("total_pages_read")
-      .eq("id", studentId)
-      .single();
-
-    await supabase
-      .from("profiles")
-      .update({ total_pages_read: (profile?.total_pages_read ?? 0) + 1 })
-      .eq("id", studentId);
-  }
+  await queryWithContext(
+    userId,
+    `UPDATE profiles SET total_pages_read = COALESCE(total_pages_read, 0) + 1
+     WHERE id = $1`,
+    [studentId],
+  );
 
   // Update streak (once per day)
-  await updateReadingStreak(supabase, studentId);
+  await updateReadingStreak(userId, studentId);
 
   // Award page XP
   await awardXP(
-    supabase,
+    userId,
     studentId,
     XP_REWARDS.PAGE_READ,
     "page_read",
@@ -476,34 +343,28 @@ export async function onPageRead(
   );
 
   // Evaluate page-based badges
-  await evaluateBadges(supabase, studentId, { bookId });
+  await evaluateBadges(userId, studentId, { bookId });
 }
 
 /**
  * Update student stats when they complete a book
  */
 export async function onBookCompleted(
-  supabase: SupabaseClient,
+  userId: string,
   studentId: string,
   bookId: number,
 ): Promise<EvaluateBadgesResult> {
   // Update total books completed
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("total_books_completed")
-    .eq("id", studentId)
-    .single();
-
-  await supabase
-    .from("profiles")
-    .update({
-      total_books_completed: (profile?.total_books_completed ?? 0) + 1,
-    })
-    .eq("id", studentId);
+  await queryWithContext(
+    userId,
+    `UPDATE profiles SET total_books_completed = COALESCE(total_books_completed, 0) + 1
+     WHERE id = $1`,
+    [studentId],
+  );
 
   // Award book completion XP
   await awardXP(
-    supabase,
+    userId,
     studentId,
     XP_REWARDS.BOOK_COMPLETED,
     "book_completed",
@@ -513,13 +374,13 @@ export async function onBookCompleted(
 
   // Award book-specific completion badges
   const bookSpecificBadges = await awardBookSpecificBadges(
-    supabase,
+    userId,
     studentId,
     bookId,
   );
 
   // Evaluate general badges
-  const generalBadges = await evaluateBadges(supabase, studentId, { bookId });
+  const generalBadges = await evaluateBadges(userId, studentId, { bookId });
 
   // Combine results
   return {
@@ -533,29 +394,32 @@ export async function onBookCompleted(
  * Award book-specific completion badges for a completed book
  */
 async function awardBookSpecificBadges(
-  supabase: SupabaseClient,
+  userId: string,
   studentId: string,
   bookId: number,
 ): Promise<EvaluateBadgesResult> {
   // Get book-specific badges for this book that the student hasn't earned
-  const { data: badges, error: badgesError } = await supabase
-    .from("badges")
-    .select("*")
-    .eq("is_active", true)
-    .eq("book_id", bookId)
-    .eq("badge_type", "book_completion_specific");
+  const badgesResult = await query(
+    `SELECT * FROM badges
+     WHERE is_active = true
+       AND book_id = $1
+       AND badge_type = 'book_completion_specific'`,
+    [bookId],
+  );
 
-  if (badgesError || !badges || badges.length === 0) {
+  const badges = badgesResult.rows;
+  if (!badges || badges.length === 0) {
     return { newBadges: [], totalXpAwarded: 0 };
   }
 
-  // Get student's earned badges for this book
-  const { data: earnedBadges } = await supabase
-    .from("student_badges")
-    .select("badge_id")
-    .eq("student_id", studentId);
+  // Get student's earned badges
+  const earnedResult = await queryWithContext(
+    userId,
+    `SELECT badge_id FROM student_badges WHERE student_id = $1`,
+    [studentId],
+  );
 
-  const earnedBadgeIds = new Set(earnedBadges?.map((b) => b.badge_id) ?? []);
+  const earnedBadgeIds = new Set(earnedResult.rows.map((b) => b.badge_id));
 
   const newBadges: Badge[] = [];
   let totalXpAwarded = 0;
@@ -565,21 +429,20 @@ async function awardBookSpecificBadges(
     if (earnedBadgeIds.has(badge.id)) continue;
 
     // Award the badge
-    const { error: insertError } = await supabase
-      .from("student_badges")
-      .insert({
-        student_id: studentId,
-        badge_id: badge.id,
-        book_id: bookId,
-      });
+    try {
+      await queryWithContext(
+        userId,
+        `INSERT INTO student_badges (student_id, badge_id, book_id)
+         VALUES ($1, $2, $3)`,
+        [studentId, badge.id, bookId],
+      );
 
-    if (!insertError) {
       newBadges.push(badge as Badge);
 
       // Award XP for the badge
       if (badge.xp_reward > 0) {
         await awardXP(
-          supabase,
+          userId,
           studentId,
           badge.xp_reward,
           "badge_earned",
@@ -588,6 +451,8 @@ async function awardBookSpecificBadges(
         );
         totalXpAwarded += badge.xp_reward;
       }
+    } catch (error) {
+      console.error(`Failed to award badge ${badge.id}:`, error);
     }
   }
 
@@ -598,7 +463,7 @@ async function awardBookSpecificBadges(
  * Update student stats when they complete a quiz
  */
 export async function onQuizCompleted(
-  supabase: SupabaseClient,
+  userId: string,
   studentId: string,
   quizId: number,
   score: number,
@@ -609,21 +474,21 @@ export async function onQuizCompleted(
   const isHighScore = scorePercent >= 90;
 
   // Update quiz stats
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("total_quizzes_completed, total_perfect_quizzes")
-    .eq("id", studentId)
-    .single();
-
-  const updates: Record<string, number> = {
-    total_quizzes_completed: (profile?.total_quizzes_completed ?? 0) + 1,
-  };
+  const updates: string[] = [
+    "total_quizzes_completed = COALESCE(total_quizzes_completed, 0) + 1",
+  ];
 
   if (isPerfect) {
-    updates.total_perfect_quizzes = (profile?.total_perfect_quizzes ?? 0) + 1;
+    updates.push(
+      "total_perfect_quizzes = COALESCE(total_perfect_quizzes, 0) + 1",
+    );
   }
 
-  await supabase.from("profiles").update(updates).eq("id", studentId);
+  await queryWithContext(
+    userId,
+    `UPDATE profiles SET ${updates.join(", ")} WHERE id = $1`,
+    [studentId],
+  );
 
   // Award XP
   let totalXp = XP_REWARDS.QUIZ_COMPLETED;
@@ -634,7 +499,7 @@ export async function onQuizCompleted(
   }
 
   await awardXP(
-    supabase,
+    userId,
     studentId,
     totalXp,
     isPerfect ? "quiz_perfect" : "quiz_completed",
@@ -643,7 +508,7 @@ export async function onQuizCompleted(
   );
 
   // Evaluate badges
-  return evaluateBadges(supabase, studentId, {
+  return evaluateBadges(userId, studentId, {
     quizId,
     quizScore: scorePercent,
   });
@@ -657,18 +522,20 @@ export async function onQuizCompleted(
  * Get gamification stats for a student
  */
 export async function getGamificationStats(
-  supabase: SupabaseClient,
+  userId: string,
   studentId: string,
 ): Promise<ProfileGamificationStats | null> {
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select(
-      "xp, level, reading_streak, longest_streak, total_books_completed, total_pages_read, total_quizzes_completed, total_perfect_quizzes",
-    )
-    .eq("id", studentId)
-    .single();
+  const result = await queryWithContext(
+    userId,
+    `SELECT xp, level, reading_streak, longest_streak,
+            total_books_completed, total_pages_read,
+            total_quizzes_completed, total_perfect_quizzes
+     FROM profiles WHERE id = $1`,
+    [studentId],
+  );
 
-  if (error || !profile) {
+  const profile = result.rows[0];
+  if (!profile) {
     return null;
   }
 
@@ -696,28 +563,49 @@ export interface StudentBadgeWithBadge extends StudentBadge {
 }
 
 export async function getStudentBadges(
-  supabase: SupabaseClient,
+  userId: string,
   studentId: string,
 ): Promise<StudentBadgeWithBadge[]> {
-  const { data, error } = await supabase
-    .from("student_badges")
-    .select("*, badge:badges(*)")
-    .eq("student_id", studentId)
-    .order("earned_at", { ascending: false });
+  const result = await queryWithContext(
+    userId,
+    `SELECT sb.*,
+            b.id as badge_id, b.name, b.description, b.icon_url, b.xp_reward,
+            b.badge_type, b.criteria, b.book_id as badge_book_id,
+            b.is_active, b.display_order
+     FROM student_badges sb
+     JOIN badges b ON sb.badge_id = b.id
+     WHERE sb.student_id = $1
+     ORDER BY sb.earned_at DESC`,
+    [studentId],
+  );
 
-  if (error) {
-    console.error("Failed to get student badges:", error);
-    return [];
-  }
-
-  return (data ?? []) as StudentBadgeWithBadge[];
+  return result.rows.map((row) => ({
+    id: row.id,
+    student_id: row.student_id,
+    badge_id: row.badge_id,
+    book_id: row.book_id,
+    quiz_id: row.quiz_id,
+    earned_at: row.earned_at,
+    badge: {
+      id: row.badge_id,
+      name: row.name,
+      description: row.description,
+      icon_url: row.icon_url,
+      xp_reward: row.xp_reward,
+      badge_type: row.badge_type,
+      criteria: row.criteria,
+      book_id: row.badge_book_id,
+      is_active: row.is_active,
+      display_order: row.display_order,
+    },
+  })) as StudentBadgeWithBadge[];
 }
 
 /**
  * Get all badges with progress for a student
  */
 export async function getBadgesWithProgress(
-  supabase: SupabaseClient,
+  userId: string,
   studentId: string,
 ): Promise<
   Array<{
@@ -730,35 +618,31 @@ export async function getBadgesWithProgress(
   }>
 > {
   // Get all badges
-  const { data: badges, error: badgesError } = await supabase
-    .from("badges")
-    .select("*")
-    .eq("is_active", true)
-    .order("display_order");
-
-  if (badgesError || !badges) {
-    return [];
-  }
+  const badgesResult = await query(
+    `SELECT * FROM badges WHERE is_active = true ORDER BY display_order`,
+  );
+  const badges = badgesResult.rows;
 
   // Get earned badges
-  const { data: earnedBadges } = await supabase
-    .from("student_badges")
-    .select("badge_id, earned_at")
-    .eq("student_id", studentId);
+  const earnedResult = await queryWithContext(
+    userId,
+    `SELECT badge_id, earned_at FROM student_badges WHERE student_id = $1`,
+    [studentId],
+  );
 
   const earnedMap = new Map(
-    earnedBadges?.map((b) => [b.badge_id, b.earned_at]) ?? [],
+    earnedResult.rows.map((b) => [b.badge_id, b.earned_at]),
   );
 
   // Get student stats
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(
-      "total_books_completed, total_pages_read, total_quizzes_completed, reading_streak",
-    )
-    .eq("id", studentId)
-    .single();
+  const statsResult = await queryWithContext(
+    userId,
+    `SELECT total_books_completed, total_pages_read, total_quizzes_completed, reading_streak
+     FROM profiles WHERE id = $1`,
+    [studentId],
+  );
 
+  const profile = statsResult.rows[0];
   const stats = {
     booksCompleted: profile?.total_books_completed ?? 0,
     pagesRead: profile?.total_pages_read ?? 0,
@@ -775,7 +659,7 @@ export async function getBadgesWithProgress(
     );
 
     return {
-      badge,
+      badge: badge as Badge,
       earned,
       earnedAt,
       progress: earned ? 100 : progress,

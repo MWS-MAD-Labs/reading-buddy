@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { getToken } from "next-auth/jwt";
 
 const PROTECTED_PREFIXES = ["/dashboard"];
 const AUTH_ROUTES = [
@@ -16,56 +16,33 @@ export async function proxy(req: NextRequest) {
   );
   const isAuthRoute = AUTH_ROUTES.includes(pathname);
 
-  // Create response object to handle cookie mutations
-  let response = NextResponse.next();
-
-  // Access env vars at runtime (middleware is server-side)
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return response;
-  }
-
-  // Create Supabase client with cookie handlers
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return req.cookies.get(name)?.value;
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        response.cookies.set({ name, value: "", ...options, maxAge: 0 });
-      },
-    },
+  // Get NextAuth session token
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
   });
 
-  // Check for active session
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const hasSession = !!token;
 
-  const hasSession = !!session;
-
+  // Redirect to login if accessing protected route without session
   if (!hasSession && isProtected) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("redirectedFrom", pathname);
-    response = NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(redirectUrl);
   }
 
+  // Redirect to dashboard if accessing auth route with active session
   if (hasSession && isAuthRoute) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = "/dashboard";
     redirectUrl.searchParams.delete("redirectedFrom");
-    response = NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(redirectUrl);
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|auth/callback).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/auth).*)"],
 };

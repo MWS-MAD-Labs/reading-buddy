@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/server";
 import type { UserRole } from "@/lib/auth/roleCheck";
 import { SystemStatsCards } from "@/components/dashboard/admin/SystemStatsCards";
 import { LibrarianStatsCards } from "@/components/dashboard/librarian/LibrarianStatsCards";
@@ -134,22 +133,11 @@ const heroCopy: Record<UserRole | "DEFAULT", { title: string; body: string }> =
   };
 
 export default async function DashboardHomePage() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Get current user from NextAuth
+  const user = await getCurrentUser();
 
-  const supabaseAdmin = getSupabaseAdminClient();
-
-  const { data: profile } = user
-    ? await supabaseAdmin
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single()
-    : { data: null };
-
-  const role = (profile?.role as UserRole | undefined) ?? "DEFAULT";
+  // Get role from session (populated by NextAuth session callback)
+  const role = (user.role as UserRole | undefined) ?? "DEFAULT";
   const copy = heroCopy[role] ?? heroCopy.DEFAULT;
   const links = roleQuickLinks[role] ?? roleQuickLinks.DEFAULT;
 
@@ -167,68 +155,12 @@ export default async function DashboardHomePage() {
     } | null;
   } | null = null;
 
-  if (user) {
-    const stats = await getGamificationStats(supabaseAdmin, user.id);
-
-    const statsWithLegacyFields = stats
-      ? {
-          ...stats,
-          // Legacy aliases to keep older UI pieces safe
-          total_xp: stats.xp ?? 0,
-          current_level_min_xp: 0,
-          next_level_min_xp: (stats.xp ?? 0) + (stats.xp_to_next_level ?? 0),
-        }
-      : null;
-
-    // Get current reading book
-    const { data: currentReading } = await supabaseAdmin
-      .from("student_books")
-      .select(
-        "book_id, current_page, updated_at, started_at, books(id, title, author, cover_url)",
-      )
-      .eq("student_id", user.id)
-      .order("updated_at", { ascending: false })
-      .order("started_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    let currentBook = null;
-    if (currentReading && currentReading.books) {
-      const bookData = Array.isArray(currentReading.books)
-        ? currentReading.books[0]
-        : currentReading.books;
-      const book = bookData as {
-        id: number;
-        title: string;
-        author: string;
-        cover_url: string;
-      } | null;
-
-      if (book) {
-        // TODO: Get actual page count from book metadata
-        const estimatedTotalPages = 300;
-        const currentPage = currentReading.current_page || 1;
-        const progressPercentage = Math.min(
-          (currentPage / estimatedTotalPages) * 100,
-          100,
-        );
-
-        currentBook = {
-          id: book.id,
-          title: book.title,
-          author: book.author,
-          cover_url: book.cover_url,
-          current_page: currentPage,
-          total_pages: estimatedTotalPages,
-          progress_percentage: progressPercentage,
-        };
-      }
+  if (user && user.userId && user.profileId) {
+    const { getReadingJourneyData } = await import("./dashboard-actions");
+    const result = await getReadingJourneyData(user.userId, user.profileId);
+    if (result.success && result.data) {
+      readingJourneyData = result.data;
     }
-
-    readingJourneyData = {
-      stats: statsWithLegacyFields,
-      currentBook,
-    };
   }
 
   const shouldShowTeacherOverview = role === "TEACHER" || role === "ADMIN";
@@ -244,90 +176,12 @@ export default async function DashboardHomePage() {
     }>;
   } | null = null;
 
-  if (shouldShowTeacherOverview && user) {
-    const classQuery = supabaseAdmin.from("classes").select("id, name");
-    const { data: teacherClasses } =
-      role === "TEACHER"
-        ? await classQuery.eq("teacher_id", user.id)
-        : await classQuery;
-
-    const classIds = teacherClasses?.map((c) => c.id) ?? [];
-
-    const { data: classStudents } = classIds.length
-      ? await supabaseAdmin
-          .from("class_students")
-          .select("student_id")
-          .in("class_id", classIds)
-      : { data: [] };
-
-    const studentIds = Array.from(
-      new Set((classStudents ?? []).map((row) => row.student_id)),
-    );
-
-    const { count: totalAssignments } = studentIds.length
-      ? await supabaseAdmin
-          .from("student_books")
-          .select("*", { count: "exact", head: true })
-          .in("student_id", studentIds)
-      : { count: 0 };
-
-    const { count: completedAssignments } = studentIds.length
-      ? await supabaseAdmin
-          .from("student_books")
-          .select("*", { count: "exact", head: true })
-          .in("student_id", studentIds)
-          .not("completed_at", "is", null)
-      : { count: 0 };
-
-    const { count: activeAssignments } = classIds.length
-      ? await supabaseAdmin
-          .from("class_books")
-          .select("*", { count: "exact", head: true })
-          .in("class_id", classIds)
-      : { count: 0 };
-
-    const { data: recentCompletions } = studentIds.length
-      ? await supabaseAdmin
-          .from("student_books")
-          .select(
-            "student_id, completed_at, profiles!student_books_student_id_fkey(full_name), books(title)",
-          )
-          .in("student_id", studentIds)
-          .not("completed_at", "is", null)
-          .order("completed_at", { ascending: false })
-          .limit(3)
-      : { data: [] };
-
-    const completionRate =
-      totalAssignments && totalAssignments > 0
-        ? Math.round(((completedAssignments ?? 0) / totalAssignments) * 100)
-        : 0;
-
-    teacherOverview = {
-      classCount: classIds.length,
-      studentCount: studentIds.length,
-      completionRate,
-      activeAssignments: activeAssignments ?? 0,
-      recentCompletions:
-        recentCompletions?.map((entry) => {
-          const profile =
-            Array.isArray(entry.profiles) && entry.profiles.length > 0
-              ? entry.profiles[0]
-              : entry.profiles;
-          const book =
-            Array.isArray(entry.books) && entry.books.length > 0
-              ? entry.books[0]
-              : entry.books;
-
-          return {
-            student:
-              (profile as { full_name?: string | null })?.full_name ??
-              "Unknown student",
-            bookTitle: (book as { title?: string })?.title ?? "Unknown book",
-            completedAt: entry.completed_at ?? null,
-          };
-        }) ?? [],
-    };
+  if (shouldShowTeacherOverview && user && user.userId && user.profileId) {
+    const { getTeacherOverview } = await import("./dashboard-actions");
+    const result = await getTeacherOverview(user.userId, user.profileId, role);
+    if (result.success && result.data) {
+      teacherOverview = result.data;
+    }
   }
 
   // Fetch leaderboard data
@@ -338,13 +192,13 @@ export default async function DashboardHomePage() {
     staffLeaderboard: Awaited<ReturnType<typeof getStaffLeaderboard>> | null;
   } | null = null;
 
-  if (user) {
+  if (user && user.userId && user.profileId) {
     const isStudent = role === "STUDENT";
     const studentLeaderboard = isStudent
-      ? await getStudentLeaderboard(user.id, 5)
+      ? await getStudentLeaderboard(user.userId, user.profileId, 5)
       : null;
     const staffLeaderboard = !isStudent
-      ? await getStaffLeaderboard(user.id, 5)
+      ? await getStaffLeaderboard(user.userId, user.profileId, 5)
       : null;
 
     leaderboardData = {
@@ -356,9 +210,13 @@ export default async function DashboardHomePage() {
   // Fetch stats based on role
   // Admin sees all stats from all roles
   const adminStatsResult =
-    role === "ADMIN" || role === "LIBRARIAN" ? await getSystemStats() : null;
+    role === "ADMIN" && user && user.userId
+      ? await getSystemStats(user.userId)
+      : null;
   const librarianStatsResult =
-    role === "ADMIN" || role === "LIBRARIAN" ? await getLibrarianStats() : null;
+    (role === "LIBRARIAN" || role === "ADMIN") && user && user.userId
+      ? await getLibrarianStats(user.userId)
+      : null;
 
   return (
     <div className="space-y-8">
