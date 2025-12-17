@@ -51,6 +51,7 @@ const localPool = new Pool({
 const TABLES = [
   "badges",
   "books",
+  "book_access", // Book access levels (UE, JH, TS, etc.)
   "profiles",
   "classes",
   "class_students",
