@@ -230,7 +230,6 @@ export const updateBookMetadata = async (input: {
     "genre = $7",
     "language = $8",
     "description = $9",
-    "updated_at = NOW()",
   ];
 
   const params: any[] = [
