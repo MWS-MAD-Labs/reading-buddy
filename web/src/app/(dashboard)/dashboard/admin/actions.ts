@@ -11,8 +11,15 @@ type AddUserParams = {
   accessLevel: string | null;
 };
 
+interface TransactionClient {
+  query: (
+    sql: string,
+    params?: unknown[],
+  ) => Promise<{ rows: Record<string, unknown>[] }>;
+}
+
 export async function addUser(params: AddUserParams): Promise<void> {
-  await transaction(async (client: any) => {
+  await transaction(async (client: TransactionClient) => {
     // Hash password
     const passwordHash = await bcrypt.hash(params.password, 10);
 
@@ -84,7 +91,7 @@ export async function updateUserAccessLevel(
 }
 
 export async function deleteUser(userId: string): Promise<void> {
-  await transaction(async (client: any) => {
+  await transaction(async (client: TransactionClient) => {
     // Get user_id from profile
     const profileResult = await client.query(
       "SELECT user_id FROM profiles WHERE id = $1",
