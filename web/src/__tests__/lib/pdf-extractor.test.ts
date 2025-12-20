@@ -170,7 +170,7 @@ describe("extractTextFromPDF", () => {
     };
 
     vi.mocked(getMinioClient).mockReturnValue(
-      mockMinioClient as ReturnType<typeof getMinioClient>,
+      mockMinioClient as unknown as ReturnType<typeof getMinioClient>,
     );
 
     // This will fail at PDF parsing stage, but validates our error handling
