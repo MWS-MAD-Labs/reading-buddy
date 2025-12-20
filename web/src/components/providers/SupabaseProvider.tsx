@@ -1,20 +1,34 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
-import { createSupabaseBrowserClient, type SupabaseBrowserClient } from '@/lib/supabase/client';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from "react";
+import {
+  createSupabaseBrowserClient,
+  type SupabaseBrowserClient,
+} from "@/lib/supabase/client";
 
-const SupabaseContext = createContext<SupabaseBrowserClient | null>(null);
+const SupabaseContext = createContext<SupabaseBrowserClient>(null);
 
 export const SupabaseProvider = ({ children }: { children: ReactNode }) => {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   useEffect(() => {
+    // Skip auth state listener if Supabase is not configured (PostgreSQL migration)
+    if (!supabase) {
+      return;
+    }
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      fetch('/auth/callback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      fetch("/auth/callback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ event, session }),
       });
     });
@@ -24,13 +38,15 @@ export const SupabaseProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [supabase]);
 
-  return <SupabaseContext.Provider value={supabase}>{children}</SupabaseContext.Provider>;
+  return (
+    <SupabaseContext.Provider value={supabase}>
+      {children}
+    </SupabaseContext.Provider>
+  );
 };
 
 export const useSupabaseBrowser = () => {
   const context = useContext(SupabaseContext);
-  if (!context) {
-    throw new Error('useSupabaseBrowser must be used within SupabaseProvider');
-  }
+  // Return null if Supabase is not configured (PostgreSQL migration)
   return context;
 };
