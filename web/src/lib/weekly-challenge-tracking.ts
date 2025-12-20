@@ -5,10 +5,7 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
-import {
-  getCurrentWeekChallenge,
-  getWeeklyChallengeProgress,
-} from "./weekly-challenges";
+import { getWeeklyChallengeProgress } from "./weekly-challenges";
 import { awardXP } from "./gamification";
 
 /**

@@ -5,13 +5,15 @@
  * Uses in-memory storage for development and can be upgraded to Redis for production.
  */
 
-import { Ratelimit } from "@upstash/ratelimit";
-
 // In-memory rate limiter for development
 class MemoryRateLimiter {
   private requests: Map<string, number[]> = new Map();
 
-  async limit(identifier: string, maxRequests: number, windowMs: number): Promise<{
+  async limit(
+    identifier: string,
+    maxRequests: number,
+    windowMs: number,
+  ): Promise<{
     success: boolean;
     limit: number;
     remaining: number;
@@ -24,7 +26,9 @@ class MemoryRateLimiter {
     const existing = this.requests.get(identifier) || [];
 
     // Filter out requests outside the window
-    const recentRequests = existing.filter(timestamp => timestamp > windowStart);
+    const recentRequests = existing.filter(
+      (timestamp) => timestamp > windowStart,
+    );
 
     // Check if limit exceeded
     if (recentRequests.length >= maxRequests) {
@@ -58,7 +62,7 @@ class MemoryRateLimiter {
 
   private cleanup(before: number) {
     for (const [key, timestamps] of this.requests.entries()) {
-      const recent = timestamps.filter(t => t > before);
+      const recent = timestamps.filter((t) => t > before);
       if (recent.length === 0) {
         this.requests.delete(key);
       } else {
@@ -100,7 +104,7 @@ export const rateLimitConfig = {
  */
 export async function rateLimit(
   identifier: string,
-  type: keyof typeof rateLimitConfig
+  type: keyof typeof rateLimitConfig,
 ): Promise<{
   success: boolean;
   limit: number;
@@ -118,11 +122,12 @@ export async function rateLimit(
  */
 export function getClientIdentifier(headers: Headers): string {
   // Try to get IP from various headers (for proxies/load balancers)
-  const forwardedFor = headers.get('x-forwarded-for');
-  const realIp = headers.get('x-real-ip');
-  const cfConnectingIp = headers.get('cf-connecting-ip');
+  const forwardedFor = headers.get("x-forwarded-for");
+  const realIp = headers.get("x-real-ip");
+  const cfConnectingIp = headers.get("cf-connecting-ip");
 
-  const ip = cfConnectingIp || realIp || forwardedFor?.split(',')[0] || 'unknown';
+  const ip =
+    cfConnectingIp || realIp || forwardedFor?.split(",")[0] || "unknown";
 
   return ip.trim();
 }
@@ -130,7 +135,10 @@ export function getClientIdentifier(headers: Headers): string {
 /**
  * Get user identifier from user ID or fallback to IP
  */
-export function getUserIdentifier(userId: string | null, headers: Headers): string {
+export function getUserIdentifier(
+  userId: string | null,
+  headers: Headers,
+): string {
   if (userId) {
     return `user:${userId}`;
   }
@@ -146,18 +154,18 @@ export function rateLimitExceeded(reset: number) {
 
   return new Response(
     JSON.stringify({
-      error: 'Too many requests',
-      message: 'Rate limit exceeded. Please try again later.',
+      error: "Too many requests",
+      message: "Rate limit exceeded. Please try again later.",
       retryAfter,
       resetAt: resetDate.toISOString(),
     }),
     {
       status: 429,
       headers: {
-        'Content-Type': 'application/json',
-        'Retry-After': retryAfter.toString(),
-        'X-RateLimit-Reset': resetDate.toISOString(),
+        "Content-Type": "application/json",
+        "Retry-After": retryAfter.toString(),
+        "X-RateLimit-Reset": resetDate.toISOString(),
       },
-    }
+    },
   );
 }
