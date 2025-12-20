@@ -15,6 +15,7 @@ async function setupDatabase() {
         database: process.env.DB_NAME || "reading_buddy",
         user: process.env.DB_USER || "reading_buddy",
         password: process.env.DB_PASSWORD,
+        ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined,
     });
 
     try {

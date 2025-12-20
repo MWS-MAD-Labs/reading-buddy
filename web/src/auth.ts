@@ -12,6 +12,7 @@ const authPool = new Pool({
     user: process.env.DB_USER || "reading_buddy",
     password: process.env.DB_PASSWORD,
     max: 20,
+    ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined,
 });
 
 export const authOptions: NextAuthConfig = {
