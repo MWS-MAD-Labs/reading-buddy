@@ -16,6 +16,7 @@ const authPool = new Pool({
 });
 
 export const authOptions: NextAuthConfig = {
+  trustHost: true,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
