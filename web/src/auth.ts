@@ -119,12 +119,16 @@ export const authOptions: NextAuthConfig = {
                     const profileCount = await authPool.query(
                         "SELECT COUNT(*) as count FROM profiles",
                     );
+                    console.log("DEBUG: Raw profile count result:", profileCount.rows[0]);
                     const count = parseInt(profileCount.rows[0].count);
+                    console.log("DEBUG: Parsed count:", count);
                     const isFirstUser = count === 0;
+                    console.log("DEBUG: isFirstUser:", isFirstUser);
                     console.log("Profile count:", count, "- First user?", isFirstUser);
 
                     // Create or update profile - first user gets ADMIN role
                     const role = isFirstUser ? "ADMIN" : "STUDENT";
+                    console.log("DEBUG: Assigned role:", role);
                     console.log("Creating profile with role:", role);
 
                     await authPool.query(
@@ -177,7 +181,7 @@ export const authOptions: NextAuthConfig = {
                 const result = await authPool.query(
                     `SELECT id, role, grade, access_level, xp, level, full_name
            FROM profiles
-           WHERE user_id = $1`,
+           WHERE id = $1`,
                     [userId],
                 );
 

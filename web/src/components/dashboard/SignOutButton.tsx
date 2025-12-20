@@ -1,21 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useSupabaseBrowser } from "@/components/providers/SupabaseProvider";
+import { signOut } from "next-auth/react";
 
 export const SignOutButton = () => {
-  const router = useRouter();
-  const supabase = useSupabaseBrowser();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignOut = async () => {
     setIsLoading(true);
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
-    router.replace("/login");
-    router.refresh();
+    await signOut({ callbackUrl: "/login" });
   };
 
   return (

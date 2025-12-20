@@ -27,7 +27,8 @@
     "check:extracted-text": "tsx scripts/check-extracted-text.ts",
     "test:quiz-generation": "tsx scripts/test-quiz-generation.ts",
     "test:auto-checkpoints": "tsx scripts/test-auto-checkpoints.ts",
-    "test:ai-providers": "tsx scripts/test-ai-providers.ts"
+    "test:ai-providers": "tsx scripts/test-ai-providers.ts",
+    "db:setup": "tsx scripts/setup-db.ts"
   },
   "dependencies": {
     "@auth/pg-adapter": "^1.11.1",
@@ -70,6 +71,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/bcryptjs": "^2.4.6",
+    "@types/dotenv": "^6.1.1",
     "@types/jszip": "^3.4.0",
     "@types/node": "^20",
     "@types/pg": "^8.16.0",
@@ -78,6 +80,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/coverage-v8": "^4.0.15",
     "babel-plugin-react-compiler": "1.0.0",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.0.1",
     "happy-dom": "^20.0.10",
