@@ -94,7 +94,7 @@ export async function extractTextFromPDF(
 
       // Concatenate text items
       const pageText = textContent.items
-        .map((item: { str?: string }) => ("str" in item ? item.str : ""))
+        .map((item) => ("str" in item ? (item as { str: string }).str : ""))
         .join(" ")
         .trim();
 
@@ -145,7 +145,7 @@ export async function extractPageRangeText(
   });
 
   return result.pages
-    .map((page: PageText) => `[Page ${page.pageNumber}]\n${page.text}`)
+    .map((page) => `[Page ${page.pageNumber}]\n${page.text}`)
     .join("\n\n");
 }
 
