@@ -26,6 +26,14 @@ export const ForgotPasswordForm = () => {
     setInfo(null);
     setIsLoading(true);
 
+    if (!supabase) {
+      setError(
+        "Password reset is not available. Please contact your administrator.",
+      );
+      setIsLoading(false);
+      return;
+    }
+
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") ?? "").trim();
 

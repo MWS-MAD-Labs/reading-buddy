@@ -74,6 +74,14 @@ export const LoginForm = ({ broadcast }: LoginFormProps) => {
     setError(null);
     setIsGoogleLoading(true);
 
+    if (!supabase) {
+      setError(
+        "Google sign-in is not available. Please use the standard login form.",
+      );
+      setIsGoogleLoading(false);
+      return;
+    }
+
     try {
       const origin = window.location.origin;
       await supabase.auth.signInWithOAuth({
