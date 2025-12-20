@@ -39,6 +39,9 @@ export default async function ManageClassroomPage({
 
   const { user, role } = await requireRole(["TEACHER", "ADMIN"]);
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    notFound();
+  }
 
   await assertCanManageClass(classId, user.id, role);
 

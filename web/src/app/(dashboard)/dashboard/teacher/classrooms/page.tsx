@@ -11,6 +11,13 @@ export default async function ClassroomManagementPage() {
 
   const supabase = await createSupabaseServerClient();
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    return (
+      <div className="p-6 text-center text-red-600">
+        Database connection not available.
+      </div>
+    );
+  }
 
   let query = supabaseAdmin.from("classes").select("id, name");
 

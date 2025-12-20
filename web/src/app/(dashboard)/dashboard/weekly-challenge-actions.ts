@@ -21,6 +21,9 @@ export async function getWeeklyChallenge(
 ): Promise<{ success: boolean; data?: WeeklyChallengeData; error?: string }> {
   try {
     const supabase = getSupabaseAdminClient();
+    if (!supabase) {
+      return { success: false, error: "Database connection not available" };
+    }
 
     const result = await getWeeklyChallengeProgress(supabase, userId);
 

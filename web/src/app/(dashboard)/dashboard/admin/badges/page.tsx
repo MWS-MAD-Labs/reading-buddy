@@ -12,6 +12,9 @@ export const dynamic = "force-dynamic";
 export default async function AdminBadgesPage() {
   const supabase = await createSupabaseServerClient();
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    redirect("/dashboard");
+  }
 
   const {
     data: { user },

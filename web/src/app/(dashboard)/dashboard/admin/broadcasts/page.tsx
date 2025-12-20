@@ -11,6 +11,13 @@ type BroadcastRow = LoginBroadcast & { isActive?: boolean };
 export default async function AdminBroadcastsPage() {
   await requireRole(["ADMIN"]);
   const supabase = getSupabaseAdminClient();
+  if (!supabase) {
+    return (
+      <div className="p-6 text-center text-red-600">
+        Database connection not available.
+      </div>
+    );
+  }
 
   const { data } = await supabase
     .from("login_broadcasts")

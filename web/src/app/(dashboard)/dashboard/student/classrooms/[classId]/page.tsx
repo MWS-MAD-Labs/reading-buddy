@@ -24,6 +24,9 @@ export default async function StudentClassroomPage({
 
   const supabase = await createSupabaseServerClient();
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    redirect("/dashboard");
+  }
   const {
     data: { user },
   } = await supabase.auth.getUser();

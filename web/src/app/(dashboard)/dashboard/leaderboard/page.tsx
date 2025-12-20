@@ -23,6 +23,9 @@ export default async function LeaderboardPage() {
   }
 
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    redirect("/dashboard");
+  }
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("role")
