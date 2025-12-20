@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 
 const PROTECTED_PREFIXES = ["/dashboard"];
 const AUTH_ROUTES = [
@@ -9,23 +9,16 @@ const AUTH_ROUTES = [
   "/reset-password",
 ];
 
-export async function proxy(req: NextRequest) {
+export const proxy = auth((req) => {
   const { pathname } = req.nextUrl;
   const isProtected = PROTECTED_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix),
   );
   const isAuthRoute = AUTH_ROUTES.includes(pathname);
-
-  // Get NextAuth session token
-  const token = await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-  });
-
-  const hasSession = !!token;
+  const isLoggedIn = !!req.auth;
 
   // Redirect to login if accessing protected route without session
-  if (!hasSession && isProtected) {
+  if (!isLoggedIn && isProtected) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("redirectedFrom", pathname);
@@ -33,7 +26,7 @@ export async function proxy(req: NextRequest) {
   }
 
   // Redirect to dashboard if accessing auth route with active session
-  if (hasSession && isAuthRoute) {
+  if (isLoggedIn && isAuthRoute) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = "/dashboard";
     redirectUrl.searchParams.delete("redirectedFrom");
@@ -41,7 +34,7 @@ export async function proxy(req: NextRequest) {
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|api/auth).*)"],
