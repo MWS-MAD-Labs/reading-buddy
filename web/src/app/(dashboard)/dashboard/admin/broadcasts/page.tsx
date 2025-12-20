@@ -14,11 +14,13 @@ export default async function AdminBroadcastsPage() {
 
   const { data } = await supabase
     .from("login_broadcasts")
-    .select("id, title, body, tone, link_label, link_url, created_at, is_active")
+    .select(
+      "id, title, body, tone, link_label, link_url, created_at, is_active",
+    )
     .order("created_at", { ascending: false });
 
   const broadcasts: BroadcastRow[] =
-    data?.map((row) => ({
+    data?.map((row: any) => ({
       id: row.id,
       title: row.title,
       body: row.body,
@@ -33,7 +35,9 @@ export default async function AdminBroadcastsPage() {
     <div className="space-y-6">
       <header className="rounded-3xl border-4 border-indigo-300 bg-gradient-to-br from-indigo-50 to-sky-50 p-6 shadow-lg">
         <div className="mb-2 inline-block rounded-2xl border-4 border-indigo-200 bg-indigo-500/80 px-4 py-1 text-white">
-          <p className="text-sm font-black uppercase tracking-wide">Admin Panel</p>
+          <p className="text-sm font-black uppercase tracking-wide">
+            Admin Panel
+          </p>
         </div>
         <h1 className="text-3xl font-black text-indigo-900">
           Login Broadcasts

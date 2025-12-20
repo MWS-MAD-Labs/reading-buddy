@@ -64,9 +64,9 @@ export const FlipBookReader = ({
     const handleFullscreenChange = () => {
       const isCurrentlyFullscreen = Boolean(
         document.fullscreenElement ||
-          (document as any).webkitFullscreenElement ||
-          (document as any).mozFullScreenElement ||
-          (document as any).msFullscreenElement,
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement,
       );
       setIsFullscreen(isCurrentlyFullscreen);
     };
@@ -260,12 +260,13 @@ export const FlipBookReader = ({
 
   // Preload nearby pages when current page changes
   useEffect(() => {
-    const preloadRange = 2; // Reduced to 2 pages ahead and behind for faster loading
+    const preloadBehind = 2; // 2 pages down (behind)
+    const preloadAhead = 3; // 3 pages up (ahead)
     const imagesToPreload: string[] = [];
 
     for (
-      let i = Math.max(1, currentPage - preloadRange);
-      i <= Math.min(pageImages.count, currentPage + preloadRange);
+      let i = Math.max(1, currentPage - preloadBehind);
+      i <= Math.min(pageImages.count, currentPage + preloadAhead);
       i++
     ) {
       const imageUrl = `${pageImages.baseUrl}/page-${padPageNumber(i)}.jpg`;
@@ -274,7 +275,7 @@ export const FlipBookReader = ({
 
     // Preload images with slight delay to prioritize current page
     const timeoutId = setTimeout(() => {
-      imagesToPreload.forEach((url) => {
+      imagesToPreload.forEach((url: any) => {
         const img = new window.Image();
         img.src = url;
       });
@@ -495,14 +496,20 @@ export const FlipBookReader = ({
             const imageUrl = `${pageImages.baseUrl}/page-${padPageNumber(pageNumber)}.jpg`;
 
             // Calculate distance from current page for lazy loading
-            const distanceFromCurrent = Math.abs(pageNumber - currentPage);
+            const distanceBehind = currentPage - pageNumber;
+            const distanceAhead = pageNumber - currentPage;
 
-            // Optimized load strategy for better performance:
-            // - Current page and next/previous 2 pages: load eagerly
-            // - Pages 3-5 away: lazy load
-            // - Pages 5+ away: don't load yet (use placeholder)
-            const shouldLoad = distanceFromCurrent <= 5;
-            const isNearby = distanceFromCurrent <= 2;
+            // Pre-render strategy for smooth page flipping:
+            // - Render (DOM): 5 pages ahead, 3 pages behind (pre-render in DOM)
+            // - Eager load (priority): Current + 3 ahead, 2 behind (download immediately)
+            // - Lazy load: 4-5 pages ahead, 3 behind (download when near)
+            // - Beyond: Show placeholder (not in DOM)
+            const shouldRender =
+              (distanceAhead >= 0 && distanceAhead <= 5) ||
+              (distanceBehind >= 0 && distanceBehind <= 3);
+            const shouldEagerLoad =
+              (distanceAhead >= 0 && distanceAhead <= 3) ||
+              (distanceBehind >= 0 && distanceBehind <= 2);
 
             return (
               <article
@@ -528,15 +535,15 @@ export const FlipBookReader = ({
               >
                 {/* Book page content */}
                 <div className="relative h-full w-full p-2">
-                  {shouldLoad ? (
+                  {shouldRender ? (
                     <Image
                       src={imageUrl}
                       alt={`Page ${pageNumber}`}
                       className="h-full w-full object-contain"
                       width={width}
                       height={height}
-                      priority={isNearby}
-                      loading={isNearby ? "eager" : "lazy"}
+                      priority={shouldEagerLoad}
+                      loading={shouldEagerLoad ? "eager" : "lazy"}
                       placeholder="blur"
                       blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWEREiMxUf/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
                     />

@@ -48,7 +48,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
     if (!searchQuery.trim()) return users;
 
     const query = searchQuery.toLowerCase();
-    return users.filter((user) => {
+    return users.filter((user: any) => {
       return (
         user.full_name?.toLowerCase().includes(query) ||
         user.email?.toLowerCase().includes(query) ||
@@ -163,7 +163,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
           </div>
         ) : (
           <>
-            {filteredUsers.map((user) => (
+            {filteredUsers.map((user: any) => (
               <div
                 key={user.id}
                 className="rounded-3xl border-2 border-white/60 bg-white/85 p-5 shadow-[0_20px_60px_rgba(147,118,255,0.18)] backdrop-blur-xl transition-all hover:shadow-[0_25px_70px_rgba(147,118,255,0.25)]"
@@ -272,7 +272,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
+                filteredUsers.map((user: any) => (
                   <tr
                     key={user.id}
                     className="transition-colors hover:bg-violet-50/50"

@@ -1,7 +1,7 @@
-import { redirect } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "./server";
 
-export type UserRole = 'ADMIN' | 'LIBRARIAN' | 'TEACHER' | 'STUDENT';
+export type UserRole = "ADMIN" | "LIBRARIAN" | "TEACHER" | "STUDENT";
 
 /**
  * Check if the current user has one of the required roles
@@ -10,6 +10,8 @@ export type UserRole = 'ADMIN' | 'LIBRARIAN' | 'TEACHER' | 'STUDENT';
 export type SessionUser = {
   id: string;
   email?: string;
+  role?: UserRole;
+  profileId?: string;
 };
 
 export type RequireRoleResult = {
@@ -17,29 +19,27 @@ export type RequireRoleResult = {
   role: UserRole;
 };
 
-export async function requireRole(allowedRoles: UserRole[]): Promise<RequireRoleResult> {
-  const supabase = await createSupabaseServerClient();
+export async function requireRole(
+  allowedRoles: UserRole[],
+): Promise<RequireRoleResult> {
+  // Get current user from NextAuth (redirects to login if not authenticated)
+  const user = await getCurrentUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  const userRole = profile?.role as UserRole | undefined;
+  // Get role from session
+  const userRole = user.role as UserRole | undefined;
 
   if (!userRole || !allowedRoles.includes(userRole)) {
     // Redirect to dashboard with unauthorized message
-    redirect('/dashboard?error=unauthorized');
+    redirect("/dashboard?error=unauthorized");
   }
 
-  return { user: { id: user.id, email: user.email ?? undefined }, role: userRole };
+  return {
+    user: {
+      id: user.id!,
+      email: user.email ?? undefined,
+      role: userRole,
+      profileId: user.profileId,
+    },
+    role: userRole,
+  };
 }

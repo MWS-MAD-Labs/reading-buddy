@@ -90,7 +90,7 @@ export async function checkAndAwardChallengeXP(
     const { weekNumber, year } = getWeekInfo();
 
     await awardXP(
-      supabase,
+      userId,
       userId,
       challenge.xpReward,
       "challenge_completed",

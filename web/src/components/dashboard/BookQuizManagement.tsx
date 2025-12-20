@@ -383,7 +383,7 @@ export const BookQuizManagement = ({
         </div>
       ) : (
         <div className="space-y-2">
-          {quizzes.map((quiz) => (
+          {quizzes.map((quiz: any) => (
             <div
               key={quiz.id}
               className="rounded-lg border-2 border-indigo-200 bg-white p-3 shadow-sm"

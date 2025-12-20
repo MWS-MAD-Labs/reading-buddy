@@ -88,14 +88,14 @@ export const DashboardNav = ({ userRole }: DashboardNavProps) => {
   const pathname = usePathname();
 
   // Filter links based on user role
-  const visibleLinks = navLinks.filter((link) => {
+  const visibleLinks = navLinks.filter((link: any) => {
     if (!userRole) return false;
     return link.roles.includes(userRole);
   });
 
   return (
     <nav className="hidden gap-3 lg:flex">
-      {visibleLinks.map((link) => {
+      {visibleLinks.map((link: any) => {
         const isActive =
           pathname === link.href || pathname.startsWith(`${link.href}/`);
         return (

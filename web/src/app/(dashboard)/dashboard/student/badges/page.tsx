@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   getBadgesWithProgress,
   getGamificationStats,
@@ -22,7 +21,6 @@ const categoryLabels: Record<BadgeCategory, { label: string }> = {
 
 export default async function BadgesPage() {
   const supabase = await createSupabaseServerClient();
-  const supabaseAdmin = getSupabaseAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -31,11 +29,8 @@ export default async function BadgesPage() {
     redirect("/login");
   }
 
-  const stats = await getGamificationStats(supabaseAdmin, user.id);
-  const badgesWithProgress = await getBadgesWithProgress(
-    supabaseAdmin,
-    user.id,
-  );
+  const stats = await getGamificationStats(user.id, user.id);
+  const badgesWithProgress = await getBadgesWithProgress(user.id, user.id);
 
   // Group badges by category
   const badgesByCategory = badgesWithProgress.reduce(
@@ -51,7 +46,7 @@ export default async function BadgesPage() {
   );
 
   // Sort each category: earned first, then by progress
-  Object.keys(badgesByCategory).forEach((category) => {
+  Object.keys(badgesByCategory).forEach((category: any) => {
     badgesByCategory[category].sort((a, b) => {
       if (a.earned && !b.earned) return -1;
       if (!a.earned && b.earned) return 1;
@@ -59,7 +54,7 @@ export default async function BadgesPage() {
     });
   });
 
-  const earnedCount = badgesWithProgress.filter((b) => b.earned).length;
+  const earnedCount = badgesWithProgress.filter((b: any) => b.earned).length;
   const totalCount = badgesWithProgress.length;
 
   // Category order for display
@@ -142,12 +137,12 @@ export default async function BadgesPage() {
       </div>
 
       {/* Badges by Category */}
-      {categoryOrder.map((category) => {
+      {categoryOrder.map((category: any) => {
         const badges = badgesByCategory[category];
         if (!badges || badges.length === 0) return null;
 
-        const categoryInfo = categoryLabels[category];
-        const earnedInCategory = badges.filter((b) => b.earned).length;
+        const categoryInfo = categoryLabels[category as BadgeCategory];
+        const earnedInCategory = badges.filter((b: any) => b.earned).length;
 
         return (
           <section
@@ -166,7 +161,7 @@ export default async function BadgesPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {badges.map((item) => (
+              {badges.map((item: any) => (
                 <BadgeCard
                   key={item.badge.id}
                   badge={item.badge}

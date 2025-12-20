@@ -1,6 +1,6 @@
 "use client";
 
-import { getLevelTitle } from "@/lib/gamification";
+import { getLevelTitle } from "@/lib/gamification-utils";
 import type { ProfileGamificationStats } from "@/types/database";
 
 interface XPProgressCardProps {

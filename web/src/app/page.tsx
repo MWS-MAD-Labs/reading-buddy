@@ -52,7 +52,7 @@ export default function Home() {
               color: "from-yellow-100 to-orange-100",
               borderColor: "border-yellow-300",
             },
-          ].map((card) => (
+          ].map((card: any) => (
             <article
               key={card.title}
               className={`sticker-card rounded-3xl border-4 ${card.borderColor} bg-gradient-to-br ${card.color} p-6 shadow-lg transition hover:scale-105 hover:shadow-2xl md:p-8`}
@@ -77,7 +77,7 @@ export default function Home() {
               { role: "Teachers", desc: "Assign books and track progress." },
               { role: "Librarians", desc: "Manage the book collection." },
               { role: "Admins", desc: "Control configuration and access." },
-            ].map((item) => (
+            ].map((item: any) => (
               <div
                 key={item.role}
                 className="rounded-2xl border-4 border-purple-300 bg-white p-4 shadow-md transition hover:shadow-lg"

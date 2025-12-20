@@ -104,7 +104,7 @@ export const ClassReadingList = ({ classId, assignedBooks, availableBooks }: Cla
             disabled={availableBooks.length === 0}
           />
           <datalist id={datalistId}>
-            {availableBooks.map((book) => (
+            {availableBooks.map((book: any) => (
               <option key={book.id} value={book.title} label={book.author ?? undefined} />
             ))}
           </datalist>
@@ -121,7 +121,7 @@ export const ClassReadingList = ({ classId, assignedBooks, availableBooks }: Cla
       {error && <p className="text-sm font-semibold text-rose-500">{error}</p>}
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
-        {assignedBooks.map((book) => (
+        {assignedBooks.map((book: any) => (
           <div
             key={book.book_id}
             className="flex gap-4 rounded-2xl border border-indigo-100 bg-white/90 p-4 shadow-[0_16px_40px_rgba(79,70,229,0.15)]"

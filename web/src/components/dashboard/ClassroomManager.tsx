@@ -87,7 +87,7 @@ export const ClassroomManager = ({
                 className="flex-grow rounded-2xl border border-orange-200 bg-white/80 px-4 py-3 text-indigo-950 shadow-[0_12px_30px_rgba(255,173,109,0.25)] focus:outline-none focus:ring-2 focus:ring-orange-300"
               >
                 <option value="">Me (current user)</option>
-                {allTeachers.map((teacher) => (
+                {allTeachers.map((teacher: any) => (
                   <option key={teacher.id} value={teacher.id}>
                     {teacher.full_name}
                   </option>
@@ -115,7 +115,7 @@ export const ClassroomManager = ({
             Tap manage to curate each roster.
           </p>
           <div className="mt-4 space-y-4">
-            {classrooms.map((classroom) => (
+            {classrooms.map((classroom: any) => (
               <div
                 key={classroom.id}
                 className="flex flex-col gap-3 rounded-2xl border border-indigo-100 bg-white/95 p-4 shadow-[0_18px_40px_rgba(93,80,255,0.15)] md:flex-row md:items-center md:justify-between"

@@ -22,7 +22,7 @@ interface RateLimitOptions {
  * @example
  * ```ts
  * export const POST = withRateLimit(
- *   async (request) => {
+ *   async (request: any) => {
  *     // Your handler logic
  *     return NextResponse.json({ success: true });
  *   },

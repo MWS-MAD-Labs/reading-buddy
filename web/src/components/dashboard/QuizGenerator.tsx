@@ -53,7 +53,7 @@ export const QuizGenerator = ({ books }: QuizGeneratorProps) => {
           onChange={(event) => setBookId(Number(event.target.value))}
         >
           {books.length ? (
-            books.map((book) => (
+            books.map((book: any) => (
               <option key={book.id} value={book.id} className="bg-white text-purple-900">
                 {book.title}
               </option>

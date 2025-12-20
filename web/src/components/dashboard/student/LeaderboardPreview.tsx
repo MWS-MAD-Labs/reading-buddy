@@ -58,7 +58,7 @@ export function LeaderboardPreview({
       </div>
 
       <div className="space-y-3">
-        {topStudents.map((student) => (
+        {topStudents.map((student: any) => (
           <div
             key={student.studentId}
             className={`flex items-center gap-3 rounded-2xl border p-3 transition ${

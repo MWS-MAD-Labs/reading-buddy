@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/server";
 import { requireRole } from "@/lib/auth/roleCheck";
+import { queryWithContext } from "@/lib/db";
 import { ClassroomManager } from "@/components/dashboard/ClassroomManager";
 import { ClassAnalyticsOverview } from "@/components/dashboard/teacher/ClassAnalyticsOverview";
 import { AssignmentTrackingDashboard } from "@/components/dashboard/teacher/AssignmentTrackingDashboard";
@@ -19,59 +19,51 @@ const cardClass =
 
 export default async function TeacherDashboardPage() {
   const { user, role } = await requireRole(["TEACHER", "ADMIN"]);
-  const supabase = await createSupabaseServerClient();
-  const supabaseAdmin = getSupabaseAdminClient();
+  const currentUser = await getCurrentUser();
+  const userId = currentUser.userId!;
+  const profileId = user.profileId!;
 
-  // Always filter to current user's classes on the dashboard
-  // (even admins only see their own classes here)
-  const { data: classroomsData, error: classroomsError } = await supabaseAdmin
-    .from("classes")
-    .select("id, name")
-    .eq("teacher_id", user.id);
+  // Get teacher's classrooms
+  const classroomsResult = await queryWithContext(
+    userId,
+    `SELECT id, name FROM classes WHERE teacher_id = $1`,
+    [profileId],
+  );
 
-  if (classroomsError) {
-    console.error(classroomsError);
-  }
+  const classrooms = await Promise.all(
+    classroomsResult.rows.map(async (c: any) => {
+      const countResult = await queryWithContext(
+        userId,
+        `SELECT COUNT(*) as count FROM class_students WHERE class_id = $1`,
+        [c.id],
+      );
 
-  const classrooms = classroomsData
-    ? await Promise.all(
-        classroomsData.map(async (c) => {
-          const { count } = await supabaseAdmin
-            .from("class_students")
-            .select("*", { count: "exact", head: true })
-            .eq("class_id", c.id);
+      return {
+        id: c.id,
+        name: c.name,
+        student_count: parseInt(countResult.rows[0].count || "0"),
+      };
+    }),
+  );
 
-          return {
-            id: c.id,
-            name: c.name,
-            student_count: count ?? 0,
-          };
-        }),
-      )
-    : [];
+  // Get all teachers
+  const allTeachersResult = await queryWithContext(
+    userId,
+    `SELECT id, full_name FROM profiles WHERE role = 'TEACHER'`,
+    [],
+  );
 
-  const { data: allTeachersData, error: allTeachersError } = await supabase
-    .from("profiles")
-    .select("id, full_name")
-    .eq("role", "TEACHER");
-
-  if (allTeachersError) {
-    console.error(allTeachersError);
-    // Handle error appropriately
-  }
-
-  const allTeachers =
-    allTeachersData?.map((t) => ({
-      id: t.id,
-      full_name: t.full_name ?? "",
-    })) ?? [];
+  const allTeachers = allTeachersResult.rows.map((t: any) => ({
+    id: t.id,
+    full_name: t.full_name ?? "",
+  }));
 
   // Get class analytics
-  const classAnalytics = await getTeacherClassAnalytics(user.id);
+  const classAnalytics = await getTeacherClassAnalytics(userId, profileId);
 
   // Get assignment tracking data
-  const bookAssignments = await getTeacherBookAssignments(user.id);
-  const quizAssignments = await getTeacherQuizAssignments(user.id);
+  const bookAssignments = await getTeacherBookAssignments(userId, profileId);
+  const quizAssignments = await getTeacherQuizAssignments(userId, profileId);
 
   return (
     <div className="space-y-8">

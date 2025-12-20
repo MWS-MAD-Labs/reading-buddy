@@ -33,8 +33,16 @@ export default async function LeaderboardPage() {
   const isStudent = role === "STUDENT";
 
   // Fetch full leaderboards (50 entries)
-  const studentLeaderboardResult = await getStudentLeaderboard(user.id, 50);
-  const staffLeaderboardResult = await getStaffLeaderboard(user.id, 50);
+  const studentLeaderboardResult = await getStudentLeaderboard(
+    user.id,
+    user.id,
+    50,
+  );
+  const staffLeaderboardResult = await getStaffLeaderboard(
+    user.id,
+    user.id,
+    50,
+  );
 
   return (
     <div className="space-y-8">
@@ -67,16 +75,19 @@ export default async function LeaderboardPage() {
       {/* Primary Leaderboard (Based on User Role) */}
       {isStudent ? (
         <>
-          {studentLeaderboardResult.success && studentLeaderboardResult.data && (
-            <StudentLeaderboard
-              entries={studentLeaderboardResult.data.entries}
-              currentUserEntry={studentLeaderboardResult.data.currentUserEntry}
-              totalParticipants={
-                studentLeaderboardResult.data.totalParticipants
-              }
-              showFullList={true}
-            />
-          )}
+          {studentLeaderboardResult.success &&
+            studentLeaderboardResult.data && (
+              <StudentLeaderboard
+                entries={studentLeaderboardResult.data.entries}
+                currentUserEntry={
+                  studentLeaderboardResult.data.currentUserEntry
+                }
+                totalParticipants={
+                  studentLeaderboardResult.data.totalParticipants
+                }
+                showFullList={true}
+              />
+            )}
 
           {studentLeaderboardResult.success &&
             studentLeaderboardResult.data &&

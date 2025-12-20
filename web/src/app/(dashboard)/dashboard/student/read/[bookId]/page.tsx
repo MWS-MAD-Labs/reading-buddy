@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/server";
+import { queryWithContext } from "@/lib/db";
 import { BookReader } from "@/components/dashboard/BookReader";
 import { buildPublicPrefixUrl } from "@/lib/minioUtils";
 
@@ -16,12 +17,9 @@ export default async function StudentReadPage({
 }: PageProps) {
   const awaitedParams = await params;
   const awaitedSearchParams = searchParams ? await searchParams : undefined;
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  if (!user) {
+  const user = await getCurrentUser();
+  if (!user || !user.userId || !user.profileId) {
     redirect("/login");
   }
 
@@ -30,11 +28,14 @@ export default async function StudentReadPage({
     notFound();
   }
 
-  const { data: book } = await supabase
-    .from("books")
-    .select("*")
-    .eq("id", bookId)
-    .single();
+  // Get book details
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT * FROM books WHERE id = $1`,
+    [bookId],
+  );
+
+  const book = bookResult.rows[0];
   if (!book) {
     notFound();
   }
@@ -47,12 +48,15 @@ export default async function StudentReadPage({
         }
       : null;
 
-  const { data: progress } = await supabase
-    .from("student_books")
-    .select("current_page")
-    .eq("student_id", user.id)
-    .eq("book_id", bookId)
-    .maybeSingle();
+  // Get student's reading progress
+  const progressResult = await queryWithContext(
+    user.userId,
+    `SELECT current_page FROM student_books
+     WHERE student_id = $1 AND book_id = $2`,
+    [user.profileId, bookId],
+  );
+
+  const progress = progressResult.rows[0];
 
   const requestedPage = awaitedSearchParams?.page
     ? Number.parseInt(awaitedSearchParams.page, 10) || undefined

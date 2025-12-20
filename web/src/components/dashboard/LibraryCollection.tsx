@@ -23,7 +23,7 @@ const buildStringOptions = (values: Array<string | null>) =>
   Array.from(
     new Set(
       values
-        .map((value) => value?.trim())
+        .map((value: any) => value?.trim())
         .filter((value): value is string => Boolean(value && value.length)),
     ),
   ).sort((a, b) => a.localeCompare(b));
@@ -51,29 +51,29 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
   const [yearFilter, setYearFilter] = useState<FilterValue>("ALL");
 
   const authorOptions = useMemo(
-    () => buildStringOptions(books.map((book) => book.author)),
+    () => buildStringOptions(books.map((book: any) => book.author)),
     [books],
   );
   const publisherOptions = useMemo(
-    () => buildStringOptions(books.map((book) => book.publisher)),
+    () => buildStringOptions(books.map((book: any) => book.publisher)),
     [books],
   );
   const genreOptions = useMemo(
-    () => buildStringOptions(books.map((book) => book.genre)),
+    () => buildStringOptions(books.map((book: any) => book.genre)),
     [books],
   );
   const languageOptions = useMemo(
-    () => buildStringOptions(books.map((book) => book.language)),
+    () => buildStringOptions(books.map((book: any) => book.language)),
     [books],
   );
   const yearOptions = useMemo(
-    () => buildYearOptions(books.map((book) => book.publicationYear)),
+    () => buildYearOptions(books.map((book: any) => book.publicationYear)),
     [books],
   );
 
   const filteredBooks = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return books.filter((book) => {
+    return books.filter((book: any) => {
       if (authorFilter !== "ALL" && book.author !== authorFilter) {
         return false;
       }
@@ -144,7 +144,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
             className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
           >
             <option value="ALL">All authors</option>
-            {authorOptions.map((option) => (
+            {authorOptions.map((option: any) => (
               <option value={option} key={option}>
                 {option}
               </option>
@@ -161,7 +161,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
             className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
           >
             <option value="ALL">All publishers</option>
-            {publisherOptions.map((option) => (
+            {publisherOptions.map((option: any) => (
               <option value={option} key={option}>
                 {option}
               </option>
@@ -178,7 +178,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
             className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
           >
             <option value="ALL">All genres</option>
-            {genreOptions.map((option) => (
+            {genreOptions.map((option: any) => (
               <option value={option} key={option}>
                 {option}
               </option>
@@ -195,7 +195,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
             className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
           >
             <option value="ALL">All languages</option>
-            {languageOptions.map((option) => (
+            {languageOptions.map((option: any) => (
               <option value={option} key={option}>
                 {option}
               </option>
@@ -212,7 +212,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
             className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
           >
             <option value="ALL">All years</option>
-            {yearOptions.map((option) => (
+            {yearOptions.map((option: any) => (
               <option value={String(option)} key={option}>
                 {option}
               </option>
@@ -223,7 +223,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
 
       {filteredBooks.length ? (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredBooks.map((book) => (
+          {filteredBooks.map((book: any) => (
             <li key={book.id} className="flex justify-center">
               <Link
                 href={`/dashboard/student/read/${book.id}`}

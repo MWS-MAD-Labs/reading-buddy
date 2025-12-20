@@ -3,8 +3,8 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getMinioBucketName, getMinioClient } from "@/lib/minio";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/server";
+import { queryWithContext } from "@/lib/db";
 import {
   buildPublicObjectUrl,
   getObjectKeyFromPublicUrl,
@@ -18,72 +18,65 @@ import { checkRateLimit } from "@/lib/middleware/withRateLimit";
 import { AIService } from "@/lib/ai";
 
 export const checkCurrentUserRole = async () => {
-  const supabase = await createSupabaseServerClient();
+  const user = await getCurrentUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!user || !user.userId) {
     return { error: "Not signed in" };
   }
 
-  // Query without .single() first to check for duplicates
-  const { data: profiles, error: profileError } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id);
+  try {
+    // Query profiles to check for duplicates
+    const result = await queryWithContext(
+      user.userId,
+      `SELECT role, full_name FROM profiles WHERE user_id = $1`,
+      [user.userId],
+    );
 
-  const hasDuplicates = profiles && profiles.length > 1;
-  const profile = profiles?.[0]; // Take the first one if multiple exist
+    const profiles = result.rows;
+    const hasDuplicates = profiles && profiles.length > 1;
+    const profile = profiles?.[0]; // Take the first one if multiple exist
 
-  return {
-    userId: user.id,
-    email: user.email,
-    profile,
-    profileError: profileError ? profileError.message : null,
-    hasDuplicates,
-    profileCount: profiles?.length || 0,
-  };
+    return {
+      userId: user.userId,
+      email: user.email,
+      profile,
+      profileError: null,
+      hasDuplicates,
+      profileCount: profiles?.length || 0,
+    };
+  } catch (error) {
+    return {
+      userId: user.userId,
+      email: user.email,
+      profile: null,
+      profileError: error instanceof Error ? error.message : "Unknown error",
+      hasDuplicates: false,
+      profileCount: 0,
+    };
+  }
 };
 
 const ensureLibrarianOrAdmin = async () => {
-  // Get user from server client (this won't modify cookies in server actions)
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId || !user.profileId) {
     throw new Error("You must be signed in to manage books.");
   }
 
-  // Use admin client to check role to avoid RLS issues
-  const adminClient = getSupabaseAdminClient();
-  const { data: profiles, error: profileError } = await adminClient
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id);
+  // Query profile to check role
+  const result = await queryWithContext(
+    user.userId,
+    `SELECT role FROM profiles WHERE id = $1`,
+    [user.profileId],
+  );
 
-  if (profileError) {
-    throw new Error(
-      `Profile query failed: ${profileError.message}. Please contact admin.`,
-    );
-  }
-
-  if (!profiles || profiles.length === 0) {
+  if (result.rows.length === 0) {
     throw new Error(
       "No profile found for your account. Please contact admin to set up your profile.",
     );
   }
 
-  if (profiles.length > 1) {
-    console.warn(
-      `Warning: User ${user.id} has ${profiles.length} duplicate profiles. Using the first one.`,
-    );
-  }
-
-  const profile = profiles[0];
+  const profile = result.rows[0];
 
   if (!profile || !["LIBRARIAN", "ADMIN"].includes(profile.role)) {
     throw new Error(
@@ -91,7 +84,43 @@ const ensureLibrarianOrAdmin = async () => {
     );
   }
 
-  return user;
+  return user as { userId: string; email: string; profileId: string };
+};
+
+// ... (skipping unchanged parts) ...
+
+export const publishQuiz = async (quizId: number) => {
+  const user = await getCurrentUser();
+
+  if (!user || !user.userId) {
+    throw new Error("You must be signed in to publish quizzes.");
+  }
+
+  await queryWithContext(
+    user.userId,
+    `UPDATE quizzes SET status = $1, is_published = $2 WHERE id = $3`,
+    ["published", true, quizId],
+  );
+
+  revalidatePath("/dashboard/librarian");
+  revalidatePath("/dashboard/library");
+};
+
+export const unpublishQuiz = async (quizId: number) => {
+  const user = await getCurrentUser();
+
+  if (!user || !user.userId) {
+    throw new Error("You must be signed in to unpublish quizzes.");
+  }
+
+  await queryWithContext(
+    user.userId,
+    `UPDATE quizzes SET status = $1, is_published = $2 WHERE id = $3`,
+    ["draft", false, quizId],
+  );
+
+  revalidatePath("/dashboard/librarian");
+  revalidatePath("/dashboard/library");
 };
 
 const sanitizeFilename = (filename: string) =>
@@ -141,69 +170,76 @@ export const saveBookMetadata = async (input: {
   fileFormat?: "pdf" | "epub" | "mobi" | "azw" | "azw3";
   fileSizeBytes?: number;
 }) => {
-  await ensureLibrarianOrAdmin();
+  const user = await ensureLibrarianOrAdmin();
 
   if (!input.accessLevels?.length) {
     throw new Error("At least one access level is required.");
   }
 
-  const supabaseAdmin = getSupabaseAdminClient();
-
-  const { data: insertedBook, error } = await supabaseAdmin
-    .from("books")
-    .insert({
-      isbn: input.isbn,
-      title: input.title,
-      author: input.author,
-      publisher: input.publisher,
-      publication_year: input.publicationYear,
-      genre: input.genre,
-      language: input.language,
-      description: input.description,
-      page_count: input.pageCount,
-      pdf_url: input.pdfUrl,
-      cover_url: input.coverUrl,
-      file_format: input.fileFormat || "pdf",
-      original_file_url: input.pdfUrl,
-      file_size_bytes: input.fileSizeBytes,
-    })
-    .select("id")
-    .single();
-
-  if (error || !insertedBook) {
-    console.error("Book insert error:", error);
-    throw error ?? new Error("Unable to insert book.");
-  }
-
-  const { error: accessInsertError } = await supabaseAdmin
-    .from("book_access")
-    .insert(
-      input.accessLevels.map((level) => ({
-        book_id: insertedBook.id,
-        access_level: level,
-      })),
+  try {
+    // Insert book and return id
+    const bookResult = await queryWithContext(
+      user.userId,
+      `INSERT INTO books (
+        isbn, title, author, publisher, publication_year,
+        genre, language, description, page_count, pdf_url, cover_url,
+        file_format, original_file_url, file_size_bytes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING id`,
+      [
+        input.isbn,
+        input.title,
+        input.author,
+        input.publisher,
+        input.publicationYear ?? null,
+        input.genre,
+        input.language,
+        input.description ?? null,
+        input.pageCount,
+        input.pdfUrl,
+        input.coverUrl,
+        input.fileFormat || "pdf",
+        input.pdfUrl,
+        input.fileSizeBytes ?? null,
+      ],
     );
 
-  if (accessInsertError) {
-    console.error("Book access insert error:", accessInsertError);
-    throw accessInsertError;
+    if (bookResult.rows.length === 0) {
+      throw new Error("Unable to insert book.");
+    }
+
+    const insertedBook = bookResult.rows[0];
+
+    // Insert book access levels
+    const accessValues = input.accessLevels
+      .map((level, idx) => `($1, $${idx + 2})`)
+      .join(", ");
+
+    await queryWithContext(
+      user.userId,
+      `INSERT INTO book_access (book_id, access_level) VALUES ${accessValues}`,
+      [insertedBook.id, ...input.accessLevels],
+    );
+
+    // Queue render job
+    try {
+      await queryWithContext(
+        user.userId,
+        `INSERT INTO book_render_jobs (book_id, status) VALUES ($1, $2)`,
+        [insertedBook.id, "pending"],
+      );
+    } catch (jobError) {
+      console.error("Unable to queue render job:", jobError);
+    }
+
+    revalidatePath("/dashboard/library");
+    revalidatePath("/dashboard/librarian");
+
+    return { bookId: insertedBook.id };
+  } catch (error) {
+    console.error("Book save error:", error);
+    throw error;
   }
-
-  const { error: jobInsertError } = await supabaseAdmin
-    .from("book_render_jobs")
-    .insert({
-      book_id: insertedBook.id,
-      status: "pending",
-    });
-
-  if (jobInsertError) {
-    console.error("Unable to queue render job:", jobInsertError.message);
-  }
-
-  revalidatePath("/dashboard/library");
-  revalidatePath("/dashboard/librarian");
-
-  return { bookId: insertedBook.id };
 };
 
 export const updateBookMetadata = async (input: {
@@ -221,67 +257,84 @@ export const updateBookMetadata = async (input: {
   coverUrl?: string;
   pageCount?: number | null;
 }) => {
-  await ensureLibrarianOrAdmin();
-
-  const supabaseAdmin = getSupabaseAdminClient();
-
-  const updateData: Record<string, unknown> = {
-    isbn: input.isbn,
-    title: input.title,
-    author: input.author,
-    publisher: input.publisher,
-    publication_year: input.publicationYear,
-    genre: input.genre,
-    language: input.language,
-    description: input.description ?? null,
-  };
-
-  // Add optional fields if provided
-  if (input.pdfUrl !== undefined) {
-    updateData.pdf_url = input.pdfUrl;
-  }
-  if (input.coverUrl !== undefined) {
-    updateData.cover_url = input.coverUrl;
-  }
-  if (input.pageCount !== undefined) {
-    updateData.page_count = input.pageCount;
-  }
-
-  const { error } = await supabaseAdmin
-    .from("books")
-    .update(updateData)
-    .eq("id", input.id);
-
-  if (error) {
-    console.error("Book update error:", error);
-    throw error;
-  }
+  const user = await ensureLibrarianOrAdmin();
 
   if (!input.accessLevels?.length) {
     throw new Error("At least one access level is required.");
   }
 
-  const { error: deleteAccessError } = await supabaseAdmin
-    .from("book_access")
-    .delete()
-    .eq("book_id", input.id);
-  if (deleteAccessError) {
-    console.error("Book access delete error:", deleteAccessError);
-    throw deleteAccessError;
+  // Build dynamic UPDATE query
+  const setParts: string[] = [
+    "isbn = $2",
+    "title = $3",
+    "author = $4",
+    "publisher = $5",
+    "publication_year = $6",
+    "genre = $7",
+    "language = $8",
+    "description = $9",
+  ];
+
+  const params: any[] = [
+    input.id,
+    input.isbn,
+    input.title,
+    input.author,
+    input.publisher,
+    input.publicationYear,
+    input.genre,
+    input.language,
+    input.description ?? null,
+  ];
+
+  let paramIndex = params.length + 1;
+
+  if (input.pdfUrl !== undefined) {
+    setParts.push(`pdf_url = $${paramIndex}`);
+    params.push(input.pdfUrl);
+    paramIndex++;
+  }
+  if (input.coverUrl !== undefined) {
+    setParts.push(`cover_url = $${paramIndex}`);
+    params.push(input.coverUrl);
+    paramIndex++;
+  }
+  if (input.pageCount !== undefined) {
+    setParts.push(`page_count = $${paramIndex}`);
+    params.push(input.pageCount);
+    paramIndex++;
   }
 
-  const { error: insertAccessError } = await supabaseAdmin
-    .from("book_access")
-    .insert(
-      input.accessLevels.map((level) => ({
-        book_id: input.id,
-        access_level: level,
-      })),
+  try {
+    // Update book metadata
+    await queryWithContext(
+      user.userId,
+      `UPDATE books SET ${setParts.join(", ")} WHERE id = $1`,
+      params,
     );
 
-  if (insertAccessError) {
-    console.error("Book access insert error:", insertAccessError);
-    throw insertAccessError;
+    // Delete existing access levels
+    await queryWithContext(
+      user.userId,
+      `DELETE FROM book_access WHERE book_id = $1`,
+      [input.id],
+    );
+
+    // Insert new access levels
+    if (input.accessLevels.length > 0) {
+      const accessValues = input.accessLevels
+        .map((level, idx) => `($1, $${idx + 2})`)
+        .join(", ");
+
+      await queryWithContext(
+        user.userId,
+        `INSERT INTO book_access (book_id, access_level) VALUES ${accessValues}`,
+        [input.id, ...input.accessLevels],
+      );
+    }
+  } catch (error) {
+    console.error("Book update error:", error);
+    throw error;
   }
 
   revalidatePath("/dashboard/library");
@@ -291,21 +344,23 @@ export const updateBookMetadata = async (input: {
 };
 
 export const deleteBook = async (input: { id: number }) => {
-  await ensureLibrarianOrAdmin();
+  const user = await ensureLibrarianOrAdmin();
 
-  const supabaseAdmin = getSupabaseAdminClient();
   const minioClient = getMinioClient();
   const bucketName = getMinioBucketName();
 
-  const { data: book, error: bookError } = await supabaseAdmin
-    .from("books")
-    .select("pdf_url, cover_url")
-    .eq("id", input.id)
-    .single();
+  // Get book details for MinIO cleanup
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT pdf_url, cover_url FROM books WHERE id = $1`,
+    [input.id],
+  );
 
-  if (bookError) {
+  if (bookResult.rows.length === 0) {
     throw new Error("Unable to locate book for deletion.");
   }
+
+  const book = bookResult.rows[0];
 
   const pdfObjectKey = getObjectKeyFromPublicUrl(book?.pdf_url);
   const coverObjectKey = getObjectKeyFromPublicUrl(book?.cover_url);
@@ -315,15 +370,10 @@ export const deleteBook = async (input: { id: number }) => {
     await minioClient.removeObject(bucketName, objectKey);
   }
 
-  const { error } = await supabaseAdmin
-    .from("books")
-    .delete()
-    .eq("id", input.id);
-
-  if (error) {
-    console.error("Book delete error:", error);
-    throw error;
-  }
+  // Delete book from DB
+  await queryWithContext(user.userId, `DELETE FROM books WHERE id = $1`, [
+    input.id,
+  ]);
 
   revalidatePath("/dashboard/library");
   revalidatePath("/dashboard/librarian");
@@ -332,18 +382,15 @@ export const deleteBook = async (input: { id: number }) => {
 };
 
 export const generateQuizForBook = async (input: { bookId: number }) => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId) {
     throw new Error("You must be signed in to generate a quiz.");
   }
 
   // Rate limiting: 10 requests per hour per user
   const rateLimitCheck = await checkRateLimit(
-    `user:${user.id}`,
+    `user:${user.userId}`,
     "quizGeneration",
   );
   if (rateLimitCheck.exceeded) {
@@ -353,17 +400,17 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
     throw new Error(`Rate limit exceeded. Please try again at ${resetTime}.`);
   }
 
-  const { data: book, error: bookError } = await supabase
-    .from("books")
-    .select(
-      "id, title, author, genre, description, pdf_url, original_file_url, page_text_content, text_extracted_at",
-    )
-    .eq("id", input.bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT id, title, author, genre, description, pdf_url, original_file_url, page_text_content, text_extracted_at
+     FROM books WHERE id = $1`,
+    [input.bookId],
+  );
 
-  if (bookError || !book) {
+  if (bookResult.rows.length === 0) {
     throw new Error("Book not found.");
   }
+  const book = bookResult.rows[0];
 
   const quizQuestionCount = 5;
 
@@ -380,7 +427,7 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
       : null;
 
   const pages =
-    textContent?.pages?.map((page) => ({
+    textContent?.pages?.map((page: any) => ({
       pageNumber: page.pageNumber,
       text: page.text,
       wordCount: page.wordCount,
@@ -389,9 +436,7 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
   const pdfUrl = book.original_file_url || book.pdf_url || undefined;
 
   if (!pages.length && !pdfUrl) {
-    throw new Error(
-      "No extracted text or PDF available for quiz generation.",
-    );
+    throw new Error("No extracted text or PDF available for quiz generation.");
   }
 
   const aiResult = await AIService.generateQuiz({
@@ -409,19 +454,19 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
 
   const quizPayload = aiResult.quiz;
 
-  const { data: inserted, error: quizError } = await supabase
-    .from("quizzes")
-    .insert({
-      book_id: book.id,
-      created_by_id: user.id,
-      questions: quizPayload,
-    })
-    .select("id")
-    .single();
+  const quizResult = await queryWithContext(
+    user.userId,
+    `INSERT INTO quizzes (book_id, created_by_id, questions)
+     VALUES ($1, $2, $3)
+     RETURNING id`,
+    [book.id, user.userId, JSON.stringify(quizPayload)],
+  );
 
-  if (quizError || !inserted) {
-    throw quizError ?? new Error("Failed to save quiz.");
+  if (quizResult.rows.length === 0) {
+    throw new Error("Failed to save quiz.");
   }
+
+  const inserted = quizResult.rows[0];
 
   revalidatePath("/dashboard/library");
   return { quizId: inserted.id, quiz: quizPayload };
@@ -435,14 +480,12 @@ export const generateQuizForBookWithContent = async (input: {
   checkpointPage?: number;
   questionCount?: number;
 }) => {
-  // Use admin client to bypass RLS policy recursion issues
+  // Use admin client to bypass RLS policy recursion issues - handled by ensuring role
   const user = await ensureLibrarianOrAdmin();
-
-  const supabase = getSupabaseAdminClient();
 
   // Rate limiting: 10 requests per hour per user
   const rateLimitCheck = await checkRateLimit(
-    `user:${user.id}`,
+    `user:${user.userId}`,
     "quizGeneration",
   );
   if (rateLimitCheck.exceeded) {
@@ -458,17 +501,18 @@ export const generateQuizForBookWithContent = async (input: {
   }
 
   // Fetch book data including extracted text
-  const { data: book, error: bookError } = await supabase
-    .from("books")
-    .select(
-      "id, title, author, genre, description, page_count, page_text_content, text_extracted_at, pdf_url, original_file_url",
-    )
-    .eq("id", input.bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT id, title, author, genre, description, page_count, page_text_content, text_extracted_at, pdf_url, original_file_url
+     FROM books WHERE id = $1`,
+    [input.bookId],
+  );
 
-  if (bookError || !book) {
+  if (bookResult.rows.length === 0) {
     throw new Error("Book not found.");
   }
+
+  const book = bookResult.rows[0];
 
   const textContent =
     book.text_extracted_at && book.page_text_content
@@ -553,36 +597,40 @@ export const generateQuizForBookWithContent = async (input: {
 
   const quizPayload = aiResult.quiz;
 
-  const { data: inserted, error: quizError } = await supabase
-    .from("quizzes")
-    .insert({
-      book_id: book.id,
-      created_by_id: user.id,
-      questions: quizPayload,
-      quiz_type: input.quizType,
-      page_range_start: input.pageRangeStart,
-      page_range_end: input.pageRangeEnd,
-      checkpoint_page: input.checkpointPage,
-    })
-    .select("id")
-    .single();
+  const quizResult = await queryWithContext(
+    user.userId,
+    `INSERT INTO quizzes (
+      book_id, created_by_id, questions, quiz_type,
+      page_range_start, page_range_end, checkpoint_page
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING id`,
+    [
+      book.id,
+      user.profileId,
+      JSON.stringify(quizPayload),
+      input.quizType,
+      input.pageRangeStart ?? null,
+      input.pageRangeEnd ?? null,
+      input.checkpointPage ?? null,
+    ],
+  );
 
-  if (quizError || !inserted) {
-    throw quizError ?? new Error("Failed to save quiz.");
+  if (quizResult.rows.length === 0) {
+    throw new Error("Failed to save quiz.");
   }
 
-  if (input.quizType === "checkpoint" && input.checkpointPage) {
-    const { error: checkpointError } = await supabase
-      .from("quiz_checkpoints")
-      .insert({
-        book_id: book.id,
-        page_number: input.checkpointPage,
-        quiz_id: inserted.id,
-        is_required: true,
-        created_by_id: user.id,
-      });
+  const inserted = quizResult.rows[0];
 
-    if (checkpointError) {
+  if (input.quizType === "checkpoint" && input.checkpointPage) {
+    try {
+      await queryWithContext(
+        user.userId,
+        `INSERT INTO quiz_checkpoints (
+          book_id, page_number, quiz_id, is_required, created_by_id
+        ) VALUES ($1, $2, $3, $4, $5)`,
+        [book.id, input.checkpointPage, inserted.id, true, user.userId],
+      );
+    } catch (checkpointError) {
       console.error("Failed to create checkpoint record:", checkpointError);
       // Don't fail the whole operation, just log the error
     }
@@ -603,34 +651,32 @@ export const autoGenerateCheckpoints = async (input: {
   bookId: number;
   customPages?: number[];
 }) => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId) {
     throw new Error("You must be signed in to generate checkpoints.");
   }
 
   // Fetch book data
-  const { data: book, error: bookError } = await supabase
-    .from("books")
-    .select("id, title, page_count, page_text_content, text_extracted_at")
-    .eq("id", input.bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT id, title, page_count, page_text_content, text_extracted_at FROM books WHERE id = $1`,
+    [input.bookId],
+  );
 
-  if (bookError || !book) {
+  if (bookResult.rows.length === 0) {
     throw new Error("Book not found.");
   }
+
+  const book = bookResult.rows[0];
 
   if (!book.page_count) {
     throw new Error("Book page count not available.");
   }
 
   // Import helper functions
-  const { suggestCheckpoints, suggestQuestionCount } = await import(
-    "@/lib/pdf-extractor"
-  );
+  const { suggestCheckpoints, suggestQuestionCount } =
+    await import("@/lib/pdf-extractor");
 
   // Determine checkpoint pages
   const checkpointPages =
@@ -678,59 +724,51 @@ export const autoGenerateCheckpoints = async (input: {
 // ============================================================================
 
 export const getQuizzesForBook = async (bookId: number) => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId) {
     throw new Error("You must be signed in to view quizzes.");
   }
 
   // Query quizzes with statistics
-  const { data: quizzes, error } = await supabase
-    .from("quiz_statistics")
-    .select("*")
-    .eq("book_id", bookId)
-    .order("created_at", { ascending: false });
+  const result = await queryWithContext(
+    user.userId,
+    `SELECT * FROM quiz_statistics WHERE book_id = $1 ORDER BY created_at DESC`,
+    [bookId],
+  );
 
-  if (error) {
-    console.error("Error fetching quizzes:", error);
-    throw error;
-  }
-
-  return quizzes || [];
+  return result.rows || [];
 };
 
 export const getAllQuizzesGroupedByBook = async () => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId) {
     throw new Error("You must be signed in to view quizzes.");
   }
 
   // Get all quizzes with book information and statistics
-  const { data: quizzes, error } = await supabase
-    .from("quiz_statistics")
-    .select(
-      `
-      *,
-      book:books!quizzes_book_id_fkey(id, title, author)
-    `,
-    )
-    .order("created_at", { ascending: false });
+  // We need to manually join since we are not using Supabase nested resources
+  const result = await queryWithContext(
+    user.userId,
+    `SELECT qs.*, b.id as book_id_joined, b.title as book_title, b.author as book_author
+     FROM quiz_statistics qs
+     JOIN books b ON qs.book_id = b.id
+     ORDER BY qs.created_at DESC`,
+  );
 
-  if (error) {
-    console.error("Error fetching quizzes:", error);
-    throw error;
-  }
+  const quizzes = result.rows.map((row: any) => ({
+    ...row,
+    book: {
+      id: row.book_id_joined,
+      title: row.book_title,
+      author: row.book_author,
+    },
+  }));
 
   // Group by book
   const grouped: Record<number, QuizStatisticsWithBook[]> = {};
-  quizzes?.forEach((quiz) => {
+  quizzes.forEach((quiz: QuizStatisticsWithBook) => {
     const bookId = quiz.book_id;
     if (!grouped[bookId]) {
       grouped[bookId] = [];
@@ -741,128 +779,47 @@ export const getAllQuizzesGroupedByBook = async () => {
   return { quizzes: quizzes || [], groupedByBook: grouped };
 };
 
-export const publishQuiz = async (quizId: number) => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("You must be signed in to publish quizzes.");
-  }
-
-  const { error } = await supabase
-    .from("quizzes")
-    .update({
-      status: "published",
-      is_published: true,
-    })
-    .eq("id", quizId);
-
-  if (error) {
-    console.error("Error publishing quiz:", error);
-    throw error;
-  }
-
-  revalidatePath("/dashboard/librarian");
-  revalidatePath("/dashboard/library");
-};
-
-export const unpublishQuiz = async (quizId: number) => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("You must be signed in to unpublish quizzes.");
-  }
-
-  const { error } = await supabase
-    .from("quizzes")
-    .update({
-      status: "draft",
-      is_published: false,
-    })
-    .eq("id", quizId);
-
-  if (error) {
-    console.error("Error unpublishing quiz:", error);
-    throw error;
-  }
-
-  revalidatePath("/dashboard/librarian");
-  revalidatePath("/dashboard/library");
-};
-
 export const archiveQuiz = async (quizId: number) => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId) {
     throw new Error("You must be signed in to archive quizzes.");
   }
 
-  const { error } = await supabase
-    .from("quizzes")
-    .update({
-      status: "archived",
-      is_published: false,
-    })
-    .eq("id", quizId);
-
-  if (error) {
-    console.error("Error archiving quiz:", error);
-    throw error;
-  }
+  await queryWithContext(
+    user.userId,
+    `UPDATE quizzes SET status = $1, is_published = $2 WHERE id = $3`,
+    ["archived", false, quizId],
+  );
 
   revalidatePath("/dashboard/librarian");
   revalidatePath("/dashboard/library");
 };
 
 export const deleteQuiz = async (quizId: number) => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId) {
     throw new Error("You must be signed in to delete quizzes.");
   }
 
-  // Use admin client to avoid RLS recursion issues when checking attempts
-  const supabaseAdmin = getSupabaseAdminClient();
-
   // Check if quiz has any attempts
-  const { data: attempts, error: checkError } = await supabaseAdmin
-    .from("quiz_attempts")
-    .select("id")
-    .eq("quiz_id", quizId)
-    .limit(1);
+  const attemptsResult = await queryWithContext(
+    user.userId,
+    `SELECT id FROM quiz_attempts WHERE quiz_id = $1 LIMIT 1`,
+    [quizId],
+  );
 
-  if (checkError) {
-    console.error("Error checking quiz attempts:", checkError);
-    throw checkError;
-  }
-
-  if (attempts && attempts.length > 0) {
+  if (attemptsResult.rows.length > 0) {
     throw new Error(
       "Cannot delete quiz that has been attempted. Archive it instead.",
     );
   }
 
-  // Delete quiz using admin client as well
-  const { error } = await supabaseAdmin
-    .from("quizzes")
-    .delete()
-    .eq("id", quizId);
-
-  if (error) {
-    console.error("Error deleting quiz:", error);
-    throw error;
-  }
+  // Delete quiz
+  await queryWithContext(user.userId, `DELETE FROM quizzes WHERE id = $1`, [
+    quizId,
+  ]);
 
   revalidatePath("/dashboard/librarian");
   revalidatePath("/dashboard/library");
@@ -873,29 +830,28 @@ export const updateQuizMetadata = async (input: {
   title?: string;
   tags?: string[];
 }) => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId) {
     throw new Error("You must be signed in to update quizzes.");
   }
 
   // Get current quiz data
-  const { data: quiz, error: fetchError } = await supabase
-    .from("quizzes")
-    .select("questions")
-    .eq("id", input.quizId)
-    .single();
+  const quizResult = await queryWithContext(
+    user.userId,
+    `SELECT questions FROM quizzes WHERE id = $1`,
+    [input.quizId],
+  );
 
-  if (fetchError || !quiz) {
+  if (quizResult.rows.length === 0) {
     throw new Error("Quiz not found.");
   }
 
+  const quiz = quizResult.rows[0];
   const quizData = quiz.questions as QuizQuestionsData;
-  const updateData: Partial<{ questions: QuizQuestionsData; tags: string[] }> =
-    { questions: quizData };
+  const updateData: { questions: QuizQuestionsData; tags?: string[] } = {
+    questions: quizData,
+  };
 
   // Update title in the questions JSONB if provided
   if (input.title !== undefined) {
@@ -910,14 +866,19 @@ export const updateQuizMetadata = async (input: {
     updateData.tags = input.tags;
   }
 
-  const { error } = await supabase
-    .from("quizzes")
-    .update(updateData)
-    .eq("id", input.quizId);
-
-  if (error) {
-    console.error("Error updating quiz:", error);
-    throw error;
+  // Build dynamic update query
+  if (input.tags !== undefined) {
+    await queryWithContext(
+      user.userId,
+      `UPDATE quizzes SET questions = $1, tags = $2 WHERE id = $3`,
+      [JSON.stringify(updateData.questions), updateData.tags, input.quizId],
+    );
+  } else {
+    await queryWithContext(
+      user.userId,
+      `UPDATE quizzes SET questions = $1 WHERE id = $2`,
+      [JSON.stringify(updateData.questions), input.quizId],
+    );
   }
 
   revalidatePath("/dashboard/librarian");
@@ -925,46 +886,58 @@ export const updateQuizMetadata = async (input: {
 };
 
 export const renderBookImages = async (bookId: number) => {
-  "use server";
+  // "use server";
 
-  const supabase = getSupabaseAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user || !user.userId) {
+    return { error: "Not authenticated" };
+  }
 
   // Check if book exists
-  const { data: book, error: bookError } = await supabase
-    .from("books")
-    .select("id, title")
-    .eq("id", bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT id, title FROM books WHERE id = $1`,
+    [bookId],
+  );
 
-  if (bookError || !book) {
+  if (bookResult.rows.length === 0) {
     return { error: "Book not found" };
   }
 
+  const book = bookResult.rows[0];
+
   // Create or update render job
-  const { data: existingJob } = await supabase
-    .from("book_render_jobs")
-    .select("id, status")
-    .eq("book_id", bookId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const existingJobResult = await queryWithContext(
+    user.userId,
+    `SELECT id, status FROM book_render_jobs
+     WHERE book_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [bookId],
+  );
 
   let jobId: number;
 
-  if (existingJob && existingJob.status === "pending") {
-    jobId = existingJob.id;
+  if (
+    existingJobResult.rows.length > 0 &&
+    existingJobResult.rows[0].status === "pending"
+  ) {
+    jobId = existingJobResult.rows[0].id;
   } else {
-    const { data: newJob, error: jobError } = await supabase
-      .from("book_render_jobs")
-      .insert({ book_id: bookId, status: "pending" })
-      .select("id")
-      .single();
+    const newJobResult = await queryWithContext(
+      user.userId,
+      `INSERT INTO book_render_jobs (book_id, status)
+       VALUES ($1, $2)
+       RETURNING id`,
+      [bookId, "pending"],
+    );
 
-    if (jobError || !newJob) {
+    if (newJobResult.rows.length === 0) {
       return { error: "Failed to create render job" };
     }
 
-    jobId = newJob.id;
+    jobId = newJobResult.rows[0].id;
   }
 
   // Trigger rendering in background (non-blocking)
@@ -989,16 +962,24 @@ export const renderBookImages = async (bookId: number) => {
 };
 
 export const checkRenderStatus = async (bookId: number) => {
-  "use server";
+  // "use server";
 
-  const supabase = getSupabaseAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user || !user.userId) {
+    return { completed: false, message: "Not authenticated" };
+  }
 
   // Check book's page_images_count
-  const { data: book } = await supabase
-    .from("books")
-    .select("page_images_count, page_images_rendered_at")
-    .eq("id", bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT page_images_count, page_images_rendered_at
+     FROM books
+     WHERE id = $1`,
+    [bookId],
+  );
+
+  const book = bookResult.rows[0];
 
   if (book?.page_images_count && book.page_images_count > 0) {
     return {
@@ -1009,13 +990,17 @@ export const checkRenderStatus = async (bookId: number) => {
   }
 
   // Check latest render job status
-  const { data: job } = await supabase
-    .from("book_render_jobs")
-    .select("status, error_message, processed_pages, total_pages")
-    .eq("book_id", bookId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const jobResult = await queryWithContext(
+    user.userId,
+    `SELECT status, error_message, processed_pages, total_pages
+     FROM book_render_jobs
+     WHERE book_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [bookId],
+  );
+
+  const job = jobResult.rows[0];
 
   return {
     completed: false,
@@ -1051,36 +1036,33 @@ export const generateBookDescription = async (input: {
   pdfUrl?: string;
   bookId?: number;
 }) => {
-  "use server";
+  // "use server";
 
-  await ensureLibrarianOrAdmin();
+  const user = await ensureLibrarianOrAdmin();
 
   try {
-    const supabase = getSupabaseAdminClient();
-    let bookRecord:
-      | {
-          title: string | null;
-          pdf_url: string | null;
-          original_file_url: string | null;
-          page_text_content: any;
-          text_extracted_at: string | null;
-        }
-      | null = null;
+    let bookRecord: {
+      title: string | null;
+      pdf_url: string | null;
+      original_file_url: string | null;
+      page_text_content: any;
+      text_extracted_at: string | null;
+    } | null = null;
 
     if (input.bookId) {
-      const { data: book, error } = await supabase
-        .from("books")
-        .select(
-          "title, pdf_url, original_file_url, page_text_content, text_extracted_at",
-        )
-        .eq("id", input.bookId)
-        .single();
+      const result = await queryWithContext(
+        user.userId,
+        `SELECT title, pdf_url, original_file_url, page_text_content, text_extracted_at
+         FROM books
+         WHERE id = $1`,
+        [input.bookId],
+      );
 
-      if (error) {
-        throw new Error(`Book lookup failed: ${error.message}`);
+      if (result.rows.length === 0) {
+        throw new Error(`Book not found with ID: ${input.bookId}`);
       }
 
-      bookRecord = book;
+      bookRecord = result.rows[0];
     }
 
     const textContent =
@@ -1091,11 +1073,12 @@ export const generateBookDescription = async (input: {
           })
         : null;
 
-    const pagesFromText = textContent?.pages?.map((page) => ({
+    const pagesFromText = textContent?.pages?.map((page: any) => ({
       pageNumber: page.pageNumber,
       text: page.text,
-      wordCount: (page as { wordCount?: number }).wordCount
-        ?? page.text.split(/\s+/).length,
+      wordCount:
+        (page as { wordCount?: number }).wordCount ??
+        page.text.split(/\s+/).length,
     }));
 
     const previewPage =
@@ -1149,28 +1132,26 @@ export const generateBookDescription = async (input: {
 };
 
 export const extractBookText = async (bookId: number) => {
-  "use server";
+  // "use server";
 
-  await ensureLibrarianOrAdmin();
-
-  const supabase = getSupabaseAdminClient();
+  const user = await ensureLibrarianOrAdmin();
 
   // Get book URL and format
-  const { data: book, error: bookError } = await supabase
-    .from("books")
-    .select(
-      "id, title, pdf_url, file_format, original_file_url, text_extraction_attempts",
-    )
-    .eq("id", bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT id, title, pdf_url, file_format, original_file_url, text_extraction_attempts FROM books WHERE id = $1`,
+    [bookId],
+  );
 
-  if (bookError || !book) {
+  if (bookResult.rows.length === 0) {
     return {
       success: false,
       message: "Book not found",
       errorType: "not_found",
     };
   }
+
+  const book = bookResult.rows[0];
 
   const fileUrl = book.original_file_url || book.pdf_url;
   if (!fileUrl) {
@@ -1184,13 +1165,14 @@ export const extractBookText = async (bookId: number) => {
   const fileFormat = book.file_format || "pdf";
 
   // Update attempt tracking before processing
-  await supabase
-    .from("books")
-    .update({
-      text_extraction_attempts: (book.text_extraction_attempts || 0) + 1,
-      last_extraction_attempt_at: new Date().toISOString(),
-    })
-    .eq("id", bookId);
+  await queryWithContext(
+    user.userId,
+    `UPDATE books SET
+      text_extraction_attempts = COALESCE(text_extraction_attempts, 0) + 1,
+      last_extraction_attempt_at = NOW()
+     WHERE id = $1`,
+    [bookId],
+  );
 
   try {
     let textContent;
@@ -1205,10 +1187,11 @@ export const extractBookText = async (bookId: number) => {
         const errorMsg = `${fileFormat.toUpperCase()} file has not been converted to PDF yet. Please render the book first.`;
 
         // Store error in database
-        await supabase
-          .from("books")
-          .update({ text_extraction_error: errorMsg })
-          .eq("id", bookId);
+        await queryWithContext(
+          user.userId,
+          `UPDATE books SET text_extraction_error = $1 WHERE id = $2`,
+          [errorMsg, bookId],
+        );
 
         return {
           success: false,
@@ -1229,10 +1212,11 @@ export const extractBookText = async (bookId: number) => {
       const errorMsg =
         "PDF appears to be image-based with no extractable text. OCR support coming soon.";
 
-      await supabase
-        .from("books")
-        .update({ text_extraction_error: errorMsg })
-        .eq("id", bookId);
+      await queryWithContext(
+        user.userId,
+        `UPDATE books SET text_extraction_error = $1 WHERE id = $2`,
+        [errorMsg, bookId],
+      );
 
       return {
         success: false,
@@ -1243,34 +1227,25 @@ export const extractBookText = async (bookId: number) => {
     }
 
     // Save to database - clear any previous errors
-    const { error: updateError } = await supabase
-      .from("books")
-      .update({
-        page_text_content: {
+    await queryWithContext(
+      user.userId,
+      `UPDATE books SET
+        page_text_content = $1,
+        text_extracted_at = NOW(),
+        text_extraction_method = $2,
+        text_extraction_error = NULL
+       WHERE id = $3`,
+      [
+        JSON.stringify({
           pages: textContent.pages,
           totalPages: textContent.totalPages,
           totalWords: textContent.totalWords,
           extractionMethod: textContent.extractionMethod,
-        },
-        text_extracted_at: new Date().toISOString(),
-        text_extraction_method: textContent.extractionMethod,
-        text_extraction_error: null, // Clear previous errors on success
-      })
-      .eq("id", bookId);
-
-    if (updateError) {
-      // Store database error
-      await supabase
-        .from("books")
-        .update({ text_extraction_error: updateError.message })
-        .eq("id", bookId);
-
-      return {
-        success: false,
-        message: updateError.message,
-        errorType: "database_error",
-      };
-    }
+        }),
+        textContent.extractionMethod,
+        bookId,
+      ],
+    );
 
     return {
       success: true,
@@ -1284,10 +1259,11 @@ export const extractBookText = async (bookId: number) => {
     const errorMsg = `Text extraction failed: ${message}`;
 
     // Store error in database
-    await supabase
-      .from("books")
-      .update({ text_extraction_error: errorMsg })
-      .eq("id", bookId);
+    await queryWithContext(
+      user.userId,
+      `UPDATE books SET text_extraction_error = $1 WHERE id = $2`,
+      [errorMsg, bookId],
+    );
 
     return {
       success: false,
@@ -1299,22 +1275,24 @@ export const extractBookText = async (bookId: number) => {
 };
 
 export const convertEpubToImages = async (bookId: number) => {
-  "use server";
+  // "use server";
 
-  await ensureLibrarianOrAdmin();
-
-  const supabase = getSupabaseAdminClient();
+  const user = await ensureLibrarianOrAdmin();
 
   // Get book details
-  const { data: book, error: bookError } = await supabase
-    .from("books")
-    .select("id, title, file_format, original_file_url, pdf_url")
-    .eq("id", bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT id, title, file_format, original_file_url, pdf_url
+     FROM books
+     WHERE id = $1`,
+    [bookId],
+  );
 
-  if (bookError || !book) {
+  if (bookResult.rows.length === 0) {
     return { success: false, message: "Book not found" };
   }
+
+  const book = bookResult.rows[0];
 
   if (book.file_format !== "epub") {
     return { success: false, message: "Book is not an EPUB file" };
@@ -1328,22 +1306,43 @@ export const convertEpubToImages = async (bookId: number) => {
   try {
     // Step 1: Convert EPUB to PDF using Calibre
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    console.log(
+      `[convertEpubToImages] Calling API: ${baseUrl}/api/convert-epub`,
+    );
+    console.log(`[convertEpubToImages] Request body:`, { bookId, epubUrl });
+
     const response = await fetch(`${baseUrl}/api/convert-epub`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bookId, epubUrl }),
     });
 
+    console.log(`[convertEpubToImages] Response status:`, response.status);
     const result = await response.json();
+    console.log(`[convertEpubToImages] Response body:`, result);
 
     if (!result.success) {
+      console.error(`[convertEpubToImages] Conversion failed:`, result.error);
       return {
         success: false,
         message: result.error || "EPUB to PDF conversion failed",
       };
     }
 
-    console.log(`EPUB converted to PDF: ${result.pdfUrl}`);
+    console.log(
+      `[convertEpubToImages] ✅ EPUB converted to PDF: ${result.pdfUrl}`,
+    );
+
+    // Verify the database was updated
+    const verifyResult = await queryWithContext(
+      user.userId,
+      `SELECT id, title, pdf_url, original_file_url, file_format FROM books WHERE id = $1`,
+      [bookId],
+    );
+    console.log(
+      `[convertEpubToImages] Book state after conversion:`,
+      verifyResult.rows[0],
+    );
 
     // Step 2: Trigger PDF rendering using existing pipeline
     const renderResult = await renderBookImages(bookId);
@@ -1366,22 +1365,22 @@ export const convertEpubToImages = async (bookId: number) => {
 };
 
 export const convertMobiToImages = async (bookId: number) => {
-  "use server";
+  // [REMOVED INLINE USE SERVER]
 
-  await ensureLibrarianOrAdmin();
-
-  const supabase = getSupabaseAdminClient();
+  const user = await ensureLibrarianOrAdmin();
 
   // Get book details
-  const { data: book, error: bookError } = await supabase
-    .from("books")
-    .select("id, title, file_format, original_file_url, pdf_url")
-    .eq("id", bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT id, title, file_format, original_file_url, pdf_url FROM books WHERE id = $1`,
+    [bookId],
+  );
 
-  if (bookError || !book) {
+  if (bookResult.rows.length === 0) {
     return { success: false, message: "Book not found" };
   }
+
+  const book = bookResult.rows[0];
 
   if (!["mobi", "azw", "azw3"].includes(book.file_format || "")) {
     return { success: false, message: "Book is not a MOBI/AZW/AZW3 file" };

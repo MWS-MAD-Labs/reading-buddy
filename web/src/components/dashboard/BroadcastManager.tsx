@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createBroadcast, setBroadcastActive } from "@/app/(dashboard)/dashboard/admin/broadcasts/actions";
+import {
+  createBroadcast,
+  setBroadcastActive,
+} from "@/app/(dashboard)/dashboard/admin/broadcasts/actions";
 import type { LoginBroadcast } from "@/lib/broadcasts";
 import { cn } from "@/lib/cn";
 import {
@@ -32,7 +35,11 @@ const toneBadgeStyles: Record<LoginBroadcast["tone"], string> = {
   alert: "bg-rose-100 text-rose-800 border-rose-200",
 };
 
-export function BroadcastManager({ broadcasts }: { broadcasts: BroadcastRow[] }) {
+export function BroadcastManager({
+  broadcasts,
+}: {
+  broadcasts: BroadcastRow[];
+}) {
   const [rows, setRows] = useState<BroadcastRow[]>(broadcasts ?? []);
   const [form, setForm] = useState<{
     title: string;
@@ -49,7 +56,10 @@ export function BroadcastManager({ broadcasts }: { broadcasts: BroadcastRow[] })
     linkUrl: "",
     isActive: true,
   });
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
 
@@ -101,16 +111,22 @@ export function BroadcastManager({ broadcasts }: { broadcasts: BroadcastRow[] })
       return;
     }
     setRows((prev) =>
-      prev.map((row) => (row.id === id ? { ...row, isActive } : row)),
+      prev.map((row: any) => (row.id === id ? { ...row, isActive } : row)),
     );
     setPendingId(null);
   };
 
   return (
     <div className="space-y-6">
-      <Card variant="frosted" padding="cozy" className="border-4 border-white/70">
+      <Card
+        variant="frosted"
+        padding="cozy"
+        className="border-4 border-white/70"
+      >
         <CardHeader>
-          <Badge variant="neutral" className="text-[11px]">Compose</Badge>
+          <Badge variant="neutral" className="text-[11px]">
+            Compose
+          </Badge>
           <CardTitle className="text-2xl">Publish a login message</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -190,7 +206,9 @@ export function BroadcastManager({ broadcasts }: { broadcasts: BroadcastRow[] })
                         }))
                       }
                     />
-                    <span>{form.isActive ? "Active on login" : "Saved as inactive"}</span>
+                    <span>
+                      {form.isActive ? "Active on login" : "Saved as inactive"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -202,7 +220,10 @@ export function BroadcastManager({ broadcasts }: { broadcasts: BroadcastRow[] })
                   maxLength={50}
                   value={form.linkLabel}
                   onChange={(event) =>
-                    setForm((prev) => ({ ...prev, linkLabel: event.target.value }))
+                    setForm((prev) => ({
+                      ...prev,
+                      linkLabel: event.target.value,
+                    }))
                   }
                   placeholder="View release notes"
                 />
@@ -215,7 +236,10 @@ export function BroadcastManager({ broadcasts }: { broadcasts: BroadcastRow[] })
                   type="url"
                   value={form.linkUrl}
                   onChange={(event) =>
-                    setForm((prev) => ({ ...prev, linkUrl: event.target.value }))
+                    setForm((prev) => ({
+                      ...prev,
+                      linkUrl: event.target.value,
+                    }))
                   }
                   placeholder="https://example.com/changelog"
                 />
@@ -237,7 +261,9 @@ export function BroadcastManager({ broadcasts }: { broadcasts: BroadcastRow[] })
       <Card variant="glow" padding="cozy" className="border-4 border-white/70">
         <CardHeader className="flex items-center justify-between">
           <div>
-            <Badge variant="neutral" className="text-[11px]">History</Badge>
+            <Badge variant="neutral" className="text-[11px]">
+              History
+            </Badge>
             <CardTitle className="text-2xl">Recent broadcasts</CardTitle>
           </div>
           <span className="text-sm font-semibold text-indigo-600">
@@ -246,9 +272,11 @@ export function BroadcastManager({ broadcasts }: { broadcasts: BroadcastRow[] })
         </CardHeader>
         <CardContent className="space-y-3">
           {rows.length === 0 ? (
-            <Alert variant="info">No messages yet. Create your first broadcast above.</Alert>
+            <Alert variant="info">
+              No messages yet. Create your first broadcast above.
+            </Alert>
           ) : (
-            rows.map((row) => (
+            rows.map((row: any) => (
               <div
                 key={row.id}
                 className="rounded-2xl border-2 border-indigo-100 bg-white/90 p-4 shadow-sm"
@@ -259,10 +287,13 @@ export function BroadcastManager({ broadcasts }: { broadcasts: BroadcastRow[] })
                       <span
                         className={cn(
                           "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide",
-                          toneBadgeStyles[row.tone] ?? toneBadgeStyles.info,
+                          toneBadgeStyles[
+                            row.tone as keyof typeof toneBadgeStyles
+                          ] ?? toneBadgeStyles.info,
                         )}
                       >
-                        {toneLabels[row.tone] ?? "Info"}
+                        {toneLabels[row.tone as keyof typeof toneLabels] ??
+                          "Info"}
                       </span>
                       <Badge
                         variant={row.isActive ? "lime" : "neutral"}
@@ -277,7 +308,9 @@ export function BroadcastManager({ broadcasts }: { broadcasts: BroadcastRow[] })
                         </span>
                       ) : null}
                     </div>
-                    <h3 className="text-lg font-black text-indigo-900">{row.title}</h3>
+                    <h3 className="text-lg font-black text-indigo-900">
+                      {row.title}
+                    </h3>
                     <p className="text-sm font-semibold text-indigo-700 whitespace-pre-wrap">
                       {row.body}
                     </p>

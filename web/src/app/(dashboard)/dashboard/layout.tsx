@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/server";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { SignOutButton } from "@/components/dashboard/SignOutButton";
@@ -10,29 +9,17 @@ export default async function DashboardLayout({
 }: {
   children: ReactNode;
 }) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  // Get current user from NextAuth (redirects to login if not authenticated)
+  const user = await getCurrentUser();
 
   const roleLabel =
-    profile?.role === "ADMIN"
+    user.role === "ADMIN"
       ? "Admin"
-      : profile?.role === "TEACHER"
+      : user.role === "TEACHER"
         ? "Teacher"
-        : profile?.role === "LIBRARIAN"
+        : user.role === "LIBRARIAN"
           ? "Librarian"
-          : profile?.role === "STUDENT"
+          : user.role === "STUDENT"
             ? "Student"
             : "Reader";
 
@@ -54,7 +41,7 @@ export default async function DashboardLayout({
           <div className="hidden items-center gap-4 lg:flex">
             <DashboardNav
               userRole={
-                profile?.role as
+                user.role as
                   | "ADMIN"
                   | "LIBRARIAN"
                   | "TEACHER"
@@ -70,7 +57,7 @@ export default async function DashboardLayout({
             <SignOutButton />
             <MobileNav
               userRole={
-                profile?.role as
+                user.role as
                   | "ADMIN"
                   | "LIBRARIAN"
                   | "TEACHER"

@@ -74,7 +74,7 @@ export default async function ManageClassroomPage({
   }
 
   const classStudents =
-    rosterData?.map((entry) => {
+    rosterData?.map((entry: any) => {
       const profileData =
         Array.isArray(entry.profiles) && entry.profiles.length > 0
           ? entry.profiles[0]
@@ -86,7 +86,7 @@ export default async function ManageClassroomPage({
       };
     }) ?? [];
 
-  const rosterStudentIds = classStudents.map((student) => student.id);
+  const rosterStudentIds = classStudents.map((student: any) => student.id);
 
   let readings: {
     student_id: string;
@@ -249,7 +249,7 @@ export default async function ManageClassroomPage({
 
   const assignedIds = new Set(
     (allAssignments ?? [])
-      .map((entry) => entry.student_id)
+      .map((entry: any) => entry.student_id)
       .filter((id): id is string => Boolean(id)),
   );
   const rosterIdSet = new Set(rosterStudentIds);
@@ -260,7 +260,7 @@ export default async function ManageClassroomPage({
         (student) =>
           rosterIdSet.has(student.id) || !assignedIds.has(student.id),
       )
-      .map((student) => ({
+      .map((student: any) => ({
         id: student.id,
         full_name: student.full_name ?? "",
       })) ?? [];
@@ -277,7 +277,7 @@ export default async function ManageClassroomPage({
   }
 
   const assignedBooks =
-    assignedBookRows?.map((entry) => {
+    assignedBookRows?.map((entry: any) => {
       const bookData =
         Array.isArray(entry.books) && entry.books.length > 0
           ? entry.books[0]
@@ -311,7 +311,7 @@ export default async function ManageClassroomPage({
         (book) =>
           !assignedBooks.some((assigned) => assigned.book_id === book.id),
       )
-      .map((book) => ({
+      .map((book: any) => ({
         id: book.id,
         title: book.title,
         author: book.author ?? null,
@@ -367,7 +367,7 @@ export default async function ManageClassroomPage({
               </thead>
               <tbody className="divide-y divide-indigo-50">
                 {readings.length > 0 ? (
-                  readings.map((entry) => (
+                  readings.map((entry: any) => (
                     <tr
                       key={`${entry.student_id}-${entry.books?.title ?? "book"}`}
                       className="hover:bg-indigo-50/60"
@@ -484,7 +484,7 @@ export default async function ManageClassroomPage({
             </p>
           </div>
 
-          {assignedBooks.map((book) => (
+          {assignedBooks.map((book: any) => (
             <BookQuizSection
               key={book.book_id}
               classId={classId}
@@ -513,7 +513,7 @@ async function BookQuizSection({
   // Fetch assigned quizzes for this class
   const allAssignments = await getClassQuizAssignments(classId);
   const assignedQuizzes =
-    allAssignments?.filter((a) => a.book_id === bookId) ?? [];
+    allAssignments?.filter((a: any) => a.book_id === bookId) ?? [];
 
   return (
     <ClassQuizList
