@@ -68,6 +68,44 @@ const streamToBuffer = async (stream: NodeJS.ReadableStream) => {
   return Buffer.concat(chunks);
 };
 
+const uploadWithRetry = async (
+  minio: ReturnType<typeof getMinioClient>,
+  bucketName: string,
+  objectKey: string,
+  buffer: Buffer,
+  maxRetries = 3,
+  retryDelay = 2000,
+) => {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await minio.putObject(bucketName, objectKey, buffer, buffer.length, {
+        "Content-Type": "image/jpeg",
+      });
+      return; // Success!
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const isTimeout =
+        lastError.message.includes("ETIMEDOUT") ||
+        lastError.message.includes("ECONNRESET") ||
+        lastError.message.includes("EPIPE");
+
+      if (isTimeout && attempt < maxRetries) {
+        console.log(
+          `  ⚠ Upload failed (attempt ${attempt}/${maxRetries}): ${lastError.message}. Retrying in ${retryDelay}ms...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        continue;
+      }
+
+      throw lastError;
+    }
+  }
+
+  throw lastError || new Error("Upload failed after retries");
+};
+
 const ensureJobForBook = async (bookId: number) => {
   const existingResult = await pool.query(
     `SELECT id, status FROM book_render_jobs
@@ -270,9 +308,7 @@ const processJob = async (job: JobRecord) => {
         `Uploading page ${pageNumber}: ${buffer.length} bytes to ${objectKey}`,
       );
 
-      await minio.putObject(bucketName, objectKey, buffer, buffer.length, {
-        "Content-Type": "image/jpeg",
-      });
+      await uploadWithRetry(minio, bucketName, objectKey, buffer);
 
       await pool.query(
         `UPDATE book_render_jobs
