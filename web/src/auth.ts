@@ -117,27 +117,39 @@ export const authOptions: NextAuthConfig = {
             console.log("Using existing user ID:", userId);
           }
 
-          // Check if this is the first profile (make them ADMIN)
-          const profileCount = await authPool.query(
-            "SELECT COUNT(*) as count FROM profiles",
+          // Check if profile already exists
+          const existingProfile = await authPool.query(
+            "SELECT id, role FROM profiles WHERE user_id = $1",
+            [userId],
           );
-          console.log("DEBUG: Raw profile count result:", profileCount.rows[0]);
-          const count = parseInt(profileCount.rows[0].count);
-          console.log("DEBUG: Parsed count:", count);
-          const isFirstUser = count === 0;
-          console.log("DEBUG: isFirstUser:", isFirstUser);
-          console.log("Profile count:", count, "- First user?", isFirstUser);
 
-          // Create or update profile - first user gets ADMIN role
-          const role = isFirstUser ? "ADMIN" : "STUDENT";
-          console.log("DEBUG: Assigned role:", role);
-          console.log("Creating profile with role:", role);
+          if (existingProfile.rows.length > 0) {
+            // Profile exists - just update name/email, preserve role
+            console.log(
+              "Profile exists - preserving existing role:",
+              existingProfile.rows[0].role,
+            );
+            await authPool.query(
+              "UPDATE profiles SET email = $1, full_name = $2, updated_at = NOW() WHERE user_id = $3",
+              [user.email, user.name, userId],
+            );
+            console.log("Profile updated (role preserved)");
+          } else {
+            // New profile - check if this is the first user (make them ADMIN)
+            const profileCount = await authPool.query(
+              "SELECT COUNT(*) as count FROM profiles",
+            );
+            const count = parseInt(profileCount.rows[0].count);
+            const isFirstUser = count === 0;
+            const role = isFirstUser ? "ADMIN" : "STUDENT";
+            console.log("Creating NEW profile with role:", role);
 
-          await authPool.query(
-            "SELECT create_or_update_profile($1, $2, $3, $4)",
-            [userId, user.email, user.name, role],
-          );
-          console.log("Profile created/updated successfully");
+            await authPool.query(
+              "SELECT create_or_update_profile($1, $2, $3, $4)",
+              [userId, user.email, user.name, role],
+            );
+            console.log("New profile created with role:", role);
+          }
         } catch (error) {
           console.error("!!! Error creating/updating user:", error);
           console.error("Error details:", JSON.stringify(error, null, 2));
