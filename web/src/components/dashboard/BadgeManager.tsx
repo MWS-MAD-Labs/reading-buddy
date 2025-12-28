@@ -168,7 +168,7 @@ export function BadgeManager({
   };
 
   // Filter badges
-  const filteredBadges = badges.filter((badge) => {
+  const filteredBadges = badges.filter((badge: any) => {
     const matchesSearch =
       badge.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       badge.description?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -214,7 +214,7 @@ export function BadgeManager({
     try {
       const updatedBadge = await updateBadge(input);
       setBadges((prev) =>
-        prev.map((b) =>
+        prev.map((b: any) =>
           b.id === updatedBadge.id ? { ...b, ...updatedBadge } : b,
         ),
       );
@@ -245,7 +245,7 @@ export function BadgeManager({
     setIsLoading(true);
     try {
       await deleteBadge(badge.id);
-      setBadges((prev) => prev.filter((b) => b.id !== badge.id));
+      setBadges((prev) => prev.filter((b: any) => b.id !== badge.id));
       showMessage("success", `Badge "${badge.name}" deleted successfully!`);
     } catch (error) {
       showMessage(
@@ -262,7 +262,7 @@ export function BadgeManager({
     try {
       const updatedBadge = await toggleBadgeActive(badge.id, !badge.is_active);
       setBadges((prev) =>
-        prev.map((b) =>
+        prev.map((b: any) =>
           b.id === updatedBadge.id ? { ...b, ...updatedBadge } : b,
         ),
       );
@@ -342,20 +342,20 @@ export function BadgeManager({
         >
           <option value="all">All Badges ({badges.length})</option>
           <option value="active">
-            Active ({badges.filter((b) => b.is_active).length})
+            Active ({badges.filter((b: any) => b.is_active).length})
           </option>
           <option value="inactive">
-            Inactive ({badges.filter((b) => !b.is_active).length})
+            Inactive ({badges.filter((b: any) => !b.is_active).length})
           </option>
           <option value="book-specific">
-            Book-Specific ({badges.filter((b) => b.book_id).length})
+            Book-Specific ({badges.filter((b: any) => b.book_id).length})
           </option>
         </select>
       </div>
 
       {/* Badge Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredBadges.map((badge) => (
+        {filteredBadges.map((badge: any) => (
           <div
             key={badge.id}
             className={`relative rounded-2xl border-2 p-4 transition ${
@@ -544,7 +544,7 @@ function BadgeFormModal({
 
   // Filter badge types based on permissions
   const availableBadgeTypes = permissions.canOnlyCreateBookBadges
-    ? BADGE_TYPES.filter((t) => t.value === "book_completion_specific")
+    ? BADGE_TYPES.filter((t: any) => t.value === "book_completion_specific")
     : BADGE_TYPES;
 
   const [criteriaType, setCriteriaType] = useState(
@@ -735,7 +735,7 @@ function BadgeFormModal({
                 }}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
               >
-                {availableBadgeTypes.map((type) => (
+                {availableBadgeTypes.map((type: any) => (
                   <option key={type.value} value={type.value}>
                     {type.label}
                   </option>
@@ -757,7 +757,7 @@ function BadgeFormModal({
                 }
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
               >
-                {BADGE_CATEGORIES.map((cat) => (
+                {BADGE_CATEGORIES.map((cat: any) => (
                   <option key={cat.value} value={cat.value}>
                     {cat.icon} {cat.label}
                   </option>
@@ -783,7 +783,7 @@ function BadgeFormModal({
                 required
               >
                 <option value="">Select a book...</option>
-                {books.map((book) => (
+                {books.map((book: any) => (
                   <option key={book.id} value={book.id}>
                     {book.title} by {book.author}
                   </option>
@@ -804,7 +804,7 @@ function BadgeFormModal({
                   onChange={(e) => setCriteriaType(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
                 >
-                  {CRITERIA_TYPES.map((type) => (
+                  {CRITERIA_TYPES.map((type: any) => (
                     <option key={type.value} value={type.value}>
                       {type.label}
                     </option>
@@ -881,7 +881,7 @@ function BadgeFormModal({
                 }
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
               >
-                {BADGE_TIERS.map((tier) => (
+                {BADGE_TIERS.map((tier: any) => (
                   <option key={tier.value} value={tier.value}>
                     {tier.label}
                   </option>

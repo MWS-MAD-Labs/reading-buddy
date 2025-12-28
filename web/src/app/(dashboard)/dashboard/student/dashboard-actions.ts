@@ -40,9 +40,12 @@ export async function getStudentDashboardData(
 ): Promise<{ success: boolean; data?: StudentDashboardData; error?: string }> {
   try {
     const supabase = getSupabaseAdminClient();
+    if (!supabase) {
+      return { success: false, error: "Database connection not available" };
+    }
 
     // 1. Get gamification stats
-    const gamificationStats = await getGamificationStats(supabase, userId);
+    const gamificationStats = await getGamificationStats(userId, userId);
 
     // 2. Get current reading book (most recent)
     const { data: currentReading } = await supabase

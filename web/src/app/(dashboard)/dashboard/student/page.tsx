@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/server";
+import { queryWithContext } from "@/lib/db";
 import {
   getGamificationStats,
   getBadgesWithProgress,
@@ -20,88 +19,100 @@ import { getWeeklyChallenge } from "../weekly-challenge-actions";
 export const dynamic = "force-dynamic";
 
 export default async function StudentDashboardPage() {
-  const supabase = await createSupabaseServerClient();
-  const supabaseAdmin = getSupabaseAdminClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
+  const profileId = user.profileId!;
+  const userId = user.userId;
 
-  if (!user) {
-    redirect("/login");
+  // If userId is not in session (old session), fetch it from database
+  if (!userId) {
+    console.error("userId not in session - user needs to login again");
+    throw new Error("Please log out and log in again to refresh your session");
   }
 
+  console.log("Student page - userId:", userId, "profileId:", profileId);
+
   // Get gamification stats
-  const gamificationStats = await getGamificationStats(supabaseAdmin, user.id);
-  const badgesWithProgress = await getBadgesWithProgress(
-    supabaseAdmin,
-    user.id,
-  );
-  const earnedBadges = await getStudentBadges(supabaseAdmin, user.id);
+  const gamificationStats = await getGamificationStats(userId, profileId);
+  const badgesWithProgress = await getBadgesWithProgress(userId, profileId);
+  const earnedBadges = await getStudentBadges(userId, profileId);
 
   // Get weekly challenge
-  const weeklyChallengeResult = await getWeeklyChallenge(user.id);
+  const weeklyChallengeResult = await getWeeklyChallenge(profileId);
   const weeklyChallenge = weeklyChallengeResult.success
     ? weeklyChallengeResult.data
     : null;
 
   // Get recent badges (last 3 earned)
-  const recentBadges = earnedBadges.slice(0, 3).map((sb) => ({
+  const recentBadges = earnedBadges.slice(0, 3).map((sb: any) => ({
     badge: sb.badge,
     earnedAt: sb.earned_at,
   }));
 
   // Get student's current readings (personal progress)
-  const { data: assignments, error: assignmentsError } = await supabase
-    .from("student_books")
-    .select("book_id, current_page, updated_at, started_at, books(*)")
-    .eq("student_id", user.id)
-    .order("updated_at", { ascending: false })
-    .order("started_at", { ascending: false });
+  const assignmentsResult = await queryWithContext(
+    userId,
+    `SELECT
+      sb.book_id,
+      sb.current_page,
+      sb.updated_at,
+      sb.started_at,
+      b.id as book_id_ref,
+      b.title,
+      b.author,
+      b.cover_url
+    FROM student_books sb
+    JOIN books b ON sb.book_id = b.id
+    WHERE sb.student_id = $1
+    ORDER BY sb.updated_at DESC, sb.started_at DESC`,
+    [profileId],
+  );
 
-  // Debug logging
-  console.log("Student ID:", user.id);
-  console.log("Assignments query result:", {
-    count: assignments?.length ?? 0,
-    data: assignments,
-    error: assignmentsError,
-  });
+  const assignments = assignmentsResult.rows.map((row: any) => ({
+    book_id: row.book_id,
+    current_page: row.current_page,
+    updated_at: row.updated_at,
+    started_at: row.started_at,
+    books: {
+      id: row.book_id_ref,
+      title: row.title,
+      author: row.author,
+      cover_url: row.cover_url,
+    },
+  }));
 
-  const assignedBookIds =
-    assignments?.map((assignment) => assignment.book_id) ?? [];
+  console.log("Student ID:", profileId);
+  console.log("Assignments count:", assignments.length);
 
-  // Get student's classes (via admin client to avoid RLS issues)
-  const { data: studentClasses } = await supabaseAdmin
-    .from("class_students")
-    .select("class_id")
-    .eq("student_id", user.id);
+  const assignedBookIds = assignments.map((assignment: any) => assignment.book_id);
 
-  const classIds = studentClasses?.map((c) => c.class_id) ?? [];
+  // Get student's classes
+  const studentClassesResult = await queryWithContext(
+    userId,
+    `SELECT class_id FROM class_students WHERE student_id = $1`,
+    [profileId],
+  );
+
+  const classIds = studentClassesResult.rows.map((c: any) => c.class_id);
 
   // Get which classrooms assigned each book (for display purposes)
   const bookClassrooms: Map<number, string[]> = new Map();
   if (classIds.length > 0 && assignedBookIds.length > 0) {
-    const { data: classBookData } = await supabaseAdmin
-      .from("class_books")
-      .select("book_id, class_id, classes(name)")
-      .in("class_id", classIds)
-      .in("book_id", assignedBookIds);
-
-    classBookData?.forEach(
-      (item: {
-        book_id: number;
-        class_id: number;
-        classes: { name: string }[] | { name: string } | null;
-      }) => {
-        const classData = Array.isArray(item.classes)
-          ? item.classes[0]
-          : item.classes;
-        const className = classData?.name ?? "Unknown class";
-        if (!bookClassrooms.has(item.book_id)) {
-          bookClassrooms.set(item.book_id, []);
-        }
-        bookClassrooms.get(item.book_id)?.push(className);
-      },
+    const classBookResult = await queryWithContext(
+      userId,
+      `SELECT cb.book_id, cb.class_id, c.name
+       FROM class_books cb
+       JOIN classes c ON cb.class_id = c.id
+       WHERE cb.class_id = ANY($1::int[]) AND cb.book_id = ANY($2::int[])`,
+      [classIds, assignedBookIds],
     );
+
+    classBookResult.rows.forEach((item: any) => {
+      const className = item.name ?? "Unknown class";
+      if (!bookClassrooms.has(item.book_id)) {
+        bookClassrooms.set(item.book_id, []);
+      }
+      bookClassrooms.get(item.book_id)?.push(className);
+    });
   }
 
   // Get classroom details for the student
@@ -112,33 +123,20 @@ export default async function StudentDashboardPage() {
   }> = [];
 
   if (classIds.length > 0) {
-    const { data: classRows } = await supabaseAdmin
-      .from("classes")
-      .select("id, name, profiles!classes_teacher_id_fkey(full_name)")
-      .in("id", classIds);
+    const classRowsResult = await queryWithContext(
+      userId,
+      `SELECT c.id, c.name, p.full_name as teacher_name
+       FROM classes c
+       JOIN profiles p ON c.teacher_id = p.id
+       WHERE c.id = ANY($1::int[])`,
+      [classIds],
+    );
 
-    classrooms =
-      classRows?.map(
-        (entry: {
-          id: number;
-          name: string;
-          profiles:
-            | { full_name: string | null }
-            | { full_name: string | null }[];
-        }) => {
-          const profileData =
-            Array.isArray(entry.profiles) && entry.profiles.length > 0
-              ? entry.profiles[0]
-              : entry.profiles;
-          const profile = profileData as { full_name: string | null } | null;
-
-          return {
-            id: entry.id,
-            name: entry.name,
-            teacher_name: profile?.full_name ?? "Unknown teacher",
-          };
-        },
-      ) ?? [];
+    classrooms = classRowsResult.rows.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      teacher_name: row.teacher_name ?? "Unknown teacher",
+    }));
   }
 
   return (
@@ -183,18 +181,8 @@ export default async function StudentDashboardPage() {
 
         {assignments?.length ? (
           <ul className="grid gap-5 md:grid-cols-2">
-            {assignments.map((assignment) => {
-              // Extract first book from array if it exists
-              const bookData =
-                Array.isArray(assignment.books) && assignment.books.length > 0
-                  ? assignment.books[0]
-                  : assignment.books;
-              const book = bookData as {
-                id: number;
-                title: string;
-                author: string;
-                cover_url: string;
-              } | null;
+            {assignments.map((assignment: any) => {
+              const book = assignment.books;
               return (
                 <li
                   key={assignment.book_id}
@@ -269,7 +257,7 @@ export default async function StudentDashboardPage() {
         </div>
         {classrooms.length ? (
           <ul className="space-y-3">
-            {classrooms.map((classroom) => (
+            {classrooms.map((classroom: any) => (
               <li
                 key={classroom.id}
                 className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-indigo-100 bg-white/80 p-4 text-indigo-900 shadow-[0_12px_30px_rgba(79,70,229,0.15)]"

@@ -13,7 +13,10 @@ interface BadgeCardProps {
   size?: "sm" | "md" | "lg";
 }
 
-const tierColors: Record<BadgeTier, { bg: string; border: string; text: string }> = {
+const tierColors: Record<
+  BadgeTier,
+  { bg: string; border: string; text: string }
+> = {
   bronze: {
     bg: "bg-gradient-to-br from-amber-100 to-orange-100",
     border: "border-amber-300",
@@ -185,9 +188,11 @@ export function BadgeGrid({
     return b.progress - a.progress;
   });
 
-  const displayBadges = showAll ? sortedBadges : sortedBadges.slice(0, maxDisplay);
+  const displayBadges = showAll
+    ? sortedBadges
+    : sortedBadges.slice(0, maxDisplay);
   const hiddenCount = badges.length - displayBadges.length;
-  const earnedCount = badges.filter((b) => b.earned).length;
+  const earnedCount = badges.filter((b: any) => b.earned).length;
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -201,7 +206,7 @@ export function BadgeGrid({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {displayBadges.map((item) => (
+        {displayBadges.map((item: any) => (
           <BadgeCard
             key={item.badge.id}
             badge={item.badge}
@@ -253,7 +258,7 @@ export function RecentBadges({
       </div>
 
       <div className="space-y-3">
-        {recentBadges.map((item) => (
+        {recentBadges.map((item: any) => (
           <div
             key={item.badge.id}
             className="flex items-center gap-3 rounded-xl bg-white/80 p-3"
@@ -266,11 +271,16 @@ export function RecentBadges({
                   className="h-full w-full rounded-full object-cover"
                 />
               ) : (
-                categoryIcons[item.badge.category || "general"]
+                categoryIcons[
+                  (item.badge.category ||
+                    "general") as keyof typeof categoryIcons
+                ]
               )}
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-emerald-800">{item.badge.name}</p>
+              <p className="font-semibold text-emerald-800">
+                {item.badge.name}
+              </p>
               <p className="text-xs text-emerald-600">
                 {new Date(item.earnedAt).toLocaleDateString()}
               </p>

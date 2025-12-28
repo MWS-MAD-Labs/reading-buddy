@@ -110,7 +110,7 @@ function BookAssignmentsList({
 
   return (
     <div className="space-y-3">
-      {assignments.map((assignment) => (
+      {assignments.map((assignment: any) => (
         <BookAssignmentCard key={assignment.bookId} assignment={assignment} />
       ))}
     </div>
@@ -210,7 +210,7 @@ function QuizAssignmentsList({
 
   return (
     <div className="space-y-3">
-      {assignments.map((assignment) => (
+      {assignments.map((assignment: any) => (
         <QuizAssignmentCard key={assignment.quizId} assignment={assignment} />
       ))}
     </div>

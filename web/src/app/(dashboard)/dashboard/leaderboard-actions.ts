@@ -1,6 +1,6 @@
 "use server";
 
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { queryWithContext } from "@/lib/db";
 import { getGamificationStats } from "@/lib/gamification";
 
 export type LeaderboardEntry = {
@@ -25,24 +25,30 @@ export type LeaderboardData = {
  * Get student leaderboard (only STUDENT role)
  */
 export async function getStudentLeaderboard(
-  currentUserId: string,
+  userId: string,
+  currentProfileId: string,
   limit: number = 50,
 ): Promise<{ success: boolean; data?: LeaderboardData; error?: string }> {
   try {
-    const supabase = getSupabaseAdminClient();
+    // Get all students with their stats
+    const result = await queryWithContext(
+      userId,
+      `SELECT
+        id,
+        full_name,
+        xp,
+        level,
+        total_books_completed,
+        total_pages_read,
+        reading_streak
+      FROM profiles
+      WHERE role = 'STUDENT'
+      ORDER BY xp DESC, level DESC
+      LIMIT $1`,
+      [limit],
+    );
 
-    // Get all students
-    const { data: profiles, error } = await supabase
-      .from("profiles")
-      .select("id, full_name")
-      .eq("role", "STUDENT");
-
-    if (error) {
-      console.error("Error fetching student leaderboard:", error);
-      return { success: false, error: "Failed to fetch leaderboard" };
-    }
-
-    if (!profiles || profiles.length === 0) {
+    if (result.rows.length === 0) {
       return {
         success: true,
         data: {
@@ -53,36 +59,28 @@ export async function getStudentLeaderboard(
       };
     }
 
-    // Get gamification stats for each student
-    const entriesWithStats = await Promise.all(
-      profiles.map(async (profile) => {
-        const stats = await getGamificationStats(supabase, profile.id);
-        return {
-          userId: profile.id,
-          name: profile.full_name || "Anonymous Student",
-          xp: stats?.xp || 0,
-          level: stats?.level || 1,
-          booksCompleted: stats?.total_books_completed || 0,
-          pagesRead: stats?.total_pages_read || 0,
-          readingStreak: stats?.reading_streak || 0,
-          isCurrentUser: profile.id === currentUserId,
-        };
+    // Get total count
+    const countResult = await queryWithContext(
+      userId,
+      `SELECT COUNT(*) as count FROM profiles WHERE role = 'STUDENT'`,
+      [],
+    );
+    const totalParticipants = parseInt(countResult.rows[0]?.count || "0");
+
+    // Map to leaderboard entries
+    const entries: LeaderboardEntry[] = result.rows.map(
+      (profile: any, index: number) => ({
+        rank: index + 1,
+        userId: profile.id,
+        name: profile.full_name || "Anonymous Student",
+        xp: profile.xp || 0,
+        level: profile.level || 1,
+        booksCompleted: profile.total_books_completed || 0,
+        pagesRead: profile.total_pages_read || 0,
+        readingStreak: profile.reading_streak || 0,
+        isCurrentUser: profile.id === currentProfileId,
       }),
     );
-
-    // Sort by XP descending, then by level
-    const sortedEntries = entriesWithStats
-      .sort((a, b) => {
-        if (b.xp !== a.xp) return b.xp - a.xp;
-        return b.level - a.level;
-      })
-      .slice(0, limit);
-
-    // Add ranks
-    const entries: LeaderboardEntry[] = sortedEntries.map((entry, index) => ({
-      ...entry,
-      rank: index + 1,
-    }));
 
     // Find current user's entry
     const currentUserEntry = entries.find((e) => e.isCurrentUser) || null;
@@ -92,7 +90,7 @@ export async function getStudentLeaderboard(
       data: {
         entries,
         currentUserEntry,
-        totalParticipants: profiles.length,
+        totalParticipants,
       },
     };
   } catch (error) {
@@ -108,24 +106,31 @@ export async function getStudentLeaderboard(
  * Get staff leaderboard (TEACHER, LIBRARIAN, ADMIN)
  */
 export async function getStaffLeaderboard(
-  currentUserId: string,
+  userId: string,
+  currentProfileId: string,
   limit: number = 50,
 ): Promise<{ success: boolean; data?: LeaderboardData; error?: string }> {
   try {
-    const supabase = getSupabaseAdminClient();
+    // Get all staff members with their stats
+    const result = await queryWithContext(
+      userId,
+      `SELECT
+        id,
+        full_name,
+        role,
+        xp,
+        level,
+        total_books_completed,
+        total_pages_read,
+        reading_streak
+      FROM profiles
+      WHERE role IN ('TEACHER', 'LIBRARIAN', 'ADMIN')
+      ORDER BY xp DESC, level DESC
+      LIMIT $1`,
+      [limit],
+    );
 
-    // Get all staff members
-    const { data: profiles, error } = await supabase
-      .from("profiles")
-      .select("id, full_name, role")
-      .in("role", ["TEACHER", "LIBRARIAN", "ADMIN"]);
-
-    if (error) {
-      console.error("Error fetching staff leaderboard:", error);
-      return { success: false, error: "Failed to fetch leaderboard" };
-    }
-
-    if (!profiles || profiles.length === 0) {
+    if (result.rows.length === 0) {
       return {
         success: true,
         data: {
@@ -136,38 +141,30 @@ export async function getStaffLeaderboard(
       };
     }
 
-    // Get gamification stats for each staff member
-    const entriesWithStats = await Promise.all(
-      profiles.map(async (profile) => {
-        const stats = await getGamificationStats(supabase, profile.id);
-        return {
-          userId: profile.id,
-          name:
-            profile.full_name ||
-            `Anonymous ${profile.role?.toLowerCase() || "staff"}`,
-          xp: stats?.xp || 0,
-          level: stats?.level || 1,
-          booksCompleted: stats?.total_books_completed || 0,
-          pagesRead: stats?.total_pages_read || 0,
-          readingStreak: stats?.reading_streak || 0,
-          isCurrentUser: profile.id === currentUserId,
-        };
+    // Get total count
+    const countResult = await queryWithContext(
+      userId,
+      `SELECT COUNT(*) as count FROM profiles WHERE role IN ('TEACHER', 'LIBRARIAN', 'ADMIN')`,
+      [],
+    );
+    const totalParticipants = parseInt(countResult.rows[0]?.count || "0");
+
+    // Map to leaderboard entries
+    const entries: LeaderboardEntry[] = result.rows.map(
+      (profile: any, index: number) => ({
+        rank: index + 1,
+        userId: profile.id,
+        name:
+          profile.full_name ||
+          `Anonymous ${profile.role?.toLowerCase() || "staff"}`,
+        xp: profile.xp || 0,
+        level: profile.level || 1,
+        booksCompleted: profile.total_books_completed || 0,
+        pagesRead: profile.total_pages_read || 0,
+        readingStreak: profile.reading_streak || 0,
+        isCurrentUser: profile.id === currentProfileId,
       }),
     );
-
-    // Sort by XP descending, then by level
-    const sortedEntries = entriesWithStats
-      .sort((a, b) => {
-        if (b.xp !== a.xp) return b.xp - a.xp;
-        return b.level - a.level;
-      })
-      .slice(0, limit);
-
-    // Add ranks
-    const entries: LeaderboardEntry[] = sortedEntries.map((entry, index) => ({
-      ...entry,
-      rank: index + 1,
-    }));
 
     // Find current user's entry
     const currentUserEntry = entries.find((e) => e.isCurrentUser) || null;
@@ -177,7 +174,7 @@ export async function getStaffLeaderboard(
       data: {
         entries,
         currentUserEntry,
-        totalParticipants: profiles.length,
+        totalParticipants,
       },
     };
   } catch (error) {
@@ -193,7 +190,8 @@ export async function getStaffLeaderboard(
  * Get combined leaderboard stats for preview
  */
 export async function getLeaderboardPreview(
-  currentUserId: string,
+  userId: string,
+  currentProfileId: string,
   role: string,
 ): Promise<{
   success: boolean;
@@ -210,8 +208,8 @@ export async function getLeaderboardPreview(
 
     // Get appropriate leaderboard
     const result = isStudent
-      ? await getStudentLeaderboard(currentUserId, 3)
-      : await getStaffLeaderboard(currentUserId, 3);
+      ? await getStudentLeaderboard(userId, currentProfileId, 3)
+      : await getStaffLeaderboard(userId, currentProfileId, 3);
 
     if (!result.success || !result.data) {
       return { success: false, error: result.error };

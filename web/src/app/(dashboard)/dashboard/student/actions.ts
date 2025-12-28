@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/server";
+import { queryWithContext } from "@/lib/db";
 import {
   updateReadingStreak,
   awardXP,
@@ -24,40 +24,34 @@ export const recordReadingProgress = async (input: {
   currentStreak?: number;
   xpAwarded?: number;
 }> => {
-  const supabase = await createSupabaseServerClient();
-  const supabaseAdmin = getSupabaseAdminClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId || !user.profileId) {
     throw new Error("You must be signed in to save progress.");
   }
 
-  const cacheKey = `${user.id}-${input.bookId}`;
+  const cacheKey = `${user.profileId}-${input.bookId}`;
   const lastPage = lastPageReadCache.get(cacheKey) ?? 0;
 
   console.log("📖 Recording progress:", {
-    student_id: user.id,
+    student_id: user.profileId,
     book_id: input.bookId,
     current_page: input.currentPage,
   });
 
-  const { data, error } = await supabase
-    .from("student_books")
-    .upsert(
-      {
-        student_id: user.id,
-        book_id: input.bookId,
-        current_page: input.currentPage,
-      },
-      { onConflict: "student_id,book_id" },
-    )
-    .select();
+  try {
+    const result = await queryWithContext(
+      user.userId,
+      `INSERT INTO student_books (student_id, book_id, current_page)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (student_id, book_id)
+       DO UPDATE SET current_page = $3, updated_at = NOW()
+       RETURNING *`,
+      [user.profileId, input.bookId, input.currentPage],
+    );
 
-  console.log("📖 Progress save result:", { data, error });
-
-  if (error) {
+    console.log("📖 Progress save result:", { rows: result.rows });
+  } catch (error) {
     console.error("❌ Failed to save progress:", error);
     throw error;
   }
@@ -71,7 +65,7 @@ export const recordReadingProgress = async (input: {
 
     // Update streak (once per day)
     try {
-      streakResult = await updateReadingStreak(supabaseAdmin, user.id);
+      streakResult = await updateReadingStreak(user.userId, user.profileId);
     } catch (err) {
       console.error("Failed to update streak:", err);
     }
@@ -80,8 +74,8 @@ export const recordReadingProgress = async (input: {
     try {
       const pageXp = newPagesRead * XP_REWARDS.PAGE_READ;
       await awardXP(
-        supabaseAdmin,
-        user.id,
+        user.userId,
+        user.profileId,
         pageXp,
         "page_read",
         `${input.bookId}-${input.currentPage}`,
@@ -90,25 +84,27 @@ export const recordReadingProgress = async (input: {
       xpAwarded += pageXp;
 
       // Update total pages read
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("total_pages_read")
-        .eq("id", user.id)
-        .single();
+      const profileResult = await queryWithContext(
+        user.userId,
+        `SELECT total_pages_read FROM profiles WHERE id = $1`,
+        [user.profileId],
+      );
+      const profile = profileResult.rows[0];
 
-      await supabaseAdmin
-        .from("profiles")
-        .update({
-          total_pages_read: (profile?.total_pages_read ?? 0) + newPagesRead,
-        })
-        .eq("id", user.id);
+      await queryWithContext(
+        user.userId,
+        `UPDATE profiles SET total_pages_read = $1 WHERE id = $2`,
+        [(profile?.total_pages_read ?? 0) + newPagesRead, user.profileId],
+      );
     } catch (err) {
       console.error("Failed to award page XP:", err);
     }
 
     // Evaluate page-based badges
     try {
-      await evaluateBadges(supabaseAdmin, user.id, { bookId: input.bookId });
+      await evaluateBadges(user.userId, user.profileId, {
+        bookId: input.bookId,
+      });
     } catch (err) {
       console.error("Failed to evaluate badges:", err);
     }
@@ -136,33 +132,27 @@ export const evaluateAchievements = async (
   xpAwarded: number;
   leveledUp: boolean;
 }> => {
-  const supabase = await createSupabaseServerClient();
-  const supabaseAdmin = getSupabaseAdminClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId || !user.profileId) {
     throw new Error("You must be signed in to evaluate achievements.");
   }
 
   // Check if this is a book completion
   let isBookCompletion = false;
   if (bookId) {
-    const { data: studentBook } = await supabase
-      .from("student_books")
-      .select("current_page, books(page_count)")
-      .eq("student_id", user.id)
-      .eq("book_id", bookId)
-      .single();
+    const studentBookResult = await queryWithContext(
+      user.userId,
+      `SELECT sb.current_page, b.page_count
+       FROM student_books sb
+       JOIN books b ON sb.book_id = b.id
+       WHERE sb.student_id = $1 AND sb.book_id = $2`,
+      [user.profileId, bookId],
+    );
 
-    if (studentBook) {
-      const bookData =
-        Array.isArray(studentBook.books) && studentBook.books.length > 0
-          ? studentBook.books[0]
-          : studentBook.books;
-      const book = bookData as { page_count?: number } | null;
-      const pageCount = book?.page_count ?? 0;
+    if (studentBookResult.rows.length > 0) {
+      const studentBook = studentBookResult.rows[0];
+      const pageCount = studentBook.page_count ?? 0;
       const currentPage = studentBook.current_page ?? 0;
       isBookCompletion = pageCount > 0 && currentPage >= pageCount;
     }
@@ -172,18 +162,19 @@ export const evaluateAchievements = async (
 
   // If book was completed, use the book completion handler
   if (isBookCompletion && bookId) {
-    result = await onBookCompleted(supabaseAdmin, user.id, bookId);
+    result = await onBookCompleted(user.userId, user.profileId, bookId);
   } else {
     // Otherwise, just evaluate badges
-    result = await evaluateBadges(supabaseAdmin, user.id, { bookId });
+    result = await evaluateBadges(user.userId, user.profileId, { bookId });
   }
 
   // Check if leveled up
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("level, xp")
-    .eq("id", user.id)
-    .single();
+  const profileResult = await queryWithContext(
+    user.userId,
+    `SELECT level, xp FROM profiles WHERE id = $1`,
+    [user.profileId],
+  );
+  const profile = profileResult.rows[0];
 
   const currentLevel = profile?.level ?? 1;
   const previousXp = (profile?.xp ?? 0) - result.totalXpAwarded;
@@ -208,38 +199,31 @@ export const getPendingCheckpointForPage = async (input: {
   bookId: number;
   currentPage: number;
 }) => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId || !user.profileId) {
     throw new Error("You must be signed in to check checkpoints.");
   }
 
-  // Use admin client for checkpoint queries to avoid RLS recursion
-  const supabaseAdmin = getSupabaseAdminClient();
-
   // Find the latest required checkpoint at or before the current page
-  const { data: checkpoints, error: checkpointError } = await supabaseAdmin
-    .from("quiz_checkpoints")
-    .select("id, page_number, quiz_id, is_required")
-    .eq("book_id", input.bookId)
-    .eq("is_required", true)
-    .not("quiz_id", "is", null)
-    .lte("page_number", input.currentPage)
-    .order("page_number", { ascending: false })
-    .limit(1);
+  const checkpointResult = await queryWithContext(
+    user.userId,
+    `SELECT id, page_number, quiz_id, is_required
+     FROM quiz_checkpoints
+     WHERE book_id = $1
+       AND is_required = true
+       AND quiz_id IS NOT NULL
+       AND page_number <= $2
+     ORDER BY page_number DESC
+     LIMIT 1`,
+    [input.bookId, input.currentPage],
+  );
 
-  if (checkpointError) {
-    throw checkpointError;
-  }
-
-  if (!checkpoints || checkpoints.length === 0) {
+  if (checkpointResult.rows.length === 0) {
     return { checkpointRequired: false as const };
   }
 
-  const checkpoint = checkpoints[0] as {
+  const checkpoint = checkpointResult.rows[0] as {
     quiz_id: number | null;
     page_number: number;
   };
@@ -249,19 +233,17 @@ export const getPendingCheckpointForPage = async (input: {
   }
 
   // Check if the student has already completed this checkpoint quiz
-  const { data: attempt, error: attemptError } = await supabaseAdmin
-    .from("quiz_attempts")
-    .select("id, score")
-    .eq("quiz_id", checkpoint.quiz_id)
-    .eq("student_id", user.id)
-    .order("submitted_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const attemptResult = await queryWithContext(
+    user.userId,
+    `SELECT id, score
+     FROM quiz_attempts
+     WHERE quiz_id = $1 AND student_id = $2
+     ORDER BY submitted_at DESC
+     LIMIT 1`,
+    [checkpoint.quiz_id, user.profileId],
+  );
 
-  if (attemptError) {
-    throw attemptError;
-  }
-
+  const attempt = attemptResult.rows[0];
   const completed = attempt && attempt.score !== null;
 
   if (completed) {
@@ -284,53 +266,58 @@ export const markBookAsCompleted = async (input: {
   leveledUp: boolean;
   newLevel?: number;
 }> => {
-  const supabase = await createSupabaseServerClient();
-  const supabaseAdmin = getSupabaseAdminClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId || !user.profileId) {
     throw new Error("You must be signed in to mark a book as completed.");
   }
 
   // Get the book's page count
-  const { data: book, error: bookError } = await supabase
-    .from("books")
-    .select("page_count")
-    .eq("id", input.bookId)
-    .single();
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT page_count FROM books WHERE id = $1`,
+    [input.bookId],
+  );
 
-  if (bookError || !book) {
+  if (bookResult.rows.length === 0) {
     throw new Error("Book not found.");
   }
 
-  // Update student_books to mark as completed
-  const { error: updateError } = await supabase.from("student_books").upsert(
-    {
-      student_id: user.id,
-      book_id: input.bookId,
-      current_page: book.page_count ?? 1,
-      completed: true,
-      completed_at: new Date().toISOString(),
-    },
-    { onConflict: "student_id,book_id" },
-  );
+  const book = bookResult.rows[0];
 
-  if (updateError) {
-    console.error("Failed to mark book as completed:", updateError);
+  // Update student_books to mark as completed
+  try {
+    await queryWithContext(
+      user.userId,
+      `INSERT INTO student_books (student_id, book_id, current_page, completed, completed_at)
+       VALUES ($1, $2, $3, true, NOW())
+       ON CONFLICT (student_id, book_id)
+       DO UPDATE SET
+         current_page = $3,
+         completed = true,
+         completed_at = NOW(),
+         updated_at = NOW()`,
+      [user.profileId, input.bookId, book.page_count ?? 1],
+    );
+  } catch (error) {
+    console.error("Failed to mark book as completed:", error);
     throw new Error("Failed to mark book as completed.");
   }
 
   // Trigger book completion rewards
-  const result = await onBookCompleted(supabaseAdmin, user.id, input.bookId);
+  const result = await onBookCompleted(
+    user.userId,
+    user.profileId,
+    input.bookId,
+  );
 
   // Get updated profile for level info
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("level, xp")
-    .eq("id", user.id)
-    .single();
+  const profileResult = await queryWithContext(
+    user.userId,
+    `SELECT level, xp FROM profiles WHERE id = $1`,
+    [user.profileId],
+  );
+  const profile = profileResult.rows[0];
 
   const currentLevel = profile?.level ?? 1;
   const previousXp = (profile?.xp ?? 0) - result.totalXpAwarded;

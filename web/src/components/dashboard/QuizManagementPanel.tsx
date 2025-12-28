@@ -206,7 +206,7 @@ export const QuizManagementPanel = ({ bookGroups }: QuizManagementPanelProps) =>
             <p className="text-blue-300">Generate quizzes using the tools above</p>
           </div>
         ) : (
-          filteredGroups.map((group) => (
+          filteredGroups.map((group: any) => (
             <div key={group.bookId} className="space-y-3">
               {/* Book Header */}
               <div className="flex items-center gap-3">
@@ -220,7 +220,7 @@ export const QuizManagementPanel = ({ bookGroups }: QuizManagementPanelProps) =>
               </div>
 
               {/* Quiz Cards */}
-              {group.quizzes.map((quiz) => (
+              {group.quizzes.map((quiz: any) => (
                 <div
                   key={quiz.id}
                   className="rounded-2xl border-4 border-blue-200 bg-white p-5 shadow-lg transition hover:shadow-xl"

@@ -4,7 +4,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getMinioClient, getMinioBucketName } from "@/lib/minio";
 import {
   getObjectKeyFromPublicUrl,
@@ -17,6 +16,7 @@ import { promisify } from "util";
 import { tmpdir } from "os";
 import { join } from "path";
 import { randomUUID } from "crypto";
+import { query } from "@/lib/db";
 
 const execAsync = promisify(exec);
 
@@ -135,17 +135,52 @@ async function convertEpubHandler(
     const pdfPublicUrl = buildPublicObjectUrl(pdfObjectKey);
 
     // 6. Update database with converted PDF URL
-    const supabase = getSupabaseAdminClient();
-    const { error: updateError } = await supabase
-      .from("books")
-      .update({
-        pdf_url: pdfPublicUrl,
-      })
-      .eq("id", bookId);
+    console.log(
+      `[EPUB Conversion] About to update database for book ${bookId}`,
+    );
+    console.log(`[EPUB Conversion] New PDF URL: ${pdfPublicUrl}`);
 
-    if (updateError) {
-      console.error("Error updating book:", updateError);
+    try {
+      // First, verify the book exists
+      const checkResult = await query(
+        "SELECT id, title, pdf_url, original_file_url FROM books WHERE id = $1",
+        [bookId],
+      );
+
+      if (checkResult.rows.length === 0) {
+        console.error(
+          `[EPUB Conversion] ERROR: Book ${bookId} not found in database!`,
+        );
+        throw new Error(`Book ${bookId} not found`);
+      }
+
+      console.log(`[EPUB Conversion] Book found:`, checkResult.rows[0]);
+
+      // Now update the pdf_url
+      const result = await query(
+        "UPDATE books SET pdf_url = $1 WHERE id = $2 RETURNING id, pdf_url",
+        [pdfPublicUrl, bookId],
+      );
+
+      console.log(
+        `[EPUB Conversion] ✅ Successfully updated book ${bookId} with pdf_url: ${pdfPublicUrl}`,
+      );
+      console.log(`[EPUB Conversion] Update result:`, result.rows[0]);
+      console.log(`[EPUB Conversion] Rows affected: ${result.rowCount}`);
+
+      if (result.rowCount === 0) {
+        console.error(
+          `[EPUB Conversion] ERROR: No rows updated for book ${bookId}!`,
+        );
+      }
+    } catch (updateError) {
+      console.error("[EPUB Conversion] Database update error:", updateError);
+      console.error("[EPUB Conversion] Update details:", {
+        bookId,
+        pdfPublicUrl,
+      });
       // Don't fail the request, PDF is already uploaded
+      throw updateError; // Re-throw to see the error in the response
     }
 
     // 7. Cleanup temp files

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { QuizPlayer } from "@/components/dashboard/QuizPlayer";
+import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -39,57 +40,38 @@ export default async function StudentQuizPage({
     notFound();
   }
 
-  // Check user role to determine which client to use
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  // Fetch quiz from PostgreSQL
+  const quizResult = await query(
+    `SELECT id, book_id, questions FROM quizzes WHERE id = $1`,
+    [quizId],
+  );
 
-  // Use admin client for ADMIN and LIBRARIAN to bypass RLS issues
-  const isAdminOrLibrarian =
-    profile?.role === "ADMIN" || profile?.role === "LIBRARIAN";
-
-  // Import admin client if needed
-  const queryClient = isAdminOrLibrarian
-    ? (await import("@/lib/supabase/admin")).getSupabaseAdminClient()
-    : supabase;
-
-  const { data: quiz, error: quizError } = await queryClient
-    .from("quizzes")
-    .select("id, book_id, questions")
-    .eq("id", quizId)
-    .single();
-
-  if (quizError) {
-    console.error("Quiz query error:", quizError);
-  }
-
-  if (!quiz) {
+  if (quizResult.rows.length === 0) {
     console.error("Quiz not found:", quizId);
     notFound();
   }
 
-  // Fetch book title separately to avoid RLS issues with joins
-  const { data: bookData } = await queryClient
-    .from("books")
-    .select("title")
-    .eq("id", quiz.book_id)
-    .single();
+  const quiz = quizResult.rows[0];
 
-  const book = bookData as { title: string } | null;
+  // Fetch book title
+  const bookResult = await query(`SELECT title FROM books WHERE id = $1`, [
+    quiz.book_id,
+  ]);
+
+  const book = bookResult.rows.length > 0 ? bookResult.rows[0] : null;
 
   // Find which classroom this quiz belongs to (for redirect after completion)
-  // Note: class_quiz_assignments table may not exist, handle gracefully
   let quizAssignment: { class_id: number } | null = null;
   try {
-    const { data } = await supabase
-      .from("class_quiz_assignments")
-      .select("class_id")
-      .eq("quiz_id", quizId)
-      .eq("is_active", true)
-      .maybeSingle();
-    quizAssignment = data;
+    const assignmentResult = await query(
+      `SELECT class_id FROM class_quiz_assignments
+       WHERE quiz_id = $1 AND is_active = true
+       LIMIT 1`,
+      [quizId],
+    );
+    if (assignmentResult.rows.length > 0) {
+      quizAssignment = assignmentResult.rows[0];
+    }
   } catch (error) {
     // Table doesn't exist or query failed, continue without class assignment
     console.warn("Could not fetch quiz assignment:", error);

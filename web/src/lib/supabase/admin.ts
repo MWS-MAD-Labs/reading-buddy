@@ -4,16 +4,15 @@ import { getServerEnv } from "@/lib/env";
 let adminClient: SupabaseClient | null = null;
 let cachedEnvVars: { url: string; key: string } | null = null;
 
-export const getSupabaseAdminClient = () => {
+export const getSupabaseAdminClient = (): SupabaseClient | null => {
   // Get runtime env vars from server
   const env = getServerEnv();
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  // Return null if Supabase is not configured (PostgreSQL migration)
   if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error(
-      "Supabase admin env vars NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.",
-    );
+    return null;
   }
 
   // If env vars changed or no client exists, recreate the client

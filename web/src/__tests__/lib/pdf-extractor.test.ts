@@ -151,23 +151,27 @@ describe("extractTextFromPDF", () => {
 
     // Mock MinIO client with a simple PDF
     const mockStream = {
-      on: vi.fn((event: string, handler: any) => {
-        if (event === "data") {
-          // Simulate PDF data
-          handler(Buffer.from("mock-pdf-data"));
-        }
-        if (event === "end") {
-          handler();
-        }
-        return mockStream;
-      }),
+      on: vi.fn(
+        (event: string, handler: (() => void) | ((data: Buffer) => void)) => {
+          if (event === "data") {
+            // Simulate PDF data
+            (handler as (data: Buffer) => void)(Buffer.from("mock-pdf-data"));
+          }
+          if (event === "end") {
+            (handler as () => void)();
+          }
+          return mockStream;
+        },
+      ),
     };
 
     const mockMinioClient = {
       getObject: vi.fn().mockResolvedValue(mockStream),
     };
 
-    vi.mocked(getMinioClient).mockReturnValue(mockMinioClient as any);
+    vi.mocked(getMinioClient).mockReturnValue(
+      mockMinioClient as unknown as ReturnType<typeof getMinioClient>,
+    );
 
     // This will fail at PDF parsing stage, but validates our error handling
     await expect(
@@ -178,8 +182,6 @@ describe("extractTextFromPDF", () => {
 
 describe("extractPageRangeText", () => {
   it("should format page range text with page numbers", async () => {
-    const { getMinioClient } = await import("@/lib/minio");
-
     // We can't easily test the full PDF extraction without a real PDF file
     // But we can verify the function exists and has correct signature
     expect(typeof extractPageRangeText).toBe("function");

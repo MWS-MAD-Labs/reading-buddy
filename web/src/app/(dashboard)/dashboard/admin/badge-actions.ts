@@ -92,6 +92,9 @@ export async function getAllBadges(): Promise<BadgeWithBook[]> {
   await requireAdminOrLibrarian();
 
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    throw new Error("Database connection not available.");
+  }
 
   const { data, error } = await supabaseAdmin
     .from("badges")
@@ -114,6 +117,9 @@ export async function getBadgesForBook(bookId: number): Promise<Badge[]> {
   await requireAdminOrLibrarian();
 
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    throw new Error("Database connection not available.");
+  }
 
   const { data, error } = await supabaseAdmin
     .from("badges")
@@ -149,6 +155,9 @@ export interface CreateBadgeInput {
 export async function createBadge(input: CreateBadgeInput): Promise<Badge> {
   const user = await requireAdminOrLibrarian();
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    throw new Error("Database connection not available.");
+  }
 
   // Validate required fields
   if (!input.name?.trim()) {
@@ -241,6 +250,9 @@ export interface UpdateBadgeInput {
 export async function updateBadge(input: UpdateBadgeInput): Promise<Badge> {
   const user = await requireAdminOrLibrarian();
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    throw new Error("Database connection not available.");
+  }
 
   if (!input.id) {
     throw new Error("Badge ID is required.");
@@ -332,6 +344,9 @@ export async function deleteBadge(
 ): Promise<{ success: boolean }> {
   const user = await requireAdminOrLibrarian();
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    throw new Error("Database connection not available.");
+  }
 
   if (!badgeId) {
     throw new Error("Badge ID is required.");
@@ -411,6 +426,9 @@ export async function createBookCompletionBadge(input: {
   icon_url?: string;
 }): Promise<Badge> {
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    throw new Error("Database connection not available.");
+  }
 
   // Get book details for default name/description
   const { data: book, error: bookError } = await supabaseAdmin
@@ -449,6 +467,9 @@ export async function getBooksForBadgeAssignment(): Promise<
 > {
   await requireAdminOrLibrarian();
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    throw new Error("Database connection not available.");
+  }
 
   const { data, error } = await supabaseAdmin
     .from("books")
@@ -472,6 +493,9 @@ export async function reorderBadges(
 ): Promise<{ success: boolean }> {
   await requireAdminOrLibrarian();
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    throw new Error("Database connection not available.");
+  }
 
   // Update each badge's display_order
   for (const { id, display_order } of badgeOrders) {

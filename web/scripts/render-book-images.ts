@@ -1,12 +1,11 @@
 import { loadEnvConfig } from "@next/env";
+import { Pool } from "pg";
 import { getMinioBucketName, getMinioClient } from "@/lib/minio";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   buildBookAssetsPrefix,
   buildPageImageKey,
   getObjectKeyFromPublicUrl,
 } from "@/lib/minioUtils";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   writeFileSync,
   unlinkSync,
@@ -20,6 +19,18 @@ import { tmpdir } from "os";
 import { execSync } from "child_process";
 
 loadEnvConfig(process.cwd());
+
+// Create a dedicated pool for this script
+const pool = new Pool({
+  host: process.env.DB_HOST || "localhost",
+  port: parseInt(process.env.DB_PORT || "5434"),
+  database: process.env.DB_NAME || "reading_buddy",
+  user: process.env.DB_USER || "reading_buddy",
+  password: process.env.DB_PASSWORD,
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
 
 const ARG_HELP = `Usage: npm run render:book-images [--bookId=123] [--limit=1]
   --bookId   Process a specific book (creates a job if needed)
@@ -57,14 +68,54 @@ const streamToBuffer = async (stream: NodeJS.ReadableStream) => {
   return Buffer.concat(chunks);
 };
 
-const ensureJobForBook = async (supabase: SupabaseClient, bookId: number) => {
-  const { data: existing } = await supabase
-    .from("book_render_jobs")
-    .select("id, status")
-    .eq("book_id", bookId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+const uploadWithRetry = async (
+  minio: ReturnType<typeof getMinioClient>,
+  bucketName: string,
+  objectKey: string,
+  buffer: Buffer,
+  maxRetries = 3,
+  retryDelay = 2000,
+) => {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await minio.putObject(bucketName, objectKey, buffer, buffer.length, {
+        "Content-Type": "image/jpeg",
+      });
+      return; // Success!
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const isTimeout =
+        lastError.message.includes("ETIMEDOUT") ||
+        lastError.message.includes("ECONNRESET") ||
+        lastError.message.includes("EPIPE");
+
+      if (isTimeout && attempt < maxRetries) {
+        console.log(
+          `  ⚠ Upload failed (attempt ${attempt}/${maxRetries}): ${lastError.message}. Retrying in ${retryDelay}ms...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        continue;
+      }
+
+      throw lastError;
+    }
+  }
+
+  throw lastError || new Error("Upload failed after retries");
+};
+
+const ensureJobForBook = async (bookId: number) => {
+  const existingResult = await pool.query(
+    `SELECT id, status FROM book_render_jobs
+     WHERE book_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [bookId],
+  );
+
+  const existing = existingResult.rows[0];
 
   if (
     existing &&
@@ -74,42 +125,43 @@ const ensureJobForBook = async (supabase: SupabaseClient, bookId: number) => {
     return existing.id;
   }
 
-  const { data, error } = await supabase
-    .from("book_render_jobs")
-    .insert({ book_id: bookId, status: "pending" })
-    .select("id")
-    .single();
+  const insertResult = await pool.query(
+    `INSERT INTO book_render_jobs (book_id, status)
+     VALUES ($1, $2)
+     RETURNING id`,
+    [bookId, "pending"],
+  );
 
-  if (error || !data) {
-    throw error ?? new Error("Unable to enqueue job.");
+  if (insertResult.rows.length === 0) {
+    throw new Error("Unable to enqueue job.");
   }
 
-  return data.id;
+  return insertResult.rows[0].id;
 };
 
 const processJob = async (job: JobRecord) => {
-  const supabase = getSupabaseAdminClient();
   const minio = getMinioClient();
   const bucketName = getMinioBucketName();
 
-  const { data: book, error: bookError } = await supabase
-    .from("books")
-    .select("id, pdf_url, page_images_prefix, page_images_count")
-    .eq("id", job.book_id)
-    .single();
+  const bookResult = await pool.query(
+    `SELECT id, pdf_url, page_images_prefix, page_images_count
+     FROM books
+     WHERE id = $1`,
+    [job.book_id],
+  );
 
-  if (bookError || !book?.pdf_url) {
+  const book = bookResult.rows[0];
+
+  if (!book?.pdf_url) {
     throw new Error("Book record missing or PDF URL unavailable.");
   }
 
-  await supabase
-    .from("book_render_jobs")
-    .update({
-      status: "processing",
-      started_at: new Date().toISOString(),
-      processed_pages: 0,
-    })
-    .eq("id", job.id);
+  await pool.query(
+    `UPDATE book_render_jobs
+     SET status = $1, started_at = $2, processed_pages = 0
+     WHERE id = $3`,
+    ["processing", new Date().toISOString(), job.id],
+  );
 
   const pdfObjectKey = getObjectKeyFromPublicUrl(book.pdf_url);
   if (!pdfObjectKey) {
@@ -129,11 +181,7 @@ const processJob = async (job: JobRecord) => {
   try {
     const pagePrefix = buildBookAssetsPrefix(book.id);
 
-    // Use pdftocairo for reliable PDF rendering with proper color space handling
-    // -jpeg: output format
-    // -r 150: resolution (DPI)
-    // -jpegopt quality=95: maximum JPEG quality
-    // -singlefile: process one page at a time for better compatibility
+    // Use pdftocairo for reliable PDF rendering
     const outputPrefix = join(tempDir, "page");
 
     console.log("Converting PDF to images using pdftocairo...");
@@ -151,22 +199,17 @@ const processJob = async (job: JobRecord) => {
 
     console.log(`PDF has ${totalPages} pages`);
 
-    // Convert each page individually for better control
-    // Note: pdftocairo appends the page number to the filename, so
-    // "page" becomes "page-1.jpg", "page-2.jpg", etc.
-    // Fail immediately if any page fails to convert
-
+    // Convert each page individually
     for (let page = 1; page <= totalPages; page++) {
       const pageOutput = join(tempDir, "page");
 
-      // Update progress in database before converting
-      await supabase
-        .from("book_render_jobs")
-        .update({
-          processed_pages: page - 1,
-          total_pages: totalPages,
-        })
-        .eq("id", job.id);
+      // Update progress before converting
+      await pool.query(
+        `UPDATE book_render_jobs
+         SET processed_pages = $1, total_pages = $2
+         WHERE id = $3`,
+        [page - 1, totalPages, job.id],
+      );
 
       try {
         execSync(
@@ -174,9 +217,7 @@ const processJob = async (job: JobRecord) => {
           { stdio: "pipe" },
         );
 
-        // Rename the generated file to our expected format
-        // pdftocairo creates files with 2-digit padding: page-01.jpg, page-02.jpg, etc.
-        // For pages > 99, it uses 3-digit padding, and for pages > 999, it uses 4-digit
+        // Rename the generated file
         let generatedFile: string | null = null;
 
         // Try different padding formats
@@ -218,7 +259,7 @@ const processJob = async (job: JobRecord) => {
 
     console.log(`✅ All ${totalPages} pages successfully converted`);
 
-    // Get list of generated images - only get the renamed 4-digit format
+    // Get list of generated images
     const generatedFiles = readdirSync(tempDir)
       .filter((file) => file.match(/^page-\d{4}\.jpg$/))
       .sort();
@@ -267,17 +308,14 @@ const processJob = async (job: JobRecord) => {
         `Uploading page ${pageNumber}: ${buffer.length} bytes to ${objectKey}`,
       );
 
-      await minio.putObject(bucketName, objectKey, buffer, buffer.length, {
-        "Content-Type": "image/jpeg",
-      });
+      await uploadWithRetry(minio, bucketName, objectKey, buffer);
 
-      await supabase
-        .from("book_render_jobs")
-        .update({
-          processed_pages: pageNumber,
-          total_pages: totalPages,
-        })
-        .eq("id", job.id);
+      await pool.query(
+        `UPDATE book_render_jobs
+         SET processed_pages = $1, total_pages = $2
+         WHERE id = $3`,
+        [pageNumber, totalPages, job.id],
+      );
 
       console.log(`✓ Uploaded page ${pageNumber}`);
 
@@ -285,24 +323,23 @@ const processJob = async (job: JobRecord) => {
       unlinkSync(localFilePath);
     }
 
-    // At this point, we've validated that generatedFiles.length === totalPages
-    await supabase
-      .from("books")
-      .update({
-        page_images_prefix: pagePrefix,
-        page_images_count: totalPages,
-        page_images_rendered_at: new Date().toISOString(),
-      })
-      .eq("id", book.id);
+    // Update book record - also update page_count for EPUBs/MOBIs
+    await pool.query(
+      `UPDATE books
+       SET page_images_prefix = $1,
+           page_images_count = $2,
+           page_images_rendered_at = $3,
+           page_count = $4
+       WHERE id = $5`,
+      [pagePrefix, totalPages, new Date().toISOString(), totalPages, book.id],
+    );
 
-    await supabase
-      .from("book_render_jobs")
-      .update({
-        status: "completed",
-        finished_at: new Date().toISOString(),
-        total_pages: totalPages,
-      })
-      .eq("id", job.id);
+    await pool.query(
+      `UPDATE book_render_jobs
+       SET status = $1, finished_at = $2, total_pages = $3
+       WHERE id = $4`,
+      ["completed", new Date().toISOString(), totalPages, job.id],
+    );
 
     console.info(
       `✅ Successfully rendered all ${totalPages} pages for book ${book.id}`,
@@ -322,15 +359,15 @@ const processJob = async (job: JobRecord) => {
 
 const main = async () => {
   const { bookId, limit } = parseArgs();
-  const supabase = getSupabaseAdminClient();
 
   if (bookId) {
-    const jobId = await ensureJobForBook(supabase, bookId);
-    const { data: job } = await supabase
-      .from("book_render_jobs")
-      .select("*")
-      .eq("id", jobId)
-      .single();
+    const jobId = await ensureJobForBook(bookId);
+    const jobResult = await pool.query(
+      `SELECT * FROM book_render_jobs WHERE id = $1`,
+      [jobId],
+    );
+
+    const job = jobResult.rows[0];
     if (job) {
       await processJob(job as JobRecord);
       return;
@@ -338,16 +375,15 @@ const main = async () => {
     throw new Error("Unable to load job that was just created.");
   }
 
-  const { data: jobs, error } = await supabase
-    .from("book_render_jobs")
-    .select("*")
-    .eq("status", "pending")
-    .order("created_at", { ascending: true })
-    .limit(limit);
+  const jobsResult = await pool.query(
+    `SELECT * FROM book_render_jobs
+     WHERE status = $1
+     ORDER BY created_at ASC
+     LIMIT $2`,
+    ["pending", limit],
+  );
 
-  if (error) {
-    throw error;
-  }
+  const jobs = jobsResult.rows;
 
   if (!jobs?.length) {
     console.info("No pending jobs found.");
@@ -359,14 +395,12 @@ const main = async () => {
       await processJob(job);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await supabase
-        .from("book_render_jobs")
-        .update({
-          status: "failed",
-          error_message: message,
-          finished_at: new Date().toISOString(),
-        })
-        .eq("id", job.id);
+      await pool.query(
+        `UPDATE book_render_jobs
+         SET status = $1, error_message = $2, finished_at = $3
+         WHERE id = $4`,
+        ["failed", message, new Date().toISOString(), job.id],
+      );
       console.error(`Job ${job.id} failed:`, message);
     }
   }

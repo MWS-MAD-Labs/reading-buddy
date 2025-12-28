@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   rateLimit,
   rateLimitConfig,
@@ -252,12 +252,12 @@ describe("rateLimitConfig", () => {
   it("should have stricter limits for expensive operations", () => {
     // File conversion should be more restricted than standard API
     expect(rateLimitConfig.fileConversion.maxRequests).toBeLessThan(
-      rateLimitConfig.standardApi.maxRequests
+      rateLimitConfig.standardApi.maxRequests,
     );
 
     // Quiz generation should be more restricted than standard API
     expect(rateLimitConfig.quizGeneration.maxRequests).toBeLessThan(
-      rateLimitConfig.standardApi.maxRequests
+      rateLimitConfig.standardApi.maxRequests,
     );
   });
 });

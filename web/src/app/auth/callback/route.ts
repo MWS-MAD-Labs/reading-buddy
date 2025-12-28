@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
   const redirectResponse = NextResponse.redirect(new URL(targetPath, origin));
 
   // Copy all cookies from the temporary response to the redirect response
-  response.cookies.getAll().forEach((cookie) => {
+  response.cookies.getAll().forEach((cookie: any) => {
     redirectResponse.cookies.set(cookie);
   });
 

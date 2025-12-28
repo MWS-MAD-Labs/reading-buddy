@@ -14,6 +14,11 @@ export const getLatestLoginBroadcast =
   async (): Promise<LoginBroadcast | null> => {
     const supabase = getSupabaseAdminClient();
 
+    // Return null if Supabase is not configured (PostgreSQL migration)
+    if (!supabase) {
+      return null;
+    }
+
     // Add retry logic for transient network failures
     let lastError: Error | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {

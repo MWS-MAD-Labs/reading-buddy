@@ -410,7 +410,7 @@ export class LocalAIProvider implements IAIProvider {
     const normalizedQuestions: QuizQuestion[] = questions.map(
       (question, index) => {
         const options = Array.isArray(question.options)
-          ? question.options.map((option) => String(option))
+          ? question.options.map((option: any) => String(option))
           : [];
 
         if (!options.length) {

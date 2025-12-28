@@ -24,6 +24,9 @@ export default async function StudentClassroomPage({
 
   const supabase = await createSupabaseServerClient();
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    redirect("/dashboard");
+  }
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -110,7 +113,7 @@ export default async function StudentClassroomPage({
     ) ?? [];
 
   // Get student's reading progress for these books
-  const bookIds = assignedBooks.map((b) => b.book_id);
+  const bookIds = assignedBooks.map((b: any) => b.book_id);
   const readingProgress: Map<number, { current_page: number }> = new Map();
   if (bookIds.length > 0) {
     const { data: progress } = await supabaseAdmin
@@ -191,7 +194,7 @@ export default async function StudentClassroomPage({
     ) ?? [];
 
   // Get quiz attempts to check which quizzes have been taken
-  const quizIds = assignedQuizzes.map((q) => q.id);
+  const quizIds = assignedQuizzes.map((q: any) => q.id);
   const quizAttempts: Map<number, { score: number; submitted_at: string }> =
     new Map();
   if (quizIds.length > 0) {
@@ -256,7 +259,7 @@ export default async function StudentClassroomPage({
         </div>
         {assignedBooks.length ? (
           <ul className="mt-2 grid gap-5 md:grid-cols-2">
-            {assignedBooks.map((book) => {
+            {assignedBooks.map((book: any) => {
               const progress = readingProgress.get(book.book_id);
               const hasStarted = !!progress;
               const currentPage = progress?.current_page ?? 1;
@@ -335,7 +338,7 @@ export default async function StudentClassroomPage({
             </p>
           </div>
           <ul className="mt-3 space-y-3">
-            {assignedQuizzes.map((quiz) => {
+            {assignedQuizzes.map((quiz: any) => {
               const attempt = quizAttempts.get(quiz.id);
               const isCompleted = !!attempt;
               const dueDateLabel = quiz.due_date

@@ -28,6 +28,14 @@ export const ResetPasswordForm = () => {
     setInfo(null);
     setIsLoading(true);
 
+    if (!supabase) {
+      setError(
+        "Password reset is not available. Please contact your administrator.",
+      );
+      setIsLoading(false);
+      return;
+    }
+
     const formData = new FormData(event.currentTarget);
     const password = String(formData.get("password") ?? "");
     const confirmPassword = String(formData.get("confirmPassword") ?? "");

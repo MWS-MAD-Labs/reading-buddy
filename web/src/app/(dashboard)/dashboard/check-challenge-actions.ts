@@ -21,6 +21,9 @@ export async function checkWeeklyChallengeCompletion() {
   }
 
   const supabaseAdmin = getSupabaseAdminClient();
+  if (!supabaseAdmin) {
+    return { success: false, error: "Database connection not available" };
+  }
   const result = await checkAndAwardChallengeXP(supabaseAdmin, user.id);
 
   if (result.awarded) {

@@ -30,6 +30,9 @@ const normalize = (
 export const createBroadcast = async (input: BroadcastInput) => {
   await requireRole(["ADMIN"]);
   const supabase = getSupabaseAdminClient();
+  if (!supabase) {
+    return { success: false, error: "Database connection not available." };
+  }
 
   const { data, error } = await supabase
     .from("login_broadcasts")
@@ -41,14 +44,19 @@ export const createBroadcast = async (input: BroadcastInput) => {
       link_url: input.linkUrl,
       is_active: input.isActive ?? true,
     })
-    .select("id, title, body, tone, link_label, link_url, created_at, is_active")
+    .select(
+      "id, title, body, tone, link_label, link_url, created_at, is_active",
+    )
     .single();
 
   revalidatePath("/login");
   revalidatePath("/dashboard/admin/broadcasts");
 
   if (error || !data) {
-    return { success: false, error: error?.message ?? "Unable to create broadcast." };
+    return {
+      success: false,
+      error: error?.message ?? "Unable to create broadcast.",
+    };
   }
 
   return { success: true, broadcast: normalize(data) };
@@ -57,19 +65,27 @@ export const createBroadcast = async (input: BroadcastInput) => {
 export const setBroadcastActive = async (id: string, isActive: boolean) => {
   await requireRole(["ADMIN"]);
   const supabase = getSupabaseAdminClient();
+  if (!supabase) {
+    return { success: false, error: "Database connection not available." };
+  }
 
   const { data, error } = await supabase
     .from("login_broadcasts")
     .update({ is_active: isActive })
     .eq("id", id)
-    .select("id, title, body, tone, link_label, link_url, created_at, is_active")
+    .select(
+      "id, title, body, tone, link_label, link_url, created_at, is_active",
+    )
     .single();
 
   revalidatePath("/login");
   revalidatePath("/dashboard/admin/broadcasts");
 
   if (error || !data) {
-    return { success: false, error: error?.message ?? "Unable to update broadcast." };
+    return {
+      success: false,
+      error: error?.message ?? "Unable to update broadcast.",
+    };
   }
 
   return { success: true, broadcast: normalize(data) };

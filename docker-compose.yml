@@ -68,8 +68,8 @@ services:
       start_period: 40s
 
     networks:
-      - reading-buddy-network
+      - reading-buddy-staging-network
 
 networks:
-  reading-buddy-network:
+  reading-buddy-staging-network:
     driver: bridge

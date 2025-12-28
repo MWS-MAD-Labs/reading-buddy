@@ -347,7 +347,7 @@ function CompletionCelebration({
                 Badges Earned
               </h3>
               <div className="flex flex-wrap justify-center gap-3">
-                {newBadges.map((badge) => (
+                {newBadges.map((badge: any) => (
                   <div
                     key={badge.id}
                     className="flex flex-col items-center gap-1 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 p-3 shadow"

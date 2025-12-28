@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { useSupabaseBrowser } from '@/components/providers/SupabaseProvider';
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useSupabaseBrowser } from "@/components/providers/SupabaseProvider";
 
 export const SignupForm = () => {
   const router = useRouter();
@@ -18,10 +18,16 @@ export const SignupForm = () => {
     setInfo(null);
     setIsLoading(true);
 
+    if (!supabase) {
+      setError("Sign up is not available. Please contact your administrator.");
+      setIsLoading(false);
+      return;
+    }
+
     const formData = new FormData(event.currentTarget);
-    const fullName = String(formData.get('fullName') ?? '').trim();
-    const email = String(formData.get('email') ?? '').trim();
-    const password = String(formData.get('password') ?? '');
+    const fullName = String(formData.get("fullName") ?? "").trim();
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
 
     try {
       const { error: signUpError } = await supabase.auth.signUp({
@@ -38,10 +44,10 @@ export const SignupForm = () => {
         throw signUpError;
       }
 
-      setInfo('Check your inbox to confirm your email, then sign in.');
+      setInfo("Check your inbox to confirm your email, then sign in.");
       router.refresh();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to sign up.';
+      const message = err instanceof Error ? err.message : "Unable to sign up.";
       setError(message);
     } finally {
       setIsLoading(false);
@@ -52,14 +58,23 @@ export const SignupForm = () => {
     setError(null);
     setIsGoogleLoading(true);
 
+    if (!supabase) {
+      setError(
+        "Google sign up is not available. Please contact your administrator.",
+      );
+      setIsGoogleLoading(false);
+      return;
+    }
+
     try {
       const origin = window.location.origin;
       await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: { redirectTo: `${origin}/auth/callback` },
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Google sign-up failed.';
+      const message =
+        err instanceof Error ? err.message : "Google sign-up failed.";
       setError(message);
       setIsGoogleLoading(false);
     }
@@ -70,12 +85,17 @@ export const SignupForm = () => {
       <div className="mb-8 space-y-3 text-center">
         <div className="text-6xl">🌟📖</div>
         <h1 className="text-4xl font-black text-purple-600">Join the Fun!</h1>
-        <p className="text-lg font-semibold text-purple-500">Start your reading adventure today!</p>
+        <p className="text-lg font-semibold text-purple-500">
+          Start your reading adventure today!
+        </p>
       </div>
 
       <form className="space-y-5" onSubmit={handleSubmit}>
         <div className="space-y-2">
-          <label htmlFor="fullName" className="text-base font-bold text-purple-700">
+          <label
+            htmlFor="fullName"
+            className="text-base font-bold text-purple-700"
+          >
             👤 Full Name
           </label>
           <input
@@ -89,7 +109,10 @@ export const SignupForm = () => {
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="email" className="text-base font-bold text-purple-700">
+          <label
+            htmlFor="email"
+            className="text-base font-bold text-purple-700"
+          >
             📧 Email
           </label>
           <input
@@ -103,7 +126,10 @@ export const SignupForm = () => {
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="password" className="text-base font-bold text-purple-700">
+          <label
+            htmlFor="password"
+            className="text-base font-bold text-purple-700"
+          >
             🔐 Password
           </label>
           <input
@@ -115,17 +141,23 @@ export const SignupForm = () => {
             className="w-full rounded-2xl border-4 border-purple-300 bg-white px-5 py-3 text-lg font-semibold text-purple-900 transition-all placeholder:text-purple-300"
             placeholder="Make it super secret!"
           />
-          <p className="text-sm font-semibold text-purple-400">✨ At least 8 characters</p>
+          <p className="text-sm font-semibold text-purple-400">
+            ✨ At least 8 characters
+          </p>
         </div>
 
         {error ? (
           <div className="rounded-2xl border-4 border-red-300 bg-red-50 px-4 py-3">
-            <p className="text-center text-base font-bold text-red-600">⚠️ {error}</p>
+            <p className="text-center text-base font-bold text-red-600">
+              ⚠️ {error}
+            </p>
           </div>
         ) : null}
         {info ? (
           <div className="rounded-2xl border-4 border-green-300 bg-green-50 px-4 py-3">
-            <p className="text-center text-base font-bold text-green-600">✅ {info}</p>
+            <p className="text-center text-base font-bold text-green-600">
+              ✅ {info}
+            </p>
           </div>
         ) : null}
 
@@ -134,7 +166,7 @@ export const SignupForm = () => {
           disabled={isLoading}
           className="btn-3d btn-squish w-full rounded-2xl bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-4 text-xl font-black text-white transition hover:from-purple-600 hover:to-pink-600 disabled:pointer-events-none disabled:opacity-50"
         >
-          {isLoading ? '🎨 Creating account…' : '🎉 Create My Account!'}
+          {isLoading ? "🎨 Creating account…" : "🎉 Create My Account!"}
         </button>
       </form>
 
@@ -144,7 +176,9 @@ export const SignupForm = () => {
             <div className="w-full border-t-2 border-purple-200"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="bg-white/90 px-4 text-base font-bold text-purple-400">OR</span>
+            <span className="bg-white/90 px-4 text-base font-bold text-purple-400">
+              OR
+            </span>
           </div>
         </div>
         <button
@@ -153,7 +187,7 @@ export const SignupForm = () => {
           disabled={isGoogleLoading}
           className="btn-3d btn-squish flex w-full items-center justify-center gap-3 rounded-2xl border-4 border-blue-300 bg-white px-6 py-4 text-xl font-black text-blue-600 transition hover:bg-blue-50 disabled:pointer-events-none disabled:opacity-50"
         >
-          {isGoogleLoading ? '🌈 Redirecting…' : '🎨 Sign Up with Google'}
+          {isGoogleLoading ? "🌈 Redirecting…" : "🎨 Sign Up with Google"}
         </button>
       </div>
     </div>

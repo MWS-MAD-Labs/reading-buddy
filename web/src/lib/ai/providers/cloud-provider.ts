@@ -163,7 +163,7 @@ export class CloudAIProvider implements IAIProvider {
         : "Provided pages";
 
     const content = input.pages
-      ?.map((page) => `[Page ${page.pageNumber}]\n${page.text}`)
+      ?.map((page: any) => `[Page ${page.pageNumber}]\n${page.text}`)
       .join("\n\n");
 
     const checkpointLine =
@@ -208,7 +208,7 @@ Respond with JSON only:
   private buildDescriptionContent(input: DescriptionGenerationInput) {
     if (input.pages && input.pages.length) {
       return input.pages
-        .map((page) => `[Page ${page.pageNumber}]\n${page.text}`)
+        .map((page: any) => `[Page ${page.pageNumber}]\n${page.text}`)
         .join("\n\n");
     }
 
@@ -296,7 +296,7 @@ Respond with JSON only:
     const normalizedQuestions: QuizQuestion[] = questions.map(
       (question, index) => {
         const options = Array.isArray(question.options)
-          ? question.options.map((option) => String(option))
+          ? question.options.map((option: any) => String(option))
           : [];
 
         if (!options.length) {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AdminUserTable } from "@/components/dashboard/AdminUserTable";
 import { requireRole } from "@/lib/auth/roleCheck";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -9,69 +9,28 @@ export default async function AdminDashboardPage() {
   // Only ADMIN users can access this page
   await requireRole(["ADMIN"]);
 
-  const supabaseAdmin = getSupabaseAdminClient();
+  // Get profiles with their emails from local database
+  const result = await query(`
+    SELECT
+      p.id,
+      p.full_name,
+      p.role,
+      p.access_level,
+      u.email
+    FROM profiles p
+    JOIN users u ON p.id = u.id
+    ORDER BY p.updated_at DESC
+  `);
 
-  // Get profiles with their auth emails
-  const { data: profiles, error: profilesError } = await supabaseAdmin
-    .from("profiles")
-    .select("id, full_name, role, access_level")
-    .order("updated_at", {
-      ascending: false,
-    });
+  const users = result.rows.map((row: any) => ({
+    id: row.id,
+    full_name: row.full_name,
+    role: row.role,
+    access_level: row.access_level,
+    email: row.email,
+  }));
 
-  if (profilesError) {
-    console.error("Error fetching profiles:", profilesError);
-  }
-
-  // Get emails one-by-one to avoid listUsers Auth API failures
-  const emailCache = new Map<string, string | null>();
-  const usersWithEmails = await Promise.all(
-    (profiles || []).map(async (profile) => {
-      if (emailCache.has(profile.id)) {
-        return { ...profile, email: emailCache.get(profile.id) ?? null };
-      }
-
-      try {
-        const { data: userData, error: userError } =
-          await supabaseAdmin.auth.admin.getUserById(profile.id);
-
-        if (userError) {
-          console.warn(
-            `Unable to fetch auth user ${profile.id}:`,
-            userError.message || userError,
-          );
-          emailCache.set(profile.id, null);
-          return {
-            ...profile,
-            email: null,
-          };
-        }
-
-        const email = userData?.user?.email || null;
-        emailCache.set(profile.id, email);
-        return {
-          ...profile,
-          email,
-        };
-      } catch (error) {
-        console.warn(
-          `Auth API threw while fetching user ${profile.id}:`,
-          error instanceof Error ? error.message : error,
-        );
-        emailCache.set(profile.id, null);
-        return {
-          ...profile,
-          email: null,
-        };
-      }
-    }),
-  );
-
-  console.log(
-    `Fetched emails for ${usersWithEmails.filter((u) => u.email).length} out of ${profiles?.length || 0} profiles`,
-  );
-
-  const users = usersWithEmails;
+  console.log(`Fetched ${users.length} users from local database`);
 
   return (
     <div className="space-y-6">

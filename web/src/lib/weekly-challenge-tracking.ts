@@ -5,10 +5,7 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
-import {
-  getCurrentWeekChallenge,
-  getWeeklyChallengeProgress,
-} from "./weekly-challenges";
+import { getWeeklyChallengeProgress } from "./weekly-challenges";
 import { awardXP } from "./gamification";
 
 /**
@@ -90,7 +87,7 @@ export async function checkAndAwardChallengeXP(
     const { weekNumber, year } = getWeekInfo();
 
     await awardXP(
-      supabase,
+      userId,
       userId,
       challenge.xpReward,
       "challenge_completed",

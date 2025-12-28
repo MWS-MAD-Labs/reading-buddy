@@ -13,6 +13,21 @@ jobs:
     name: Test and Build
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: reading_buddy_test
+          POSTGRES_USER: reading_buddy
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     permissions:
       contents: read
       packages: write
@@ -45,6 +60,44 @@ jobs:
         run: npm run test
         env:
           NODE_ENV: test
+          # PostgreSQL test database configuration
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: reading_buddy_test
+          DB_USER: reading_buddy
+          DB_PASSWORD: test_password
+          DATABASE_URL: postgresql://reading_buddy:test_password@localhost:5432/reading_buddy_test
+          # NextAuth configuration for tests
+          NEXTAUTH_SECRET: test-secret-for-ci-cd-pipeline-only
+          NEXTAUTH_URL: http://localhost:3000
+
+      - name: Install Playwright browsers
+        working-directory: ./web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: ./web
+        run: npm run test:e2e
+        env:
+          NODE_ENV: test
+          # PostgreSQL test database configuration
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: reading_buddy_test
+          DB_USER: reading_buddy
+          DB_PASSWORD: test_password
+          DATABASE_URL: postgresql://reading_buddy:test_password@localhost:5432/reading_buddy_test
+          # NextAuth configuration for tests
+          NEXTAUTH_SECRET: test-secret-for-ci-cd-pipeline-only
+          NEXTAUTH_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -78,8 +131,6 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
           build-args: |
-            NEXT_PUBLIC_SUPABASE_URL=https://hbrosmlrvbkmcbyggriv.supabase.co
-            NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhicm9zbWxydmJrbWNieWdncml2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTA1MTMsImV4cCI6MjA3ODA2NjUxM30.R9d8zWNLXtnO9zGu_1Zts4JP-B9XE26J6gS6Xfg5hpo
             NEXT_PUBLIC_APP_URL=https://staging-reads.mws.web.id
             NEXT_PUBLIC_RAG_API_URL=https://rag.mws.web.id/
             MINIO_ENDPOINT=minioapi.mws.web.id

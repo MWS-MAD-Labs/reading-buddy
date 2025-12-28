@@ -68,7 +68,9 @@ describe("getFormatName", () => {
   });
 
   it("should handle unknown format gracefully", () => {
-    const name = getFormatName("unknown" as any);
+    const name = getFormatName(
+      "unknown" as "pdf" | "epub" | "mobi" | "azw" | "azw3",
+    );
 
     // Function doesn't have default case, returns undefined for unknown formats
     expect(name).toBeUndefined();
@@ -120,7 +122,9 @@ describe("getFormatColor", () => {
   });
 
   it("should handle unknown format gracefully", () => {
-    const color = getFormatColor("unknown" as any);
+    const color = getFormatColor(
+      "unknown" as "pdf" | "epub" | "mobi" | "azw" | "azw3",
+    );
 
     expect(color).toBeTruthy();
     expect(typeof color).toBe("string");

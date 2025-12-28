@@ -2,36 +2,36 @@ import {
   LibraryCollection,
   type LibraryBook,
 } from "@/components/dashboard/LibraryCollection";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/server";
+import { queryWithContext } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export default async function LibraryPage() {
-  const supabase = await createSupabaseServerClient();
-  const { data: books, error } = await supabase
-    .from("books")
-    .select(
-      "id, title, author, cover_url, description, genre, language, publisher, publication_year, created_at",
-    )
-    .order("created_at", { ascending: false });
+  const user = await getCurrentUser();
 
-  if (error) {
-    throw error;
-  }
+  const result = await queryWithContext(
+    user.userId!,
+    `SELECT
+      id, title, author, cover_url, description,
+      genre, language, publisher, publication_year, created_at
+    FROM books
+    ORDER BY created_at DESC`,
+    [],
+  );
 
-  const libraryBooks: LibraryBook[] =
-    books?.map((book) => ({
-      id: book.id,
-      title: book.title ?? "Untitled book",
-      author: book.author ?? "Unknown author",
-      coverUrl: book.cover_url,
-      description: book.description ?? null,
-      genre: book.genre ?? null,
-      language: book.language ?? null,
-      publisher: book.publisher ?? null,
-      publicationYear: book.publication_year ?? null,
-      createdAt: book.created_at ?? null,
-    })) ?? [];
+  const libraryBooks: LibraryBook[] = result.rows.map((book: any) => ({
+    id: book.id,
+    title: book.title ?? "Untitled book",
+    author: book.author ?? "Unknown author",
+    coverUrl: book.cover_url,
+    description: book.description ?? null,
+    genre: book.genre ?? null,
+    language: book.language ?? null,
+    publisher: book.publisher ?? null,
+    publicationYear: book.publication_year ?? null,
+    createdAt: book.created_at ?? null,
+  }));
 
   return (
     <div className="space-y-6">

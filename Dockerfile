@@ -1,8 +1,6 @@
 # Reading Buddy - Production Dockerfile with EPUB Support
 
 # Build arguments - declare at the top for use across stages
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_RAG_API_URL
 
