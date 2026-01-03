@@ -1,0 +1,74 @@
+# Workflow Status - reading-budd
+# This tracks progress through BMM methodology Analysis, Planning, and Solutioning phases.
+# Implementation phase is tracked separately in sprint-status.yaml
+
+generated: "2026-01-03"
+project: "reading-budd"
+project_type: "software"
+selected_track: "bmad-method"
+field_type: "brownfield"
+workflow_path: "_bmad/bmm/workflows/workflow-status/paths/method-brownfield.yaml"
+
+workflow_status:
+  - phase: 0
+    name: "Documentation"
+    status: "required"
+    workflows:
+      - id: "document-project"
+        status: "required"
+        agent: "analyst"
+        command: "/bmad:bmm:workflows:document-project"
+        purpose: "Understand existing codebase before planning"
+        output: "Comprehensive project documentation"
+  - phase: 1
+    name: "Analysis (Optional)"
+    status: "required"
+    workflows:
+      - id: "brainstorm-project"
+        status: "optional"
+        agent: "analyst"
+        command: "/bmad:bmm:workflows:brainstorming"
+      - id: "research"
+        status: "optional"
+        agent: "analyst"
+        command: "/bmad:bmm:workflows:research"
+  - phase: 2
+    name: "Planning"
+    status: "required"
+    workflows:
+      - id: "prd"
+        status: "required"
+        agent: "pm"
+        command: "/bmad:bmm:workflows:create-prd"
+      - id: "create-ux-design"
+        status: "conditional"
+        agent: "ux-designer"
+        command: "/bmad:bmm:workflows:create-ux-design"
+  - phase: 3
+    name: "Solutioning"
+    status: "required"
+    workflows:
+      - id: "create-architecture"
+        status: "required"
+        agent: "architect"
+        command: "/bmad:bmm:workflows:create-architecture"
+      - id: "create-epics-and-stories"
+        status: "required"
+        agent: "pm"
+        command: "/bmad:bmm:workflows:create-epics-and-stories"
+      - id: "test-design"
+        status: "optional"
+        agent: "tea"
+        command: "/bmad:bmm:workflows:test-design"
+      - id: "implementation-readiness"
+        status: "required"
+        agent: "architect"
+        command: "/bmad:bmm:workflows:implementation-readiness"
+  - phase: 4
+    name: "Implementation"
+    status: "required"
+    workflows:
+      - id: "sprint-planning"
+        status: "required"
+        agent: "sm"
+        command: "/bmad:bmm:workflows:sprint-planning"
