@@ -10,7 +10,9 @@ import {
   onBookCompleted,
   XP_REWARDS,
 } from "@/lib/gamification";
+import { createJournalEntry } from "@/app/(dashboard)/dashboard/journal/journal-actions";
 import type { Badge } from "@/types/database";
+
 
 // Track last page read to avoid duplicate XP awards
 const lastPageReadCache = new Map<string, number>();
@@ -46,11 +48,24 @@ export const recordReadingProgress = async (input: {
        VALUES ($1, $2, $3)
        ON CONFLICT (student_id, book_id)
        DO UPDATE SET current_page = $3, updated_at = NOW()
-       RETURNING *`,
+       RETURNING *, (xmax = 0) AS is_new`,
       [user.profileId, input.bookId, input.currentPage],
     );
 
-    console.log("📖 Progress save result:", { rows: result.rows });
+    const isNew = result.rows[0]?.is_new;
+
+    if (isNew) {
+      // Log started_book
+      try {
+        await createJournalEntry({
+          entryType: "started_book",
+          bookId: input.bookId,
+          content: "Started reading this book! 📚",
+        });
+      } catch (err) {
+        console.error("Failed to log started_book:", err);
+      }
+    }
   } catch (error) {
     console.error("❌ Failed to save progress:", error);
     throw error;
@@ -62,6 +77,21 @@ export const recordReadingProgress = async (input: {
   // Award XP for new pages read (avoid duplicates)
   if (input.currentPage > lastPage) {
     const newPagesRead = input.currentPage - lastPage;
+
+    // Log reading session periodically (every 5 pages or first page read)
+    if (lastPage === 0 || input.currentPage % 5 === 0) {
+      try {
+        await createJournalEntry({
+          entryType: "reading_session",
+          bookId: input.bookId,
+          pageRangeStart: lastPage === 0 ? 1 : lastPage,
+          pageRangeEnd: input.currentPage,
+          content: `Read up to page ${input.currentPage} 📖`,
+        });
+      } catch (err) {
+        console.error("Failed to log reading_session:", err);
+      }
+    }
 
     // Update streak (once per day)
     try {
@@ -302,6 +332,21 @@ export const markBookAsCompleted = async (input: {
   } catch (error) {
     console.error("Failed to mark book as completed:", error);
     throw new Error("Failed to mark book as completed.");
+  }
+
+  // Log to journal
+  try {
+    const bookData = bookResult.rows[0];
+    await createJournalEntry({
+      entryType: "finished_book",
+      bookId: input.bookId,
+      content: `Finished reading ${bookData.title || "this book"}! 🏁`,
+      metadata: {
+        completed_at: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    console.error("Failed to log finished_book to journal:", err);
   }
 
   // Trigger book completion rewards

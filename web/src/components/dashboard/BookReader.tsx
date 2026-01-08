@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FlipBookReader } from "@/components/dashboard/FlipBookReader";
+import Link from "next/link";
+import { FlipBookReader, type FlipBookRef } from "@/components/dashboard/FlipBookReader";
+import { ReaderNotesPanel } from "@/components/dashboard/reader/ReaderNotesPanel";
 import {
   evaluateAchievements,
   recordReadingProgress,
@@ -10,6 +12,7 @@ import {
   markBookAsCompleted,
 } from "@/app/(dashboard)/dashboard/student/actions";
 import type { Badge } from "@/types/database";
+
 
 type PageImageInfo = {
   baseUrl: string;
@@ -45,6 +48,7 @@ export const BookReader = ({
   const [flipError, setFlipError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [isNotesPanelOpen, setIsNotesPanelOpen] = useState(false);
   const [completion, setCompletion] = useState<CompletionState>({
     isCompleted: false,
     showCelebration: false,
@@ -53,6 +57,7 @@ export const BookReader = ({
     leveledUp: false,
   });
   const achievementsTriggeredRef = useRef(false);
+  const flipBookRef = useRef<FlipBookRef>(null);
   const router = useRouter();
 
   // Only show completion when we've actually reached the last page
@@ -138,6 +143,10 @@ export const BookReader = ({
     router.push("/dashboard/student");
   };
 
+  const handlePageJump = (page: number) => {
+    flipBookRef.current?.goToPage(page);
+  };
+
   if (!pageImages || pageImages.count === 0) {
     return (
       <div className="rounded-3xl border-4 border-red-300 bg-red-50 p-8">
@@ -151,10 +160,44 @@ export const BookReader = ({
   return (
     <div className="space-y-4">
       <FlipBookReader
+        ref={flipBookRef}
         pageImages={pageImages}
         initialPage={initialPage}
         fallbackPdfUrl={pdfUrl}
         onPageChange={handleFlipProgress}
+      />
+
+      {/* Reader Actions Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-white/80 p-3">
+        <div className="flex items-center gap-2 text-sm text-indigo-600">
+          <span className="font-medium">📍 Page {currentPage}</span>
+          {totalPages > 0 && (
+            <span className="text-indigo-400">of {totalPages}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/dashboard/journal/${bookId}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+          >
+            📓 Book Journal
+          </Link>
+          <button
+            onClick={() => setIsNotesPanelOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
+          >
+            📝 Notes
+          </button>
+        </div>
+      </div>
+
+      {/* Notes Panel */}
+      <ReaderNotesPanel
+        bookId={bookId}
+        currentPage={currentPage}
+        isOpen={isNotesPanelOpen}
+        onClose={() => setIsNotesPanelOpen(false)}
+        onPageJump={handlePageJump}
       />
 
       {flipError && (
@@ -267,15 +310,13 @@ function CompletionCelebration({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 transition-opacity duration-300 ${
-        isVisible ? "opacity-100" : "opacity-0"
-      }`}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 transition-opacity duration-300 ${isVisible ? "opacity-100" : "opacity-0"
+        }`}
       onClick={onClose}
     >
       <div
-        className={`relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-8 shadow-2xl transition-all duration-500 ${
-          isVisible ? "scale-100 opacity-100" : "scale-75 opacity-0"
-        }`}
+        className={`relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-8 shadow-2xl transition-all duration-500 ${isVisible ? "scale-100 opacity-100" : "scale-75 opacity-0"
+          }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Confetti Effect */}
