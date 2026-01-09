@@ -100,6 +100,16 @@ interface BadgeRow {
   book_author?: string | null;
 }
 
+function mapRowToBadge(row: BadgeRow): Badge {
+  return {
+    ...row,
+    badge_type: row.badge_type as BadgeType,
+    tier: row.tier as BadgeTier,
+    category: row.category as BadgeCategory,
+    criteria: row.criteria as unknown as BadgeCriteria,
+  };
+}
+
 export async function getAllBadges(): Promise<BadgeWithBook[]> {
   await requireAdminOrLibrarian();
 
@@ -113,11 +123,7 @@ export async function getAllBadges(): Promise<BadgeWithBook[]> {
   );
 
   return result.rows.map((row) => ({
-    ...row,
-    badge_type: row.badge_type as BadgeType,
-    tier: row.tier as BadgeTier,
-    category: row.category as BadgeCategory,
-    criteria: row.criteria as unknown as BadgeCriteria,
+    ...mapRowToBadge(row),
     book: row.book_id ? {
       id: row.book_id,
       title: row.book_title || "",
@@ -138,13 +144,7 @@ export async function getBadgesForBook(bookId: number): Promise<Badge[]> {
     [bookId]
   );
 
-  return result.rows.map(row => ({
-    ...row,
-    badge_type: row.badge_type as BadgeType,
-    tier: row.tier as BadgeTier,
-    category: row.category as BadgeCategory,
-    criteria: row.criteria as unknown as BadgeCriteria
-  })) as Badge[];
+  return result.rows.map(row => mapRowToBadge(row));
 }
 
 // ============================================================================
@@ -222,7 +222,7 @@ export async function createBadge(input: CreateBadgeInput): Promise<Badge> {
     revalidatePath("/dashboard/librarian");
     revalidatePath("/dashboard/student/badges");
 
-    return result.rows[0] as Badge;
+    return mapRowToBadge(result.rows[0]);
   } catch (error: any) {
     console.error("Failed to create badge:", error);
     if (error.code === "23505") {
@@ -357,7 +357,7 @@ export async function updateBadge(input: UpdateBadgeInput): Promise<Badge> {
     revalidatePath("/dashboard/librarian");
     revalidatePath("/dashboard/student/badges");
 
-    return result.rows[0] as Badge;
+    return mapRowToBadge(result.rows[0]);
   } catch (error: any) {
     console.error("Failed to update badge:", error);
     if (error.code === "23505") {
