@@ -631,3 +631,5 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
     );
   }
 );
+
+FlipBookReader.displayName = "FlipBookReader";

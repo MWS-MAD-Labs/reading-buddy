@@ -28,10 +28,15 @@
     "test:quiz-generation": "tsx scripts/test-quiz-generation.ts",
     "test:auto-checkpoints": "tsx scripts/test-auto-checkpoints.ts",
     "test:ai-providers": "tsx scripts/test-ai-providers.ts",
-    "db:setup": "tsx scripts/setup-db.ts"
+    "db:setup": "tsx scripts/setup-db.ts",
+    "migrate:text-reader": "tsx scripts/migrate-to-text-reader.ts"
   },
   "dependencies": {
     "@auth/pg-adapter": "^1.11.1",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/lora": "^5.2.8",
+    "@fontsource/open-sans": "^5.2.7",
+    "@fontsource/opendyslexic": "^5.2.5",
     "@google/generative-ai": "^0.24.1",
     "@heroicons/react": "^2.2.0",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -44,6 +49,7 @@
     "canvas": "^2.11.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "epubjs": "^0.3.93",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
     "jszip": "^3.10.1",
@@ -58,6 +64,7 @@
     "react-dom": "19.2.0",
     "react-pageflip": "^2.0.3",
     "react-pdf": "^10.2.0",
+    "react-reader": "^2.0.15",
     "recharts": "^3.5.1",
     "tailwind-merge": "^3.3.1",
     "use-debounce": "^10.0.6",

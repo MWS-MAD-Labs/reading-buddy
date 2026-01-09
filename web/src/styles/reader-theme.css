@@ -1,0 +1,223 @@
+/* Realistic Book Effects */
+
+/* Book Container - The "Desk" */
+.book-container {
+    perspective: 1500px;
+    background-image:
+        radial-gradient(circle at center, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0.1) 100%);
+}
+
+/* Page Texture & Base - Generic */
+.reader-page-card {
+    /* Use CSS variable for background, with fallback */
+    background-color: var(--reader-bg, #fdfbf7);
+    color: var(--reader-text, #1a1a1a);
+    /* Vignette */
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.05);
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
+    /* Add subtle depth to page edges */
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Right Page (even index in flipbook) */
+.reader-page-card:not(.reader-page-card--left) {
+    /* Shadow falling from the spine (left edge of right page) */
+    background: linear-gradient(to right,
+            rgba(0, 0, 0, 0.12) 0%,
+            rgba(0, 0, 0, 0.04) 5%,
+            transparent 15%,
+            transparent 100%), var(--reader-bg, #fdfbf7);
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-left: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Left Page (odd index in flipbook) */
+.reader-page-card--left {
+    /* Shadow falling from the spine (right edge of left page) */
+    background: linear-gradient(to left,
+            rgba(0, 0, 0, 0.12) 0%,
+            rgba(0, 0, 0, 0.04) 5%,
+            transparent 15%,
+            transparent 100%), var(--reader-bg, #fdfbf7);
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Theme Overrides - Sepia */
+.reader-theme-sepia .reader-page-card,
+.reader-page-card.reader-theme-sepia {
+    --reader-bg: #f4ecd8;
+    --reader-text: #5b4636;
+    --reader-text-muted: #8b7355;
+    --reader-border: #d4c4a8;
+}
+
+.reader-theme-sepia .reader-page-card:not(.reader-page-card--left),
+.reader-page-card.reader-theme-sepia:not(.reader-page-card--left) {
+    background: linear-gradient(to right,
+            rgba(91, 70, 54, 0.12) 0%,
+            rgba(91, 70, 54, 0.04) 5%,
+            transparent 15%,
+            transparent 100%), var(--reader-bg);
+}
+
+.reader-theme-sepia .reader-page-card--left,
+.reader-page-card.reader-theme-sepia.reader-page-card--left {
+    background: linear-gradient(to left,
+            rgba(91, 70, 54, 0.12) 0%,
+            rgba(91, 70, 54, 0.04) 5%,
+            transparent 15%,
+            transparent 100%), var(--reader-bg);
+}
+
+/* Theme Overrides - Dark */
+.reader-theme-dark .reader-page-card,
+.reader-page-card.reader-theme-dark {
+    --reader-bg: #2a2a2e;
+    --reader-text: #e0e0e0;
+    --reader-text-muted: #888;
+    --reader-border: #444;
+    box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.4);
+    border-color: #444;
+}
+
+.reader-theme-dark .reader-page-card:not(.reader-page-card--left),
+.reader-page-card.reader-theme-dark:not(.reader-page-card--left) {
+    background: linear-gradient(to right,
+            rgba(0, 0, 0, 0.4) 0%,
+            rgba(0, 0, 0, 0.2) 8%,
+            transparent 20%,
+            transparent 100%), var(--reader-bg);
+}
+
+.reader-theme-dark .reader-page-card--left,
+.reader-page-card.reader-theme-dark.reader-page-card--left {
+    background: linear-gradient(to left,
+            rgba(0, 0, 0, 0.4) 0%,
+            rgba(0, 0, 0, 0.2) 8%,
+            transparent 20%,
+            transparent 100%), var(--reader-bg);
+}
+
+/* Content Typography */
+.reader-content p,
+.reader-page-card p {
+    margin-bottom: 1.6em;
+    line-height: 1.9;
+    text-align: justify;
+    text-justify: inter-word;
+    /* Optical kerning for better readability */
+    font-variant-ligatures: common-ligatures;
+    text-rendering: optimizeLegibility;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+}
+
+/* Drop Caps for Chapter Starts */
+.chapter-start p:first-of-type::first-letter {
+    float: left;
+    font-size: 3.5em;
+    /* Large drop cap */
+    line-height: 0.8;
+    padding-right: 0.1em;
+    padding-top: 0.1em;
+    font-weight: bold;
+    color: inherit;
+    /* Matches text color */
+}
+
+/* Book Cover Styling */
+.book-cover {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    box-shadow:
+        inset 0 0 30px rgba(0, 0, 0, 0.5),
+        /* Cover depth */
+        inset 2px 0 5px rgba(255, 255, 255, 0.1);
+    /* Highlight edge */
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 3rem;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Leather Texture Effect for Cover */
+.book-cover::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    pointer-events: none;
+}
+
+.cover-title {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-size: 2.5rem;
+    color: #ecf0f1;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    margin-bottom: 1rem;
+    letter-spacing: 0.05em;
+    border: 4px double rgba(236, 240, 241, 0.3);
+    padding: 2rem;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.cover-author {
+    font-family: 'Lato', sans-serif;
+    font-size: 1.2rem;
+    color: #bdc3c7;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    margin-top: 2rem;
+}
+
+/* Book Spine Effect - REMOVED: was showing through pages during flip */
+/* The react-pageflip library handles shadows natively */
+.book-spine-center {
+    display: none;
+}
+
+/* Page "Thickness" Effect (Stacked Pages) */
+.stacked-pages-right {
+    position: absolute;
+    right: 0;
+    top: 5px;
+    bottom: 5px;
+    width: 15px;
+    /* Adjust based on book thickness */
+    background: repeating-linear-gradient(to right,
+            #fdfbf7,
+            #fdfbf7 1px,
+            #e0e0e0 2px);
+    transform: translateX(100%) perspective(1000px) rotateY(-10deg);
+    transform-origin: left;
+    box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2);
+    z-index: -1;
+}
+
+.stacked-pages-left {
+    position: absolute;
+    left: 0;
+    top: 5px;
+    bottom: 5px;
+    width: 15px;
+    background: repeating-linear-gradient(to left,
+            #fdfbf7,
+            #fdfbf7 1px,
+            #e0e0e0 2px);
+    transform: translateX(-100%) perspective(1000px) rotateY(10deg);
+    transform-origin: right;
+    box-shadow: -5px 5px 15px rgba(0, 0, 0, 0.2);
+    z-index: -1;
+}
