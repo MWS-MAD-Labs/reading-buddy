@@ -174,10 +174,23 @@ export const authOptions: NextAuthConfig = {
       // Fetch profile from database
       try {
         // Get user_id from users table by email
-        const userResult = await authPool.query(
-          "SELECT id FROM users WHERE email = $1",
-          [token.email],
-        );
+        let userResult;
+        try {
+          userResult = await authPool.query(
+            "SELECT id FROM users WHERE email = $1",
+            [token.email],
+          );
+        } catch (dbError) {
+          console.error("❌ Database Connection Error in getSession:", dbError);
+          console.error("DB Config:", {
+            host: process.env.DB_HOST,
+            port: process.env.DB_PORT,
+            database: process.env.DB_NAME,
+            user: process.env.DB_USER,
+            ssl: process.env.DB_SSL,
+          });
+          throw dbError;
+        }
 
         if (userResult.rows.length === 0) {
           // User doesn't exist in DB yet, return session with defaults

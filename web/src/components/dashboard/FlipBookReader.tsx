@@ -263,7 +263,7 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
         }, 100);
         return () => clearTimeout(timer);
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+       
     }, [initialPage]);
 
     // Preload nearby pages when current page changes

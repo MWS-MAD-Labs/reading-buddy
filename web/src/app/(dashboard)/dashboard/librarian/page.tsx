@@ -42,7 +42,7 @@ export default async function LibrarianPage() {
 
   // Get access levels for each book
   const bookIds = booksResult.rows.map((book: any) => book.id);
-  let accessLevelsMap: Record<number, AccessLevelValue[]> = {};
+  const accessLevelsMap: Record<number, AccessLevelValue[]> = {};
 
   if (bookIds.length > 0) {
     const accessResult = await queryWithContext(
