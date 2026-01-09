@@ -15,6 +15,8 @@ import {
   getStudentLeaderboard,
   getStaffLeaderboard,
 } from "./leaderboard-actions";
+import { RecentBadges } from "@/components/dashboard/RecentBadges";
+import { getStudentBadges } from "@/lib/gamification";
 
 export const dynamic = "force-dynamic";
 
@@ -109,28 +111,28 @@ const roleQuickLinks: Record<UserRole | "DEFAULT", QuickLink[]> = {
 };
 
 const heroCopy: Record<UserRole | "DEFAULT", { title: string; body: string }> =
-  {
-    STUDENT: {
-      title: "Welcome back to your reading list",
-      body: "Jump into your stories, earn badges, and explore new worlds picked for you.",
-    },
-    TEACHER: {
-      title: "Classroom insights at a glance",
-      body: "Keep tabs on reading progress, celebrate milestones, and share quizzes with your students.",
-    },
-    LIBRARIAN: {
-      title: "Keep the collection organized",
-      body: "Upload books, maintain metadata, and make sure every reader has something great to open.",
-    },
-    ADMIN: {
-      title: "Manage roles and visibility",
-      body: "Keep access up to date, monitor the system, and support every team.",
-    },
-    DEFAULT: {
-      title: "Welcome to your library workspace",
-      body: "Manage books, track reading progress, and build AI-powered quizzes in one place.",
-    },
-  };
+{
+  STUDENT: {
+    title: "Welcome back to your reading list",
+    body: "Jump into your stories, earn badges, and explore new worlds picked for you.",
+  },
+  TEACHER: {
+    title: "Classroom insights at a glance",
+    body: "Keep tabs on reading progress, celebrate milestones, and share quizzes with your students.",
+  },
+  LIBRARIAN: {
+    title: "Keep the collection organized",
+    body: "Upload books, maintain metadata, and make sure every reader has something great to open.",
+  },
+  ADMIN: {
+    title: "Manage roles and visibility",
+    body: "Keep access up to date, monitor the system, and support every team.",
+  },
+  DEFAULT: {
+    title: "Welcome to your library workspace",
+    body: "Manage books, track reading progress, and build AI-powered quizzes in one place.",
+  },
+};
 
 export default async function DashboardHomePage() {
   // Get current user from NextAuth
@@ -207,6 +209,12 @@ export default async function DashboardHomePage() {
     };
   }
 
+  // Fetch recent badges
+  let recentBadges: Awaited<ReturnType<typeof getStudentBadges>> = [];
+  if (user && user.userId && user.profileId) {
+    recentBadges = await getStudentBadges(user.userId, user.profileId);
+  }
+
   // Fetch stats based on role
   // Admin sees all stats from all roles
   const adminStatsResult =
@@ -235,40 +243,59 @@ export default async function DashboardHomePage() {
         />
       )}
 
-      {/* Leaderboard Sections */}
-      {leaderboardData && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Student Leaderboard */}
-          {leaderboardData.studentLeaderboard?.success &&
-            leaderboardData.studentLeaderboard.data && (
-              <StudentLeaderboard
-                entries={leaderboardData.studentLeaderboard.data.entries}
-                currentUserEntry={
-                  leaderboardData.studentLeaderboard.data.currentUserEntry
-                }
-                totalParticipants={
-                  leaderboardData.studentLeaderboard.data.totalParticipants
-                }
-                showFullList={false}
-              />
-            )}
+      {/* Progress & Rankings Section */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Leaderboard Section - Takes 2/3 on desktop if possible, but let's keep it simple for now */}
+        <div className="lg:col-span-2">
+          {leaderboardData && (
+            <div className="h-full">
+              {/* Student Leaderboard */}
+              {leaderboardData.studentLeaderboard?.success &&
+                leaderboardData.studentLeaderboard.data && (
+                  <StudentLeaderboard
+                    entries={leaderboardData.studentLeaderboard.data.entries}
+                    currentUserEntry={
+                      leaderboardData.studentLeaderboard.data.currentUserEntry
+                    }
+                    totalParticipants={
+                      leaderboardData.studentLeaderboard.data.totalParticipants
+                    }
+                    showFullList={false}
+                  />
+                )}
 
-          {/* Staff Leaderboard */}
-          {leaderboardData.staffLeaderboard?.success &&
-            leaderboardData.staffLeaderboard.data && (
-              <StaffLeaderboard
-                entries={leaderboardData.staffLeaderboard.data.entries}
-                currentUserEntry={
-                  leaderboardData.staffLeaderboard.data.currentUserEntry
-                }
-                totalParticipants={
-                  leaderboardData.staffLeaderboard.data.totalParticipants
-                }
-                showFullList={false}
-              />
-            )}
+              {/* Staff Leaderboard */}
+              {leaderboardData.staffLeaderboard?.success &&
+                leaderboardData.staffLeaderboard.data && (
+                  <StaffLeaderboard
+                    entries={leaderboardData.staffLeaderboard.data.entries}
+                    currentUserEntry={
+                      leaderboardData.staffLeaderboard.data.currentUserEntry
+                    }
+                    totalParticipants={
+                      leaderboardData.staffLeaderboard.data.totalParticipants
+                    }
+                    showFullList={false}
+                  />
+                )}
+
+              {!leaderboardData.studentLeaderboard?.data && !leaderboardData.staffLeaderboard?.data && (
+                <div className="flex h-full items-center justify-center rounded-[32px] border border-dashed border-indigo-200 bg-white/50 p-12 text-center">
+                  <p className="font-bold text-indigo-300">Leaderboard data currently unavailable</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Recent Badges Section - Takes 1/3 on desktop */}
+        <div className="lg:col-span-1">
+          <RecentBadges
+            badges={recentBadges.slice(0, 4)}
+            totalBadges={recentBadges.length}
+          />
+        </div>
+      </div>
 
       {(role === "TEACHER" || role === "ADMIN") && teacherOverview && (
         <section className="space-y-4">
