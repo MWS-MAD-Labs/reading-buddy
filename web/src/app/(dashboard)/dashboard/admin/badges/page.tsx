@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { requireRole, type UserRole } from "@/lib/auth/roleCheck";
+import { query } from "@/lib/db";
 import {
   BadgeManager,
   type UserPermissions,
@@ -9,65 +8,85 @@ import {
 
 export const dynamic = "force-dynamic";
 
+interface BadgeRow {
+  id: string;
+  name: string;
+  description: string | null;
+  icon_url: string | null;
+  xp_reward: number;
+  badge_type: string;
+  tier: string;
+  category: string;
+  criteria: Record<string, unknown>;
+  book_id: number | null;
+  is_active: boolean;
+  display_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  book_title: string | null;
+  book_author: string | null;
+}
+
+interface BookRow {
+  id: number;
+  title: string;
+  author: string;
+}
+
 export default async function AdminBadgesPage() {
-  const supabase = await createSupabaseServerClient();
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    redirect("/dashboard");
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Check if user is admin or librarian
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || !["ADMIN", "LIBRARIAN"].includes(profile.role)) {
-    redirect("/dashboard");
-  }
+  // Authenticate and check role using NextAuth
+  const { user, role } = await requireRole(["ADMIN", "LIBRARIAN"]);
 
   // Build permissions object based on role
-  const isAdmin = profile.role === "ADMIN";
-  const isLibrarian = profile.role === "LIBRARIAN";
+  const isAdmin = role === "ADMIN";
+  const isLibrarian = role === "LIBRARIAN";
 
   const permissions: UserPermissions = {
-    role: profile.role as "ADMIN" | "LIBRARIAN",
+    role: role as "ADMIN" | "LIBRARIAN",
     userId: user.id,
     canCreateAllBadges: isAdmin,
     canEditSystemBadges: isAdmin,
     canOnlyCreateBookBadges: isLibrarian,
   };
 
-  // Fetch all badges with book info
-  const { data: badges, error: badgesError } = await supabaseAdmin
-    .from("badges")
-    .select("*, book:books(id, title, author)")
-    .order("display_order", { ascending: true });
+  // Fetch all badges with book info using local PostgreSQL
+  let badges: Array<BadgeRow & { book?: { id: number; title: string; author: string } | null }> = [];
+  try {
+    const badgesResult = await query<BadgeRow>(
+      `SELECT b.*, 
+              bk.title as book_title, 
+              bk.author as book_author
+       FROM badges b
+       LEFT JOIN books bk ON b.book_id = bk.id
+       ORDER BY b.display_order ASC`
+    );
 
-  if (badgesError) {
-    console.error("Failed to fetch badges:", badgesError);
+    // Transform to match the expected format with nested book object
+    badges = badgesResult.rows.map((row) => ({
+      ...row,
+      book: row.book_id ? {
+        id: row.book_id,
+        title: row.book_title || "",
+        author: row.book_author || "",
+      } : null,
+    }));
+  } catch (error) {
+    console.error("Failed to fetch badges:", error);
   }
 
   // Debug: Log badges count
-  console.log(`[Badge Management] Fetched ${badges?.length ?? 0} badges`);
+  console.log(`[Badge Management] Fetched ${badges.length} badges`);
 
   // Fetch all books for the dropdown
-  const { data: books, error: booksError } = await supabaseAdmin
-    .from("books")
-    .select("id, title, author")
-    .order("title", { ascending: true });
-
-  if (booksError) {
-    console.error("Failed to fetch books:", booksError);
+  let books: BookRow[] = [];
+  try {
+    const booksResult = await query<BookRow>(
+      `SELECT id, title, author FROM books ORDER BY title ASC`
+    );
+    books = booksResult.rows;
+  } catch (error) {
+    console.error("Failed to fetch books:", error);
   }
 
   // Header text based on role
@@ -96,8 +115,8 @@ export default async function AdminBadgesPage() {
       {/* Badge Manager Component */}
       <div className="rounded-[28px] border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(147,118,255,0.18)]">
         <BadgeManager
-          initialBadges={badges ?? []}
-          books={books ?? []}
+          initialBadges={badges}
+          books={books}
           permissions={permissions}
         />
       </div>

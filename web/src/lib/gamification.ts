@@ -612,7 +612,7 @@ export async function getStudentBadges(
     `SELECT sb.*,
             b.id as badge_id, b.name, b.description, b.icon_url, b.xp_reward,
             b.badge_type, b.criteria, b.book_id as badge_book_id,
-            b.is_active, b.display_order
+            b.is_active, b.display_order, b.tier, b.category
      FROM student_badges sb
      JOIN badges b ON sb.badge_id = b.id
      WHERE sb.student_id = $1
@@ -638,6 +638,8 @@ export async function getStudentBadges(
       book_id: row.badge_book_id,
       is_active: row.is_active,
       display_order: row.display_order,
+      tier: row.tier,
+      category: row.category,
     },
   })) as StudentBadgeWithBadge[];
 }
