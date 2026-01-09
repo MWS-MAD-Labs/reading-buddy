@@ -394,11 +394,11 @@ export const TextFlipReader = forwardRef<
             isFullscreen
               ? { background: "transparent" }
               : {
-                  background:
-                    "linear-gradient(to right, #8B4513 0%, #A0522D 2%, transparent 2%, transparent 98%, #A0522D 98%, #8B4513 100%)",
-                  boxShadow:
-                    "0 10px 40px rgba(0,0,0,0.3), inset 0 0 20px rgba(139,69,19,0.2)",
-                }
+                background:
+                  "linear-gradient(to right, #8B4513 0%, #A0522D 2%, transparent 2%, transparent 98%, #A0522D 98%, #8B4513 100%)",
+                boxShadow:
+                  "0 10px 40px rgba(0,0,0,0.3), inset 0 0 20px rgba(139,69,19,0.2)",
+              }
           }
         >
           <HTMLFlipBook

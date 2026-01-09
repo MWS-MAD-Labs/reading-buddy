@@ -117,7 +117,7 @@ export async function getAllBadges(): Promise<BadgeWithBook[]> {
     badge_type: row.badge_type as BadgeType,
     tier: row.tier as BadgeTier,
     category: row.category as BadgeCategory,
-    criteria: row.criteria as BadgeCriteria,
+    criteria: row.criteria as unknown as BadgeCriteria,
     book: row.book_id ? {
       id: row.book_id,
       title: row.book_title || "",
@@ -138,7 +138,13 @@ export async function getBadgesForBook(bookId: number): Promise<Badge[]> {
     [bookId]
   );
 
-  return result.rows as Badge[];
+  return result.rows.map(row => ({
+    ...row,
+    badge_type: row.badge_type as BadgeType,
+    tier: row.tier as BadgeTier,
+    category: row.category as BadgeCategory,
+    criteria: row.criteria as unknown as BadgeCriteria
+  })) as Badge[];
 }
 
 // ============================================================================

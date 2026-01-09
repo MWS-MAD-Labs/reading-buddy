@@ -1,38 +1,15 @@
 import Link from "next/link";
-import { requireRole, type UserRole } from "@/lib/auth/roleCheck";
-import { query } from "@/lib/db";
+import { requireRole } from "@/lib/auth/roleCheck";
+import {
+  getAllBadges,
+  getBooksForBadgeAssignment,
+} from "../badge-actions";
 import {
   BadgeManager,
   type UserPermissions,
 } from "@/components/dashboard/BadgeManager";
 
 export const dynamic = "force-dynamic";
-
-interface BadgeRow {
-  id: string;
-  name: string;
-  description: string | null;
-  icon_url: string | null;
-  xp_reward: number;
-  badge_type: string;
-  tier: string;
-  category: string;
-  criteria: Record<string, unknown>;
-  book_id: number | null;
-  is_active: boolean;
-  display_order: number;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-  book_title: string | null;
-  book_author: string | null;
-}
-
-interface BookRow {
-  id: number;
-  title: string;
-  author: string;
-}
 
 export default async function AdminBadgesPage() {
   // Authenticate and check role using NextAuth
@@ -50,44 +27,14 @@ export default async function AdminBadgesPage() {
     canOnlyCreateBookBadges: isLibrarian,
   };
 
-  // Fetch all badges with book info using local PostgreSQL
-  let badges: Array<BadgeRow & { book?: { id: number; title: string; author: string } | null }> = [];
-  try {
-    const badgesResult = await query<BadgeRow>(
-      `SELECT b.*, 
-              bk.title as book_title, 
-              bk.author as book_author
-       FROM badges b
-       LEFT JOIN books bk ON b.book_id = bk.id
-       ORDER BY b.display_order ASC`
-    );
-
-    // Transform to match the expected format with nested book object
-    badges = badgesResult.rows.map((row) => ({
-      ...row,
-      book: row.book_id ? {
-        id: row.book_id,
-        title: row.book_title || "",
-        author: row.book_author || "",
-      } : null,
-    }));
-  } catch (error) {
-    console.error("Failed to fetch badges:", error);
-  }
+  // Fetch all badges and books using server actions
+  const [badges, books] = await Promise.all([
+    getAllBadges(),
+    getBooksForBadgeAssignment(),
+  ]);
 
   // Debug: Log badges count
   console.log(`[Badge Management] Fetched ${badges.length} badges`);
-
-  // Fetch all books for the dropdown
-  let books: BookRow[] = [];
-  try {
-    const booksResult = await query<BookRow>(
-      `SELECT id, title, author FROM books ORDER BY title ASC`
-    );
-    books = booksResult.rows;
-  } catch (error) {
-    console.error("Failed to fetch books:", error);
-  }
 
   // Header text based on role
   const headerDescription = isAdmin
