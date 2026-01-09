@@ -44,20 +44,44 @@ async function main() {
     `);
 
         if (bookResult.rows.length === 0) {
-            console.log("⚠️ No books found in database. Please add some books first or run migrations.");
-            // We could ideally insert a dummy book here if needed, but for now we expect some data
-        } else {
-            console.log(`✅ Found ${bookResult.rows.length} book(s) to use for testing.`);
+            console.log("⚠️ No books found in database. Inserting a dummy book for testing...");
+            const dummyBook = await pool.query(`
+                INSERT INTO books (
+                    title, 
+                    author, 
+                    description, 
+                    file_format, 
+                    pdf_url, 
+                    cover_url,
+                    page_count,
+                    text_extraction_status
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                RETURNING id, title, file_format
+            `, [
+                "Test Book",
+                "Test Author",
+                "A book for E2E testing",
+                "pdf",
+                "http://localhost/test.pdf",
+                "http://localhost/cover.jpg",
+                10,
+                "completed"
+            ]);
+            bookResult.rows.push(dummyBook.rows[0]);
+            console.log(`✅ Dummy book created: "${dummyBook.rows[0].title}"`);
+        }
 
-            // Assign books to student if not already assigned
-            for (const book of bookResult.rows) {
-                await pool.query(`
-          INSERT INTO student_books (student_id, book_id, current_page, completed)
-          VALUES ($1, $2, 1, false)
-          ON CONFLICT (student_id, book_id) DO NOTHING
-        `, [userId, book.id]);
-                console.log(`✅ Assigned book "${book.title}" to test user.`);
-            }
+        console.log(`✅ Found ${bookResult.rows.length} book(s) to use for testing.`);
+
+        // Assign books to student if not already assigned
+        for (const book of bookResult.rows) {
+            await pool.query(`
+                INSERT INTO student_books (student_id, book_id, current_page, completed)
+                VALUES ($1, $2, 1, false)
+                ON CONFLICT (student_id, book_id) DO NOTHING
+            `, [userId, book.id]);
+            console.log(`✅ Assigned book "${book.title}" to test user.`);
         }
 
         console.log("✨ Test data setup complete!");

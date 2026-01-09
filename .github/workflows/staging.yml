@@ -77,7 +77,10 @@ jobs:
 
       - name: Run E2E tests
         working-directory: ./web
-        run: npm run test:e2e
+        run: |
+          npm run db:setup
+          npx tsx scripts/setup-test-data.ts
+          npm run test:e2e
         env:
           NODE_ENV: test
           # PostgreSQL test database configuration

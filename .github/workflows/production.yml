@@ -8,10 +8,20 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: reading-companion
 
-jobs:
-  test-and-build:
-    name: Test and Build
-    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: reading_buddy_test
+          POSTGRES_USER: reading_buddy
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     permissions:
       contents: read
@@ -45,6 +55,13 @@ jobs:
         run: npm run test -- --coverage
         env:
           NODE_ENV: test
+          # PostgreSQL test database configuration
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: reading_buddy_test
+          DB_USER: reading_buddy
+          DB_PASSWORD: test_password
+          DATABASE_URL: postgresql://reading_buddy:test_password@localhost:5432/reading_buddy_test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
@@ -61,9 +78,22 @@ jobs:
 
       - name: Run E2E tests
         working-directory: ./web
-        run: npm run test:e2e
+        run: |
+          npm run db:setup
+          npx tsx scripts/setup-test-data.ts
+          npm run test:e2e
         env:
           NODE_ENV: test
+          # PostgreSQL test database configuration
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: reading_buddy_test
+          DB_USER: reading_buddy
+          DB_PASSWORD: test_password
+          DATABASE_URL: postgresql://reading_buddy:test_password@localhost:5432/reading_buddy_test
+          # NextAuth configuration for tests
+          NEXTAUTH_SECRET: test-secret-for-ci-cd-pipeline-only
+          NEXTAUTH_URL: http://localhost:3000
           NEXT_PUBLIC_APP_URL: https://reads.mws.web.id
           NEXT_PUBLIC_RAG_API_URL: https://rag.mws.web.id/
 
