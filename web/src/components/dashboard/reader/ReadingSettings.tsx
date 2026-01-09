@@ -90,10 +90,10 @@ export function getPreferenceClasses(preferences: ReadingPreferences): string {
 }
 
 // Get inline styles for font size
-export function getPreferenceStyles(preferences: ReadingPreferences): React.CSSProperties {
+export function getPreferenceStyles(preferences: ReadingPreferences, scaleFactor = 1): React.CSSProperties {
     // Base font size is 16px, calculate actual px value
     const baseFontSize = 16;
-    const fontSizePx = Math.round((preferences.fontSize / 100) * baseFontSize);
+    const fontSizePx = Math.round((preferences.fontSize / 100) * baseFontSize * scaleFactor);
     return {
         fontSize: `${fontSizePx}px`,
     };

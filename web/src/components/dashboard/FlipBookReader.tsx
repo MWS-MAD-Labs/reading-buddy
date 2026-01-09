@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import clsx from "clsx";
+import { FullscreenReaderOverlay } from "./reader/FullscreenReaderOverlay";
 
 export type FlipBookRef = {
   goToPage: (page: number) => void;
@@ -25,7 +34,6 @@ const HTMLFlipBook = dynamic(() => import("react-pageflip"), { ssr: false });
 
 export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
   ({ pageImages, initialPage = 1, onPageChange, fallbackPdfUrl }, ref) => {
-
     const [currentPage, setCurrentPage] = useState(Math.max(initialPage, 1));
     const [jumpToPage, setJumpToPage] = useState("");
     const [zoom, setZoom] = useState(1);
@@ -80,12 +88,18 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
       };
 
       document.addEventListener("fullscreenchange", handleFullscreenChange);
-      document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.addEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenChange,
+      );
       document.addEventListener("mozfullscreenchange", handleFullscreenChange);
       document.addEventListener("msfullscreenchange", handleFullscreenChange);
 
       return () => {
-        document.removeEventListener("fullscreenchange", handleFullscreenChange);
+        document.removeEventListener(
+          "fullscreenchange",
+          handleFullscreenChange,
+        );
         document.removeEventListener(
           "webkitfullscreenchange",
           handleFullscreenChange,
@@ -109,7 +123,10 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
     const handleFlip = (pageIndex: number) => {
       // pageIndex from react-pageflip is 0-based
       // Convert to 1-based page number
-      const resolvedPage = Math.min(pageImages.count, Math.max(pageIndex + 1, 1));
+      const resolvedPage = Math.min(
+        pageImages.count,
+        Math.max(pageIndex + 1, 1),
+      );
       setCurrentPage(resolvedPage);
       onPageChange?.(resolvedPage);
     };
@@ -171,6 +188,33 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
         console.error("Error toggling fullscreen:", error);
       }
     };
+
+    const exitFullscreen = useCallback(async () => {
+      try {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        } else if ((document as any).mozCancelFullScreen) {
+          await (document as any).mozCancelFullScreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
+        }
+      } catch {
+        // ignore
+      }
+    }, []);
+
+    useEffect(() => {
+      if (!isFullscreen) return;
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Escape") {
+          void exitFullscreen();
+        }
+      };
+      window.addEventListener("keydown", onKeyDown);
+      return () => window.removeEventListener("keydown", onKeyDown);
+    }, [isFullscreen, exitFullscreen]);
 
     const zoomLabel = `${Math.round(zoom * 100)}%`;
 
@@ -263,7 +307,6 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
         }, 100);
         return () => clearTimeout(timer);
       }
-       
     }, [initialPage]);
 
     // Preload nearby pages when current page changes
@@ -297,17 +340,34 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
         ref={containerRef}
         className={`${isFullscreen ? "fixed inset-0 z-[9999] overflow-hidden bg-white flex items-center justify-center" : "space-y-2"}`}
       >
-        {/* Floating Exit Button - Only shown in fullscreen */}
-        {isFullscreen && (
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="fixed top-4 right-4 z-[10000] rounded-full bg-gray-900/80 hover:bg-gray-900 px-4 py-2 text-sm font-bold text-white shadow-2xl backdrop-blur-sm transition-all hover:scale-105"
-            title="Exit Fullscreen (ESC)"
-          >
-            ✕ Exit Fullscreen
-          </button>
-        )}
+        <FullscreenReaderOverlay
+          isOpen={isFullscreen}
+          leftSlot={
+            <>
+              <span className="text-xs font-semibold opacity-90">Zoom</span>
+              <button
+                type="button"
+                onClick={() => adjustZoom(-0.1)}
+                className="rounded-full bg-white/10 px-2.5 py-1 text-sm font-bold hover:bg-white/20"
+                aria-label="Zoom out"
+              >
+                –
+              </button>
+              <span className="min-w-14 text-center text-xs font-semibold opacity-90">
+                {zoomLabel}
+              </span>
+              <button
+                type="button"
+                onClick={() => adjustZoom(0.1)}
+                className="rounded-full bg-white/10 px-2.5 py-1 text-sm font-bold hover:bg-white/20"
+                aria-label="Zoom in"
+              >
+                +
+              </button>
+            </>
+          }
+          onExitFullscreen={() => void exitFullscreen()}
+        />
 
         {/* Compact Navigation Controls - Hidden in fullscreen */}
         {!isFullscreen && (
@@ -365,7 +425,10 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
               </button>
             </div>
 
-            <form onSubmit={handleJumpSubmit} className="flex items-center gap-1">
+            <form
+              onSubmit={handleJumpSubmit}
+              className="flex items-center gap-1"
+            >
               <label
                 htmlFor="page-jump"
                 className="text-xs font-semibold text-purple-700"
@@ -423,21 +486,21 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
           style={
             isFullscreen
               ? {
-                // Clean white background for fullscreen
-                background: "white",
-              }
+                  // Clean white background for fullscreen
+                  background: "white",
+                }
               : isMobile && isPortrait
                 ? {
-                  // Simple background for mobile portrait
-                  background: "transparent",
-                }
+                    // Simple background for mobile portrait
+                    background: "transparent",
+                  }
                 : {
-                  // Book-like background for desktop/landscape
-                  background:
-                    "linear-gradient(to right, #8B4513 0%, #A0522D 2%, transparent 2%, transparent 98%, #A0522D 98%, #8B4513 100%)",
-                  boxShadow:
-                    "0 10px 40px rgba(0,0,0,0.3), inset 0 0 20px rgba(139,69,19,0.2)",
-                }
+                    // Book-like background for desktop/landscape
+                    background:
+                      "linear-gradient(to right, #8B4513 0%, #A0522D 2%, transparent 2%, transparent 98%, #A0522D 98%, #8B4513 100%)",
+                    boxShadow:
+                      "0 10px 40px rgba(0,0,0,0.3), inset 0 0 20px rgba(139,69,19,0.2)",
+                  }
           }
         >
           {/* Book spine effect - only show on desktop/landscape, not in fullscreen */}
@@ -465,7 +528,9 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
             ref={bookRef}
             width={width}
             height={height}
-            size={isFullscreen || (isMobile && isPortrait) ? "fixed" : "stretch"}
+            size={
+              isFullscreen || (isMobile && isPortrait) ? "fixed" : "stretch"
+            }
             minWidth={Math.round(baseWidth * 0.6)}
             maxWidth={Math.round(baseWidth * 2)}
             minHeight={Math.round(baseHeight * 0.6)}
@@ -534,11 +599,11 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
                     isFullscreen
                       ? {} // No shadows in fullscreen
                       : {
-                        boxShadow:
-                          pageNumber % 2 === 0
-                            ? "inset 4px 0 8px rgba(0,0,0,0.05)" // Right page shadow
-                            : "inset -4px 0 8px rgba(0,0,0,0.05)", // Left page shadow
-                      }
+                          boxShadow:
+                            pageNumber % 2 === 0
+                              ? "inset 4px 0 8px rgba(0,0,0,0.05)" // Right page shadow
+                              : "inset -4px 0 8px rgba(0,0,0,0.05)", // Left page shadow
+                        }
                   }
                 >
                   {/* Book page content */}
@@ -629,7 +694,7 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
         )}
       </div>
     );
-  }
+  },
 );
 
 FlipBookReader.displayName = "FlipBookReader";
