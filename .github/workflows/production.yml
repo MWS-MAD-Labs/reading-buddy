@@ -8,6 +8,11 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: reading-companion
 
+jobs:
+  test-and-build:
+    name: Test and Build
+    runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16-alpine
