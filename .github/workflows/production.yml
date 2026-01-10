@@ -101,6 +101,13 @@ jobs:
           NEXTAUTH_URL: http://localhost:3000
           NEXT_PUBLIC_APP_URL: https://reads.mws.web.id
           NEXT_PUBLIC_RAG_API_URL: https://rag.mws.web.id/
+          # Dummy MinIO configuration for E2E tests (URLs won't be fetched)
+          MINIO_ENDPOINT: localhost
+          MINIO_PORT: 9000
+          MINIO_ACCESS_KEY: test-access-key
+          MINIO_SECRET_KEY: test-secret-key
+          MINIO_BUCKET_NAME: test-bucket
+          MINIO_USE_SSL: "false"
 
       - name: Upload E2E test results
         if: always()
