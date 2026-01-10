@@ -18,7 +18,11 @@ export const SupabaseProvider = ({ children }: { children: ReactNode }) => {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   useEffect(() => {
-    // Skip auth state listener if Supabase is not configured (PostgreSQL migration)
+    // Skip auth state listener as NextAuth handles our authentication primarily.
+    // This prevents background network errors (AuthRetryableFetchError) from an unreachable Supabase Auth server.
+    return;
+
+    /* 
     if (!supabase) {
       return;
     }
@@ -30,12 +34,19 @@ export const SupabaseProvider = ({ children }: { children: ReactNode }) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ event, session }),
+      }).catch((err) => {
+        // Log as warning rather than allowing it to crash as an unhandled rejection
+        console.warn(
+          "Supabase session sync skipped or failed (safe to ignore if not using Supabase auth):",
+          err,
+        );
       });
     });
 
     return () => {
       subscription.unsubscribe();
     };
+    */
   }, [supabase]);
 
   return (

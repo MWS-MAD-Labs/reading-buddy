@@ -119,7 +119,7 @@ export const authOptions: NextAuthConfig = {
 
           // Check if profile already exists
           const existingProfile = await authPool.query(
-            "SELECT id, role FROM profiles WHERE id = $1",
+            "SELECT id, role FROM profiles WHERE user_id = $1",
             [userId],
           );
 
@@ -130,7 +130,7 @@ export const authOptions: NextAuthConfig = {
               existingProfile.rows[0].role,
             );
             await authPool.query(
-              "UPDATE profiles SET full_name = $1, updated_at = NOW() WHERE id = $2",
+              "UPDATE profiles SET full_name = $1, updated_at = NOW() WHERE user_id = $2",
               [user.name, userId],
             );
             console.log("Profile updated (role preserved)");
@@ -208,7 +208,7 @@ export const authOptions: NextAuthConfig = {
         const result = await authPool.query(
           `SELECT id, role, grade, access_level, xp, level, full_name
            FROM profiles
-           WHERE id = $1`,
+           WHERE user_id = $1`,
           [userId],
         );
 

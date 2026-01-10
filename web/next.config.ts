@@ -26,6 +26,11 @@ const nextConfig: NextConfig = {
         hostname: "minioapi.mws.web.id",
         pathname: "/**",
       },
+      {
+        protocol: "http",
+        hostname: "localhost",
+        pathname: "/**",
+      },
     ],
   },
 };

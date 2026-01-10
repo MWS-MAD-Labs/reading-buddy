@@ -1,109 +1,76 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { query } from "@/lib/db";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { ClassroomManager } from "@/components/dashboard/ClassroomManager";
 import { AllClassroomsTable } from "@/components/dashboard/AllClassroomsTable";
 
 export const dynamic = "force-dynamic";
 
+type AdminClassroomRow = {
+  id: number;
+  name: string;
+  teacher_id: string;
+  teacher_name: string;
+  student_count: number;
+  book_count: number;
+  created_at: string;
+};
+
 export default async function ClassroomManagementPage() {
   const { user, role } = await requireRole(["TEACHER", "ADMIN"]);
 
-  const supabase = await createSupabaseServerClient();
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    return (
-      <div className="p-6 text-center text-red-600">
-        Database connection not available.
-      </div>
-    );
-  }
-
-  let query = supabaseAdmin.from("classes").select("id, name");
-
-  if (role === "TEACHER") {
-    query = query.eq("teacher_id", user.id);
-  }
-
-  const { data: classroomsData, error: classroomsError } = await query;
-
-  if (classroomsError) {
-    console.error(classroomsError);
-    // Handle error appropriately
-  }
-
   // Get my classrooms (where I'm the teacher)
-  const myClassrooms = classroomsData
-    ? await Promise.all(
-        classroomsData.map(async (c: any) => {
-          const { count } = await supabaseAdmin
-            .from("class_students")
-            .select("*", { count: "exact", head: true })
-            .eq("class_id", c.id);
+  // Uses LEFT JOIN to count students in one go
+  const myClassroomsResult = await query(
+    `SELECT c.id, c.name, COUNT(cs.id) as student_count
+     FROM classes c
+     LEFT JOIN class_students cs ON c.id = cs.class_id
+     WHERE c.teacher_id = $1
+     GROUP BY c.id, c.name`,
+    [user.id]
+  );
 
-          return {
-            id: c.id,
-            name: c.name,
-            student_count: count ?? 0,
-          };
-        }),
-      )
-    : [];
+  const myClassrooms = myClassroomsResult.rows.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    student_count: parseInt(row.student_count),
+  }));
 
   // Get all classrooms (for admin view)
-  const { data: allClassroomsData } = await supabaseAdmin
-    .from("classes")
-    .select("id, name, teacher_id, created_at");
+  let allClassrooms: AdminClassroomRow[] = [];
+  if (role === "ADMIN") {
+    // Optimized query to get class details + teacher name + counts
+    // Using subqueries for counts to avoid Cartesian product issues with multiple joins
+    const allClassroomsResult = await query(
+      `SELECT
+        c.id, c.name, c.teacher_id, c.created_at,
+        p.full_name as teacher_name,
+        (SELECT COUNT(*) FROM class_students cs WHERE cs.class_id = c.id) as student_count,
+        (SELECT COUNT(*) FROM class_books cb WHERE cb.class_id = c.id) as book_count
+       FROM classes c
+       LEFT JOIN profiles p ON c.teacher_id = p.id
+       ORDER BY c.created_at DESC`
+    );
 
-  const allClassrooms = allClassroomsData
-    ? await Promise.all(
-        allClassroomsData.map(async (c: any) => {
-          // Get student count
-          const { count: studentCount } = await supabaseAdmin
-            .from("class_students")
-            .select("*", { count: "exact", head: true })
-            .eq("class_id", c.id);
-
-          // Get book count
-          const { count: bookCount } = await supabaseAdmin
-            .from("class_books")
-            .select("*", { count: "exact", head: true })
-            .eq("class_id", c.id);
-
-          // Get teacher name
-          const { data: teacherData } = await supabaseAdmin
-            .from("profiles")
-            .select("full_name")
-            .eq("id", c.teacher_id)
-            .single();
-
-          return {
-            id: c.id,
-            name: c.name,
-            teacher_id: c.teacher_id,
-            teacher_name: teacherData?.full_name || "Unknown",
-            student_count: studentCount ?? 0,
-            book_count: bookCount ?? 0,
-            created_at: c.created_at,
-          };
-        }),
-      )
-    : [];
-
-  const { data: allTeachersData, error: allTeachersError } = await supabase
-    .from("profiles")
-    .select("id, full_name")
-    .eq("role", "TEACHER");
-
-  if (allTeachersError) {
-    console.error(allTeachersError);
+    allClassrooms = allClassroomsResult.rows.map((row: any): AdminClassroomRow => ({
+      id: Number(row.id),
+      name: row.name,
+      teacher_id: row.teacher_id,
+      teacher_name: row.teacher_name || "Unknown",
+      student_count: parseInt(row.student_count),
+      book_count: parseInt(row.book_count),
+      created_at: row.created_at,
+    }));
   }
 
-  const allTeachers =
-    allTeachersData?.map((t: any) => ({
-      id: t.id,
-      full_name: t.full_name ?? "",
-    })) ?? [];
+  // Get all teachers for the dropdown
+  const allTeachersResult = await query(
+    `SELECT id, full_name FROM profiles WHERE role = 'TEACHER' ORDER BY full_name ASC`
+  );
+
+  const allTeachers = allTeachersResult.rows.map((t: any) => ({
+    id: t.id,
+    full_name: t.full_name ?? "",
+  }));
 
   return (
     <div className="space-y-8">

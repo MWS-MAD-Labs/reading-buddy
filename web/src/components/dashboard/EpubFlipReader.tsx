@@ -37,6 +37,7 @@ type EpubFlipReaderProps = {
   epubUrl: string;
   initialPage?: number;
   onPageChange?: (pageNumber: number) => void;
+  onTotalPages?: (totalPages: number) => void;
   bookTitle?: string;
 };
 
@@ -56,7 +57,7 @@ const CHARS_PER_PAGE = 1500;
 export const EpubFlipReader = forwardRef<
   EpubFlipReaderRef,
   EpubFlipReaderProps
->(({ epubUrl, initialPage = 1, onPageChange, bookTitle }, ref) => {
+>(({ epubUrl, initialPage = 1, onPageChange, onTotalPages, bookTitle }, ref) => {
   // Generate storage key from epub URL
   const storageKey = `epub-page-${epubUrl.replace(/[^a-zA-Z0-9]/g, "_").slice(-50)}`;
 
@@ -244,6 +245,7 @@ export const EpubFlipReader = forwardRef<
         setPages(finalPages);
         setTotalPages(finalPages.length);
         setIsLoading(false);
+        onTotalPages?.(finalPages.length);
       } catch (err) {
         console.error("Error parsing EPUB:", err);
         setError(err instanceof Error ? err.message : "Failed to parse EPUB");

@@ -384,3 +384,39 @@ export const markBookAsCompleted = async (input: {
     newLevel: leveledUp ? currentLevel : undefined,
   };
 };
+
+export const updateBookTotalPages = async (bookId: number, totalPages: number) => {
+  const user = await getCurrentUser();
+
+  if (!user || !user.userId) {
+    throw new Error("You must be signed in to update book metadata.");
+  }
+
+  // Verify the book exists and check current page count
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT page_count FROM books WHERE id = $1`,
+    [bookId],
+  );
+
+  if (bookResult.rows.length === 0) {
+    throw new Error("Book not found.");
+  }
+
+  const currentCount = bookResult.rows[0].page_count;
+
+  // Only update if the new count is significantly different (e.g., > 10% difference)
+  // or if the current count is 1 or null.
+  // This prevents minor fluctuations based on screen size/parsing variations if any.
+  // For EPUBs, the reader calculates pages based on content, which is more accurate for the reader view.
+  if (!currentCount || currentCount <= 1 || Math.abs(currentCount - totalPages) > 5) {
+    console.log(`📚 Updating book ${bookId} page count: ${currentCount} -> ${totalPages}`);
+    await queryWithContext(
+      user.userId,
+      `UPDATE books SET page_count = $1 WHERE id = $2`,
+      [totalPages, bookId]
+    );
+  }
+
+  return { success: true };
+};

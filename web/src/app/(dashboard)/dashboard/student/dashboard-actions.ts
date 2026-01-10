@@ -1,6 +1,6 @@
 "use server";
 
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { queryWithContext } from "@/lib/db";
 import { getGamificationStats } from "@/lib/gamification";
 
 export type StudentDashboardData = {
@@ -39,55 +39,64 @@ export async function getStudentDashboardData(
   userId: string,
 ): Promise<{ success: boolean; data?: StudentDashboardData; error?: string }> {
   try {
-    const supabase = getSupabaseAdminClient();
-    if (!supabase) {
-      return { success: false, error: "Database connection not available" };
+    // 0. Get profile ID
+    const profileResult = await queryWithContext(
+      userId,
+      `SELECT id FROM profiles WHERE user_id = $1`,
+      [userId]
+    );
+    const profileId = profileResult.rows[0]?.id;
+
+    if (!profileId) {
+      return { success: false, error: "Profile not found" };
     }
 
     // 1. Get gamification stats
-    const gamificationStats = await getGamificationStats(userId, userId);
+    const gamificationStats = await getGamificationStats(userId, profileId);
 
     // 2. Get current reading book (most recent)
-    const { data: currentReading } = await supabase
-      .from("student_books")
-      .select("book_id, current_page, books(id, title, author, cover_url)")
-      .eq("student_id", userId)
-      .order("started_at", { ascending: false })
-      .limit(1)
-      .single();
+    // Replaced Supabase query with direct SQL
+    const currentReadingResult = await queryWithContext(
+      userId,
+      `
+      SELECT 
+        sb.book_id, 
+        sb.current_page, 
+        b.id, 
+        b.title, 
+        b.author, 
+        b.cover_url
+      FROM student_books sb
+      JOIN books b ON sb.book_id = b.id
+      WHERE sb.student_id = $1
+      ORDER BY sb.started_at DESC
+      LIMIT 1
+      `,
+      [profileId]
+    );
 
     let currentBook = null;
-    if (currentReading && currentReading.books) {
-      const bookData = Array.isArray(currentReading.books)
-        ? currentReading.books[0]
-        : currentReading.books;
-      const book = bookData as {
-        id: number;
-        title: string;
-        author: string;
-        cover_url: string;
-      } | null;
+    const currentReading = currentReadingResult.rows[0];
 
-      if (book) {
-        // Get total pages from the book (you might need to add this field or calculate it)
-        // For now, we'll estimate based on a typical book
-        const estimatedTotalPages = 300; // TODO: Get actual page count from book metadata
-        const currentPage = currentReading.current_page || 1;
-        const progressPercentage = Math.min(
-          (currentPage / estimatedTotalPages) * 100,
-          100,
-        );
+    if (currentReading) {
+      // Get total pages from the book (you might need to add this field or calculate it)
+      // For now, we'll estimate based on a typical book
+      const estimatedTotalPages = 300; // TODO: Get actual page count from book metadata
+      const currentPage = currentReading.current_page || 1;
+      const progressPercentage = Math.min(
+        (currentPage / estimatedTotalPages) * 100,
+        100,
+      );
 
-        currentBook = {
-          id: book.id,
-          title: book.title,
-          author: book.author,
-          cover_url: book.cover_url,
-          current_page: currentPage,
-          total_pages: estimatedTotalPages,
-          progress_percentage: progressPercentage,
-        };
-      }
+      currentBook = {
+        id: currentReading.id, // book id from join
+        title: currentReading.title,
+        author: currentReading.author,
+        cover_url: currentReading.cover_url,
+        current_page: currentPage,
+        total_pages: estimatedTotalPages,
+        progress_percentage: progressPercentage,
+      };
     }
 
     // 3. Generate weekly challenge (based on current progress)
@@ -103,16 +112,20 @@ export async function getStudentDashboardData(
       icon: "📖",
     };
 
-    // 4. Get leaderboard (top 5 students by XP)
-    const { data: allProfiles } = await supabase
-      .from("profiles")
-      .select("id, full_name, total_xp, level")
-      .eq("role", "STUDENT")
-      .order("total_xp", { ascending: false })
-      .limit(50); // Get top 50 to find current user's rank
+    // 4. Get leaderboard (top 50 students by XP)
+    const leaderboardResult = await queryWithContext(
+      userId,
+      `
+      SELECT id, full_name, total_xp, level
+      FROM profiles
+      WHERE role = 'STUDENT'
+      ORDER BY total_xp DESC
+      LIMIT 50
+      `
+    );
 
     const leaderboardData =
-      allProfiles?.map((profile, index) => ({
+      leaderboardResult.rows.map((profile, index) => ({
         rank: index + 1,
         studentId: profile.id,
         name: profile.full_name || "Anonymous",
@@ -123,7 +136,7 @@ export async function getStudentDashboardData(
 
     const currentUserRank =
       leaderboardData.find((entry) => entry.studentId === userId)?.rank || null;
-    const totalStudents = allProfiles?.length || 0;
+    const totalStudents = leaderboardResult.rows.length || 0; // This might need a separate COUNT query if we want true total, but matching original logic
 
     // Get top 3 for preview
     const leaderboard = leaderboardData.slice(0, 3);

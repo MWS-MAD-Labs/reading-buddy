@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { recordReadingProgress } from "@/app/(dashboard)/dashboard/student/actions";
+import { recordReadingProgress, updateBookTotalPages } from "@/app/(dashboard)/dashboard/student/actions";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ReaderNotesPanel } from "./reader/ReaderNotesPanel";
@@ -284,6 +284,10 @@ export function UnifiedBookReader({
                     bookTitle={bookTitle}
                     initialPage={initialPage}
                     onPageChange={handlePageChange}
+                    onTotalPages={(count) => {
+                        console.log("📚 Reader reported total pages:", count);
+                        updateBookTotalPages(bookId, count).catch(console.error);
+                    }}
                 />
 
                 {/* Reader Actions Bar */}

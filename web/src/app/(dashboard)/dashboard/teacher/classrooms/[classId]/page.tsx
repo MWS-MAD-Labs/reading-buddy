@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { query } from "@/lib/db";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { assertCanManageClass } from "@/lib/classrooms/permissions";
 import { ClassroomRoster } from "@/components/dashboard/ClassroomRoster";
@@ -38,56 +38,40 @@ export default async function ManageClassroomPage({
   }
 
   const { user, role } = await requireRole(["TEACHER", "ADMIN"]);
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    notFound();
-  }
 
   await assertCanManageClass(classId, user.id, role);
 
-  const { data: classroom, error: classroomError } = await supabaseAdmin
-    .from("classes")
-    .select("id, name, teacher_id")
-    .eq("id", classId)
-    .single();
+  const classroomResult = await query(
+    `SELECT id, name, teacher_id FROM classes WHERE id = $1`,
+    [classId]
+  );
 
-  if (classroomError || !classroom) {
-    console.error("Unable to load classroom", { classroomError, classId });
+  if (classroomResult.rows.length === 0) {
+    console.error("Unable to load classroom", { classId });
     notFound();
   }
 
-  const { data: teacherProfile, error: teacherProfileError } =
-    await supabaseAdmin
-      .from("profiles")
-      .select("full_name")
-      .eq("id", classroom.teacher_id)
-      .maybeSingle();
+  const classroom = classroomResult.rows[0];
 
-  if (teacherProfileError) {
-    console.error("Unable to load teacher profile", teacherProfileError);
-  }
+  const teacherProfileResult = await query(
+    `SELECT full_name FROM profiles WHERE id = $1`,
+    [classroom.teacher_id]
+  );
 
-  const { data: rosterData, error: rosterError } = await supabaseAdmin
-    .from("class_students")
-    .select("student_id, profiles(full_name)")
-    .eq("class_id", classId);
+  const teacherProfile = teacherProfileResult.rows[0] || null;
 
-  if (rosterError) {
-    console.error(rosterError);
-  }
+  const rosterResult = await query(
+    `SELECT cs.student_id, p.full_name
+     FROM class_students cs
+     LEFT JOIN profiles p ON cs.student_id = p.id
+     WHERE cs.class_id = $1`,
+    [classId]
+  );
 
-  const classStudents =
-    rosterData?.map((entry: any) => {
-      const profileData =
-        Array.isArray(entry.profiles) && entry.profiles.length > 0
-          ? entry.profiles[0]
-          : entry.profiles;
-      const profile = profileData as { full_name: string | null } | null;
-      return {
-        id: entry.student_id,
-        full_name: profile?.full_name ?? "Unknown student",
-      };
-    }) ?? [];
+  const classStudents = rosterResult.rows.map((row: any) => ({
+    id: row.student_id,
+    full_name: row.full_name ?? "Unknown student",
+  }));
 
   const rosterStudentIds = classStudents.map((student: any) => student.id);
 
@@ -101,56 +85,32 @@ export default async function ManageClassroomPage({
   }[] = [];
 
   if (rosterStudentIds.length > 0) {
-    const { data: readingsData, error: readingsError } = await supabaseAdmin
-      .from("student_books")
-      .select(
-        "student_id, current_page, started_at, completed_at, profiles!student_books_student_id_fkey(full_name), books(title, page_count)",
-      )
-      .in("student_id", rosterStudentIds)
-      .order("started_at", { ascending: false, nullsFirst: false })
-      .limit(10);
-
-    if (readingsError) {
-      console.error(readingsError);
-    }
-
-    // Transform array relationships to single objects
-    readings = (readingsData ?? []).map(
-      (entry: {
-        student_id: string;
-        current_page: number | null;
-        started_at: string | null;
-        completed_at: string | null;
-        profiles:
-          | { full_name: string | null }
-          | { full_name: string | null }[]
-          | null;
-        books:
-          | { title: string; page_count: number | null }
-          | { title: string; page_count: number | null }[]
-          | null;
-      }) => {
-        const profileData =
-          Array.isArray(entry.profiles) && entry.profiles.length > 0
-            ? entry.profiles[0]
-            : entry.profiles;
-        const bookData =
-          Array.isArray(entry.books) && entry.books.length > 0
-            ? entry.books[0]
-            : entry.books;
-        return {
-          student_id: entry.student_id,
-          current_page: entry.current_page,
-          started_at: entry.started_at,
-          completed_at: entry.completed_at,
-          profiles: profileData as { full_name: string | null } | null,
-          books: bookData as {
-            title: string;
-            page_count: number | null;
-          } | null,
-        };
-      },
+    const readingsResult = await query(
+      `SELECT 
+        sb.student_id,
+        sb.current_page,
+        sb.started_at,
+        sb.completed_at,
+        p.full_name,
+        b.title,
+        b.page_count
+       FROM student_books sb
+       LEFT JOIN profiles p ON sb.student_id = p.id
+       LEFT JOIN books b ON sb.book_id = b.id
+       WHERE sb.student_id = ANY($1)
+       ORDER BY sb.started_at DESC NULLS LAST
+       LIMIT 10`,
+      [rosterStudentIds]
     );
+
+    readings = readingsResult.rows.map((row: any) => ({
+      student_id: row.student_id,
+      current_page: row.current_page,
+      started_at: row.started_at,
+      completed_at: row.completed_at,
+      profiles: { full_name: row.full_name },
+      books: { title: row.title, page_count: row.page_count },
+    }));
   }
 
   let quizAttempts: {
@@ -161,165 +121,101 @@ export default async function ManageClassroomPage({
   }[] = [];
 
   if (rosterStudentIds.length > 0) {
-    const { data: quizData, error: quizError } = await supabaseAdmin
-      .from("quiz_attempts")
-      .select(
-        "score, submitted_at, profiles!quiz_attempts_student_id_fkey(full_name), quizzes(id, books(title))",
-      )
-      .in("student_id", rosterStudentIds)
-      .order("submitted_at", { ascending: false })
-      .limit(10);
-
-    if (quizError) {
-      console.error(quizError);
-    }
-
-    // Transform nested array relationships (profiles, quizzes.books) to single objects
-    quizAttempts = (quizData ?? []).map(
-      (entry: {
-        score: number;
-        submitted_at: string | null;
-        profiles:
-          | { full_name: string | null }
-          | { full_name: string | null }[]
-          | null;
-        quizzes:
-          | {
-              id?: number;
-              books?:
-                | { title: string | null }
-                | { title: string | null }[]
-                | null;
-            }
-          | Array<{
-              id?: number;
-              books?:
-                | { title: string | null }
-                | { title: string | null }[]
-                | null;
-            }>
-          | null;
-      }) => {
-        const profileData =
-          Array.isArray(entry.profiles) && entry.profiles.length > 0
-            ? entry.profiles[0]
-            : entry.profiles;
-
-        const quizInfo =
-          Array.isArray(entry.quizzes) && entry.quizzes.length > 0
-            ? entry.quizzes[0]
-            : entry.quizzes;
-        const quiz = quizInfo as {
-          id?: number;
-          books?: { title: string | null } | { title: string | null }[] | null;
-        } | null;
-
-        const bookData =
-          quiz && Array.isArray(quiz.books) && quiz.books.length > 0
-            ? quiz.books[0]
-            : quiz?.books;
-
-        return {
-          ...entry,
-          profiles: profileData as { full_name: string | null } | null,
-          quizzes: quiz
-            ? {
-                books: bookData as { title: string | null } | null,
-              }
-            : null,
-        };
-      },
+    const quizAttemptsResult = await query(
+      `SELECT 
+        qa.score,
+        qa.submitted_at,
+        p.full_name,
+        b.title as book_title
+       FROM quiz_attempts qa
+       LEFT JOIN profiles p ON qa.student_id = p.id
+       LEFT JOIN quizzes q ON qa.quiz_id = q.id
+       LEFT JOIN books b ON q.book_id = b.id
+       WHERE qa.student_id = ANY($1)
+       ORDER BY qa.submitted_at DESC
+       LIMIT 10`,
+      [rosterStudentIds]
     );
+
+    quizAttempts = quizAttemptsResult.rows.map((row: any) => ({
+      score: row.score,
+      submitted_at: row.submitted_at,
+      profiles: { full_name: row.full_name },
+      quizzes: { books: { title: row.book_title } },
+    }));
   }
 
-  const { data: studentDirectory, error: studentDirectoryError } =
-    await supabaseAdmin
-      .from("profiles")
-      .select("id, full_name")
-      .eq("role", "STUDENT");
+  const studentDirectoryResult = await query(
+    `SELECT id, full_name FROM profiles WHERE role = 'STUDENT'`
+  );
 
-  if (studentDirectoryError) {
-    console.error(studentDirectoryError);
-  }
+  const studentDirectory = studentDirectoryResult.rows;
 
-  const { data: allAssignments, error: assignmentsError } = await supabaseAdmin
-    .from("class_students")
-    .select("student_id");
+  const allAssignmentsResult = await query(
+    `SELECT student_id FROM class_students`
+  );
 
-  if (assignmentsError) {
-    console.error(assignmentsError);
-  }
+  const allAssignments = allAssignmentsResult.rows;
 
   const assignedIds = new Set(
-    (allAssignments ?? [])
+    allAssignments
       .map((entry: any) => entry.student_id)
       .filter((id): id is string => Boolean(id)),
   );
   const rosterIdSet = new Set(rosterStudentIds);
 
-  const availableStudents =
-    studentDirectory
-      ?.filter(
-        (student) =>
-          rosterIdSet.has(student.id) || !assignedIds.has(student.id),
-      )
-      .map((student: any) => ({
-        id: student.id,
-        full_name: student.full_name ?? "",
-      })) ?? [];
+  const availableStudents = studentDirectory
+    .filter(
+      (student: any) =>
+        rosterIdSet.has(student.id) || !assignedIds.has(student.id),
+    )
+    .map((student: any) => ({
+      id: student.id,
+      full_name: student.full_name ?? "",
+    }));
 
-  const { data: assignedBookRows, error: assignedBooksError } =
-    await supabaseAdmin
-      .from("class_books")
-      .select("book_id, assigned_at, books(id, title, author, cover_url)")
-      .eq("class_id", classId)
-      .order("assigned_at", { ascending: false });
+  const assignedBooksResult = await query(
+    `SELECT 
+      cb.book_id,
+      cb.assigned_at,
+      b.id,
+      b.title,
+      b.author,
+      b.cover_url
+     FROM class_books cb
+     LEFT JOIN books b ON cb.book_id = b.id
+     WHERE cb.class_id = $1
+     ORDER BY cb.assigned_at DESC`,
+    [classId]
+  );
 
-  if (assignedBooksError) {
-    console.error(assignedBooksError);
-  }
+  const assignedBookRows = assignedBooksResult.rows;
 
-  const assignedBooks =
-    assignedBookRows?.map((entry: any) => {
-      const bookData =
-        Array.isArray(entry.books) && entry.books.length > 0
-          ? entry.books[0]
-          : entry.books;
-      const book = bookData as {
-        id: number;
-        title: string;
-        author: string | null;
-        cover_url: string | null;
-      } | null;
-      return {
-        book_id: entry.book_id,
-        title: book?.title ?? "Untitled",
-        author: book?.author ?? null,
-        cover_url: book?.cover_url ?? null,
-        assigned_at: entry.assigned_at ?? null,
-      };
-    }) ?? [];
+  const assignedBooks = assignedBookRows.map((row: any) => ({
+    book_id: row.book_id,
+    title: row.title ?? "Untitled",
+    author: row.author ?? null,
+    cover_url: row.cover_url ?? null,
+    assigned_at: row.assigned_at ?? null,
+  }));
 
-  const { data: allBooksData, error: allBooksError } = await supabaseAdmin
-    .from("books")
-    .select("id, title, author, cover_url");
+  const allBooksResult = await query(
+    `SELECT id, title, author, cover_url FROM books`
+  );
 
-  if (allBooksError) {
-    console.error(allBooksError);
-  }
+  const allBooksData = allBooksResult.rows;
 
-  const availableBooks =
-    allBooksData
-      ?.filter(
-        (book) =>
-          !assignedBooks.some((assigned) => assigned.book_id === book.id),
-      )
-      .map((book: any) => ({
-        id: book.id,
-        title: book.title,
-        author: book.author ?? null,
-        cover_url: book.cover_url ?? null,
-      })) ?? [];
+  const availableBooks = allBooksData
+    .filter(
+      (book: any) =>
+        !assignedBooks.some((assigned) => assigned.book_id === book.id),
+    )
+    .map((book: any) => ({
+      id: book.id,
+      title: book.title,
+      author: book.author ?? null,
+      cover_url: book.cover_url ?? null,
+    }));
 
   return (
     <div className="space-y-8">
