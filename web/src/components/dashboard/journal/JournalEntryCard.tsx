@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import type { JournalEntry } from "@/app/(dashboard)/dashboard/journal/journal-actions";
 import { deleteJournalEntry } from "@/app/(dashboard)/dashboard/journal/journal-actions";
+import { ShareJournalNoteModal } from "./ShareJournalNoteModal";
+import { Share2 } from "lucide-react";
 
 interface JournalEntryCardProps {
     entry: JournalEntry;
@@ -60,6 +62,7 @@ const entryTypeConfig: Record<
 export function JournalEntryCard({ entry }: JournalEntryCardProps) {
     const [isDeleting, setIsDeleting] = useState(false);
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
 
     const config = entryTypeConfig[entry.entry_type] ?? {
         icon: "📋",
@@ -169,34 +172,54 @@ export function JournalEntryCard({ entry }: JournalEntryCardProps) {
                 </div>
             )}
 
-            {/* Delete action */}
-            <div className="mt-3 flex justify-end">
-                {showConfirmDelete ? (
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs text-red-500">Delete this entry?</span>
-                        <button
-                            onClick={handleDelete}
-                            disabled={isDeleting}
-                            className="rounded-full bg-red-500 px-3 py-1 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
-                        >
-                            {isDeleting ? "..." : "Yes"}
-                        </button>
-                        <button
-                            onClick={() => setShowConfirmDelete(false)}
-                            className="rounded-full bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-300"
-                        >
-                            No
-                        </button>
-                    </div>
-                ) : (
+            {/* Actions */}
+            <div className="mt-3 flex items-center justify-between">
+                {/* Share Button (only for notes) */}
+                {entry.entry_type === "note" && (
                     <button
-                        onClick={() => setShowConfirmDelete(true)}
-                        className="text-xs text-indigo-400 hover:text-red-500"
+                        onClick={() => setShowShareModal(true)}
+                        className="flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-100 transition-colors"
                     >
-                        🗑️ Delete
+                        <Share2 className="h-3.5 w-3.5" />
+                        Share to Classroom
                     </button>
                 )}
+
+                {/* Delete Action */}
+                <div className="ml-auto flex justify-end">
+                    {showConfirmDelete ? (
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-red-500">Delete this entry?</span>
+                            <button
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                className="rounded-full bg-red-500 px-3 py-1 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                            >
+                                {isDeleting ? "..." : "Yes"}
+                            </button>
+                            <button
+                                onClick={() => setShowConfirmDelete(false)}
+                                className="rounded-full bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-300"
+                            >
+                                No
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setShowConfirmDelete(true)}
+                            className="text-xs text-indigo-400 hover:text-red-500"
+                        >
+                            🗑️ Delete
+                        </button>
+                    )}
+                </div>
             </div>
+
+            <ShareJournalNoteModal
+                isOpen={showShareModal}
+                onClose={() => setShowShareModal(false)}
+                entry={entry}
+            />
         </div>
     );
 }

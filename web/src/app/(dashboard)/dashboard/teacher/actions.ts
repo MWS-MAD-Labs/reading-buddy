@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { getCurrentUser } from "@/lib/auth/server";
-import { queryWithContext } from "@/lib/db";
+import { query, queryWithContext } from "@/lib/db";
 import { assertCanManageClass } from "@/lib/classrooms/permissions";
+import { AIService } from "@/lib/ai";
+import { checkRateLimit } from "@/lib/middleware/withRateLimit";
 
 const revalidateClassroom = (classId: number) => {
   revalidatePath("/dashboard/teacher");
@@ -296,4 +298,219 @@ export const getClassQuizAssignments = async (classId: number) => {
     completed_count: parseInt(row.completed_count || "0"),
     total_students: parseInt(row.total_students || "0"),
   }));
+};
+
+// =============================================
+// Teacher Quiz Generation Actions
+// =============================================
+
+export const getBookDetailsForQuiz = async (bookId: number) => {
+  await requireRole(["TEACHER", "ADMIN"]);
+  const currentUser = await getCurrentUser();
+  const userId = currentUser.userId!;
+
+  const result = await queryWithContext(
+    userId,
+    `SELECT id, title, page_count, text_extracted_at, page_text_content
+     FROM books WHERE id = $1`,
+    [bookId]
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const book = result.rows[0];
+  return {
+    id: book.id,
+    title: book.title,
+    pageCount: book.page_count,
+    hasExtractedText: !!book.text_extracted_at && !!book.page_text_content,
+  };
+};
+
+export const generateQuizForBookAsTeacher = async (input: {
+  classId: number;
+  bookId: number;
+  quizType: "checkpoint" | "classroom";
+  pageRangeStart?: number;
+  pageRangeEnd?: number;
+  checkpointPage?: number;
+  questionCount?: number;
+}) => {
+  const { user, role } = await requireRole(["TEACHER", "ADMIN"]);
+  const currentUser = await getCurrentUser();
+  const userId = currentUser.userId!;
+
+  // Verify teacher has access to this class
+  await assertCanManageClass(input.classId, user.profileId!, role);
+
+  // Verify the book is assigned to this class
+  const bookAssignment = await queryWithContext(
+    userId,
+    `SELECT 1 FROM class_books WHERE class_id = $1 AND book_id = $2`,
+    [input.classId, input.bookId]
+  );
+
+  if (bookAssignment.rows.length === 0) {
+    throw new Error("This book is not assigned to your class.");
+  }
+
+  // Rate limiting: 10 requests per hour per user
+  const rateLimitCheck = await checkRateLimit(
+    `user:${userId}`,
+    "quizGeneration"
+  );
+  if (rateLimitCheck.exceeded) {
+    const resetTime = rateLimitCheck.reset
+      ? new Date(rateLimitCheck.reset).toLocaleTimeString()
+      : "soon";
+    throw new Error(`Rate limit exceeded. Please try again at ${resetTime}.`);
+  }
+
+  // Validate checkpoint input
+  if (input.quizType === "checkpoint" && !input.checkpointPage) {
+    throw new Error("Checkpoint page is required for checkpoint quizzes.");
+  }
+
+  // Fetch book data including extracted text
+  const bookResult = await queryWithContext(
+    userId,
+    `SELECT id, title, author, genre, description, page_count, page_text_content, text_extracted_at, pdf_url, original_file_url
+     FROM books WHERE id = $1`,
+    [input.bookId]
+  );
+
+  if (bookResult.rows.length === 0) {
+    throw new Error("Book not found.");
+  }
+
+  const book = bookResult.rows[0];
+
+  const textContent =
+    book.text_extracted_at && book.page_text_content
+      ? (book.page_text_content as {
+        pages: { pageNumber: number; text: string; wordCount?: number }[];
+        totalPages: number;
+        totalWords: number;
+      })
+      : null;
+
+  const questionCount = input.questionCount ?? 5;
+  let pagesPayload:
+    | { pageNumber: number; text: string; wordCount?: number }[]
+    | null = null;
+  let totalWords = 0;
+  let contentSource = "description";
+
+  if (textContent) {
+    const startPage = input.pageRangeStart ?? 1;
+    const endPage = input.pageRangeEnd ?? textContent.totalPages;
+
+    const pagesInRange = textContent.pages.filter(
+      (p) => p.pageNumber >= startPage && p.pageNumber <= endPage
+    );
+
+    const filteredPages = pagesInRange.filter(
+      (page) => page.text && page.text.trim().length > 0
+    );
+
+    if (filteredPages.length) {
+      pagesPayload = filteredPages;
+      totalWords =
+        filteredPages.reduce(
+          (sum, page) =>
+            sum + (page.wordCount ?? page.text.split(/\s+/).length),
+          0
+        ) || textContent.totalWords;
+      contentSource = `pages ${startPage}-${endPage}`;
+    }
+  }
+
+  if (!pagesPayload) {
+    const fallbackText = book.description || "";
+    if (!fallbackText) {
+      throw new Error(
+        "No book content available. Please ask a librarian to extract text from the book first."
+      );
+    }
+
+    const wordCount = fallbackText.split(/\s+/).length;
+    pagesPayload = [
+      {
+        pageNumber: 0,
+        text: fallbackText,
+        wordCount,
+      },
+    ];
+    totalWords = wordCount;
+    contentSource =
+      textContent && textContent.pages.length
+        ? "description (fallback - insufficient text extracted)"
+        : "description";
+  }
+
+  const pdfUrl = book.original_file_url || book.pdf_url || undefined;
+
+  // Generate quiz using AI
+  const aiResult = await AIService.generateQuiz({
+    title: book.title ?? "Untitled",
+    author: book.author ?? undefined,
+    genre: book.genre ?? undefined,
+    description: book.description ?? undefined,
+    quizType: input.quizType,
+    questionCount,
+    checkpointPage: input.checkpointPage,
+    pageRangeStart: input.pageRangeStart,
+    pageRangeEnd: input.pageRangeEnd,
+    pages: pagesPayload,
+    totalWords,
+    pdfUrl,
+    contentSource,
+  });
+
+  const quizPayload = aiResult.quiz;
+
+  // Save the quiz to database - teacher-created quizzes are auto-published as 'classroom' type
+  const quizResult = await queryWithContext(
+    userId,
+    `INSERT INTO quizzes (
+      book_id, created_by_id, questions, quiz_type,
+      page_range_start, page_range_end, checkpoint_page, status, is_published
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', true)
+    RETURNING id`,
+    [
+      book.id,
+      user.profileId,
+      JSON.stringify(quizPayload),
+      input.quizType,
+      input.pageRangeStart ?? null,
+      input.pageRangeEnd ?? null,
+      input.checkpointPage ?? null,
+    ]
+  );
+
+  if (quizResult.rows.length === 0) {
+    throw new Error("Failed to save quiz.");
+  }
+
+  const inserted = quizResult.rows[0];
+
+  // Auto-assign the quiz to the class
+  await queryWithContext(
+    userId,
+    `INSERT INTO class_quiz_assignments (class_id, quiz_id, assigned_by, is_active)
+     VALUES ($1, $2, $3, true)
+     ON CONFLICT (class_id, quiz_id) DO NOTHING`,
+    [input.classId, inserted.id, user.profileId]
+  );
+
+  revalidateClassroom(input.classId);
+  revalidatePath("/dashboard/library");
+
+  return {
+    quizId: inserted.id,
+    questionCount: quizPayload.questions.length,
+    contentSource,
+  };
 };

@@ -12,7 +12,7 @@ import {
 } from "@/app/(dashboard)/dashboard/teacher/actions";
 import { DiscussionStream } from "@/components/dashboard/DiscussionStream";
 import { getClassroomMessages } from "@/app/(dashboard)/dashboard/student/classrooms/[classId]/classroom-stream-actions";
-import { MessageSquare, LayoutDashboard } from "lucide-react";
+import { MessageSquare, LayoutDashboard, ClipboardList } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +39,7 @@ export default async function ManageClassroomPage({
   const { classId: classIdParam } = await params;
   const { view: viewParam } = await searchParams;
   const classId = Number.parseInt(classIdParam, 10);
-  const view = viewParam === "discussion" ? "discussion" : "overview";
+  const view = viewParam === "discussion" ? "discussion" : viewParam === "quizzes" ? "quizzes" : "overview";
 
   if (Number.isNaN(classId)) {
     notFound();
@@ -267,6 +267,19 @@ export default async function ManageClassroomPage({
             Overview
           </Link>
           <Link
+            href={`/dashboard/teacher/classrooms/${classId}?view=quizzes`}
+            className={`
+              flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors rounded-t-lg
+              ${view === 'quizzes'
+                ? 'text-indigo-600 border-b-2 border-indigo-500 bg-indigo-50/50'
+                : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-50'
+              }
+            `}
+          >
+            <ClipboardList className="h-4 w-4" />
+            Quizzes
+          </Link>
+          <Link
             href={`/dashboard/teacher/classrooms/${classId}?view=discussion`}
             className={`
               flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors rounded-t-lg
@@ -409,23 +422,29 @@ export default async function ManageClassroomPage({
             assignedBooks={assignedBooks}
             availableBooks={availableBooks}
           />
+        </div>
+      )}
 
-          {assignedBooks.length > 0 && (
-            <section className="space-y-6">
-              <div className="rounded-[32px] border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-4">
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1">
-                  <p className="text-xs font-black uppercase tracking-wide text-purple-600">
-                    Quiz Assignments
-                  </p>
-                </div>
-                <h2 className="text-xl font-black text-indigo-950">
-                  Assign Quizzes to Class
-                </h2>
-                <p className="text-sm text-indigo-500">
-                  Assign quizzes created by librarians for each book below.
+      {view === "quizzes" && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+          <section className="rounded-[32px] border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-6">
+            <div className="mb-4">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1">
+                <p className="text-xs font-black uppercase tracking-wide text-purple-600">
+                  Quiz Management
                 </p>
               </div>
+              <h2 className="text-2xl font-black text-indigo-950">
+                Create & Assign Quizzes
+              </h2>
+              <p className="text-sm text-indigo-500">
+                Create AI-generated quizzes or assign existing quizzes to your class.
+              </p>
+            </div>
+          </section>
 
+          {assignedBooks.length > 0 ? (
+            <div className="space-y-4">
               {assignedBooks.map((book: any) => (
                 <BookQuizSection
                   key={book.book_id}
@@ -434,7 +453,15 @@ export default async function ManageClassroomPage({
                   bookTitle={book.title}
                 />
               ))}
-            </section>
+            </div>
+          ) : (
+            <div className="rounded-[32px] border border-dashed border-purple-300 bg-white/80 p-12 text-center">
+              <div className="mb-4 text-5xl">📚</div>
+              <h3 className="text-lg font-bold text-indigo-950">No Books Assigned</h3>
+              <p className="text-sm text-indigo-500">
+                Assign books to your class first to create quizzes for them.
+              </p>
+            </div>
           )}
         </div>
       )}

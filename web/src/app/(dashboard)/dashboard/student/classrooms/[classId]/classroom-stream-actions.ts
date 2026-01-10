@@ -306,7 +306,7 @@ export async function shareNoteToClassroom(input: {
         noteId: note.id,
         bookId: note.book_id,
         bookTitle: note.book_title || "General Note",
-        noteContent: note.content?.substring(0, 500), // Truncate for preview
+        noteContent: note.content,
         pageNumber: note.page_number,
         bookCoverUrl: note.book_cover_url,
     };
@@ -318,4 +318,37 @@ export async function shareNoteToClassroom(input: {
         content,
         attachments: [attachment],
     });
+}
+// Get classrooms (optionally filtered by book assignment)
+export async function getClassroomsForBook(bookId?: number | null): Promise<{ id: number; name: string }[]> {
+    const user = await getCurrentUser();
+
+    if (!user || !user.userId || !user.profileId) {
+        throw new Error("You must be signed in to view classrooms.");
+    }
+
+    let queryStr = "";
+    let params: any[] = [user.profileId];
+
+    if (bookId) {
+        queryStr = `
+            SELECT c.id, c.name
+            FROM classes c
+            INNER JOIN class_books cb ON cb.class_id = c.id
+            INNER JOIN class_students cs ON cs.class_id = c.id
+            WHERE cb.book_id = $2 AND cs.student_id = $1
+        `;
+        params.push(bookId);
+    } else {
+        queryStr = `
+            SELECT c.id, c.name
+            FROM classes c
+            INNER JOIN class_students cs ON cs.class_id = c.id
+            WHERE cs.student_id = $1
+        `;
+    }
+
+    const result = await query(queryStr, params);
+
+    return result.rows as { id: number; name: string }[];
 }

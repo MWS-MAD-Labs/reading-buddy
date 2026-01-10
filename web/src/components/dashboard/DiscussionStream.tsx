@@ -4,18 +4,22 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
-    Loader2, Send, MessageSquare, CornerDownRight, MoreHorizontal,
-    Trash2, Share2, BookOpen, Smile, Paperclip, ExternalLink
+    Loader2, Send, MessageSquare,
+    Trash2, BookOpen, Paperclip, ExternalLink
 } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     ClassroomMessage,
     SharableNote,
     sendClassroomMessage,
     deleteClassroomMessage,
-    getClassroomMessages,
     getMessageReplies,
     shareNoteToClassroom
 } from "@/app/(dashboard)/dashboard/student/classrooms/[classId]/classroom-stream-actions";
@@ -37,7 +41,7 @@ const MessageInput = ({
     onAttachNote: () => void,
     placeholder?: string
 }) => (
-    <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm transition-all focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100">
+    <div className="relative rounded-2xl border border-slate-200 bg-white shadow-sm transition-all focus-within:border-indigo-400">
         <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -56,12 +60,13 @@ const MessageInput = ({
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-9 w-9 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                    className="h-9 px-3 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors flex items-center gap-2"
                     onClick={onAttachNote}
                     type="button"
                     title="Attach a note"
                 >
-                    <Paperclip className="h-5 w-5" />
+                    <Paperclip className="h-4 w-4" />
+                    <span className="text-xs font-medium">Attach Note</span>
                 </Button>
             </div>
             <Button
@@ -78,6 +83,8 @@ const MessageInput = ({
 
 // Attachment Viewer with Journal Card Style
 const AttachmentView = ({ attachments }: { attachments: any[] }) => {
+    const [expandedNote, setExpandedNote] = useState<any | null>(null);
+
     if (!attachments || attachments.length === 0) return null;
 
     return (
@@ -89,69 +96,165 @@ const AttachmentView = ({ attachments }: { attachments: any[] }) => {
                     return (
                         <div
                             key={i}
-                            className="relative rounded-2xl border bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200 p-4 shadow-sm"
+                            className="relative rounded-2xl border bg-gradient-to-br from-indigo-50/50 to-blue-50/50 border-indigo-100 p-4 shadow-sm hover:shadow-md transition-shadow"
                         >
-                            {/* Header */}
-                            <div className="mb-2 flex items-start justify-between gap-2">
+                            {/* Header Tag */}
+                            <div className="mb-3 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xl">📖</span>
-                                    <span className="text-xs font-semibold uppercase tracking-wide text-indigo-500">
-                                        {isBookNote ? "Reading Session" : "Note"}
+                                    <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center">
+                                        <span className="text-sm">📖</span>
+                                    </div>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
+                                        {isBookNote ? "Reading Reflection" : "Quick Note"}
                                     </span>
                                 </div>
+                                {att.pageNumber && (
+                                    <span className="text-xs font-medium text-indigo-400 bg-white/60 px-2 py-1 rounded-full">
+                                        Page {att.pageNumber}
+                                    </span>
+                                )}
                             </div>
 
-                            {/* Content */}
-                            {att.noteContent && (
-                                <p className="mb-3 text-sm text-indigo-900 whitespace-pre-wrap italic">
-                                    "{att.noteContent}"
-                                </p>
-                            )}
-
-                            {/* Page reference */}
-                            {att.pageNumber && (
-                                <p className="mb-3 text-xs text-indigo-500">
-                                    📍 Read up to page {att.pageNumber}
-                                </p>
-                            )}
-
-                            {/* Book info card */}
-                            {isBookNote && (
-                                <div className="flex items-center gap-2 rounded-xl bg-white/60 p-2">
-                                    {att.bookCoverUrl ? (
-                                        <Image
-                                            src={att.bookCoverUrl}
-                                            alt={att.bookTitle}
-                                            width={28}
-                                            height={40}
-                                            className="h-10 w-7 rounded object-cover"
-                                            unoptimized
-                                        />
-                                    ) : (
-                                        <div className="flex h-10 w-7 shrink-0 items-center justify-center rounded bg-blue-100 text-blue-300">
-                                            <BookOpen className="h-4 w-4" />
-                                        </div>
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                        <p className="block truncate text-sm font-medium text-indigo-700">
-                                            {att.bookTitle}
-                                        </p>
+                            <div className="flex gap-4">
+                                {/* Book Cover (if exists) */}
+                                {isBookNote && (
+                                    <div className="shrink-0">
+                                        {att.bookCoverUrl ? (
+                                            <div className="relative h-24 w-16 rounded-lg shadow-sm border border-black/5 overflow-hidden group-hover:scale-105 transition-transform duration-300">
+                                                <Image
+                                                    src={att.bookCoverUrl}
+                                                    alt={att.bookTitle}
+                                                    fill
+                                                    className="object-cover"
+                                                    unoptimized
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="flex h-24 w-16 items-center justify-center rounded-lg bg-indigo-100 text-indigo-300 border border-indigo-200">
+                                                <BookOpen className="h-6 w-6" />
+                                            </div>
+                                        )}
                                     </div>
-                                    {att.bookId && (
-                                        <Link
-                                            href={`/dashboard/student/read/${att.bookId}${att.pageNumber ? `?page=${att.pageNumber}` : ''}`}
-                                            className="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-200"
+                                )}
+
+                                {/* Content */}
+                                <div className="flex-1 min-w-0 flex flex-col justify-between">
+                                    <div>
+                                        {att.noteContent && (
+                                            <div className="mb-2">
+                                                <p className="text-sm text-indigo-950 italic line-clamp-3 leading-relaxed">
+                                                    &quot;{att.noteContent}&quot;
+                                                </p>
+                                            </div>
+                                        )}
+                                        {isBookNote && (
+                                            <h4 className="text-sm font-semibold text-indigo-900 truncate">
+                                                {att.bookTitle}
+                                            </h4>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="h-7 text-xs bg-white text-indigo-600 hover:bg-indigo-50 border border-indigo-100"
+                                            onClick={() => setExpandedNote(att)}
                                         >
-                                            Open
-                                        </Link>
-                                    )}
+                                            Read Note
+                                        </Button>
+
+                                        {isBookNote && att.bookId && (
+                                            <Link
+                                                href={`/dashboard/student/read/${att.bookId}${att.pageNumber ? `?page=${att.pageNumber}` : ''}`}
+                                            >
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 text-xs text-indigo-400 hover:text-indigo-700"
+                                                >
+                                                    Open Book
+                                                </Button>
+                                            </Link>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     );
                 }
                 return null;
             })}
+
+            {/* Expanded Note Modal */}
+            <Dialog open={!!expandedNote} onOpenChange={(open) => !open && setExpandedNote(null)}>
+                <DialogContent className="sm:max-w-xl p-0 overflow-hidden border-0 shadow-2xl bg-white/95 backdrop-blur-xl">
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 pointer-events-none" />
+
+                    <div className="relative flex flex-col h-full max-h-[85vh]">
+                        {/* Header */}
+                        <div className="p-6 pb-4 border-b border-indigo-50/50 flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                                {expandedNote?.bookCoverUrl ? (
+                                    <div className="relative h-12 w-8 rounded shadow-sm overflow-hidden">
+                                        <Image
+                                            src={expandedNote.bookCoverUrl}
+                                            alt={expandedNote.bookTitle || "Book"}
+                                            fill
+                                            className="object-cover"
+                                            unoptimized
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-500">
+                                        <span className="text-lg">📖</span>
+                                    </div>
+                                )}
+                                <div>
+                                    <DialogTitle className="text-lg font-bold text-indigo-950">
+                                        {expandedNote?.bookTitle || "Note Details"}
+                                    </DialogTitle>
+                                    {expandedNote?.pageNumber && (
+                                        <p className="text-sm text-indigo-500 font-medium">
+                                            Page {expandedNote.pageNumber}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            {/* Close button is handled by DialogPrimitive, but we can add custom one if needed or just rely on default X */}
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                            <div className="prose prose-indigo max-w-none">
+                                <p className="text-lg leading-relaxed text-indigo-900 font-serif italic whitespace-pre-wrap">
+                                    &quot;{expandedNote?.noteContent}&quot;
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-indigo-50/50 bg-white/50 flex justify-end gap-2">
+                            <Button
+                                variant="ghost"
+                                onClick={() => setExpandedNote(null)}
+                                className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                            >
+                                Close
+                            </Button>
+                            {expandedNote?.bookId && (
+                                <Link
+                                    href={`/dashboard/student/read/${expandedNote.bookId}${expandedNote.pageNumber ? `?page=${expandedNote.pageNumber}` : ''}`}
+                                >
+                                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200">
+                                        Open Book
+                                    </Button>
+                                </Link>
+                            )}
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
