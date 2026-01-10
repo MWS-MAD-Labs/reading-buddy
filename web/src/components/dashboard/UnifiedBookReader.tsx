@@ -6,7 +6,12 @@
  */
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { recordReadingProgress, updateBookTotalPages } from "@/app/(dashboard)/dashboard/student/actions";
+import { useRouter } from "next/navigation";
+import {
+    recordReadingProgress,
+    updateBookTotalPages,
+    getPendingCheckpointForPage
+} from "@/app/(dashboard)/dashboard/student/actions";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ReaderNotesPanel } from "./reader/ReaderNotesPanel";
@@ -85,6 +90,7 @@ export function UnifiedBookReader({
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     onComplete,
 }: UnifiedBookReaderProps) {
+    const router = useRouter();
     const [readerMode, setReaderMode] = useState<ReaderMode>("loading");
     const [textContent, setTextContent] = useState<BookTextJSON | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -174,16 +180,33 @@ export function UnifiedBookReader({
         }
 
         saveTimeoutRef.current = setTimeout(async () => {
-            if (page > lastSavedPageRef.current || Math.abs(page - lastSavedPageRef.current) >= 2) {
+            // Check if page has changed or if it's the very first load (where lastSavedPageRef might match page but we need a check)
+            const isSignificantChange = page > lastSavedPageRef.current || Math.abs(page - lastSavedPageRef.current) >= 2;
+            const isInitialCheck = lastSavedPageRef.current === initialPage && !saveTimeoutRef.current; // This logic is tricky with debounce
+
+            // Simplified: Always check if it's the first time we're successfully recording or if page progressed
+            if (isSignificantChange || page === initialPage) {
                 try {
                     await recordReadingProgress({ bookId, currentPage: page });
                     lastSavedPageRef.current = page;
+
+                    // Check for required checkpoint quiz at or before this page
+                    const checkpoint = await getPendingCheckpointForPage({
+                        bookId,
+                        currentPage: page,
+                    });
+
+                    if (checkpoint.checkpointRequired && checkpoint.quizId) {
+                        router.push(
+                            `/dashboard/student/quiz/${checkpoint.quizId}?bookId=${bookId}&page=${page}`,
+                        );
+                    }
                 } catch (err) {
                     console.error('Failed to save reading progress:', err);
                 }
             }
         }, process.env.NODE_ENV === 'test' ? 500 : 3000); // 3 second debounce (0.5s in test)
-    }, [bookId, onPageChange]);
+    }, [bookId, onPageChange, router]);
 
     // Cleanup timeout on unmount
     useEffect(() => {

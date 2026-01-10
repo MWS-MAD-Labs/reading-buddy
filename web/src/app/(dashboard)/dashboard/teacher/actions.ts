@@ -158,7 +158,7 @@ export const getPublishedQuizzesByBook = async (bookId: number) => {
     page_range_start: quiz.page_range_start,
     page_range_end: quiz.page_range_end,
     checkpoint_page: quiz.checkpoint_page,
-    question_count: Array.isArray(quiz.questions) ? quiz.questions.length : 0,
+    question_count: quiz.questions?.questions?.length || (Array.isArray(quiz.questions) ? quiz.questions.length : 0),
   }));
 };
 
@@ -290,7 +290,7 @@ export const getClassQuizAssignments = async (classId: number) => {
     quiz_id: row.quiz_id,
     quiz_type: row.quiz_type || "classroom",
     book_id: row.book_id || 0,
-    question_count: Array.isArray(row.questions) ? row.questions.length : 0,
+    question_count: row.questions?.questions?.length || (Array.isArray(row.questions) ? row.questions.length : 0),
     assigned_at: row.assigned_at,
     due_date: row.due_date,
     is_active: row.is_active,
@@ -329,7 +329,8 @@ export const getBookDetailsForQuiz = async (bookId: number) => {
   };
 };
 
-export const generateQuizForBookAsTeacher = async (input: {
+// Step 1: Generate a preview of the quiz (doesn't save to DB)
+export const previewQuizAsTeacher = async (input: {
   classId: number;
   bookId: number;
   quizType: "checkpoint" | "classroom";
@@ -469,20 +470,41 @@ export const generateQuizForBookAsTeacher = async (input: {
     contentSource,
   });
 
-  const quizPayload = aiResult.quiz;
+  return {
+    quiz: aiResult.quiz,
+    contentSource,
+  };
+};
 
-  // Save the quiz to database - teacher-created quizzes are auto-published as 'classroom' type
+// Step 2: Save the confirmed quiz and assign to class
+export const saveAndAssignTeacherQuiz = async (input: {
+  classId: number;
+  bookId: number;
+  quizType: "checkpoint" | "classroom";
+  pageRangeStart?: number;
+  pageRangeEnd?: number;
+  checkpointPage?: number;
+  quizPayload: any;
+}) => {
+  const { user, role } = await requireRole(["TEACHER", "ADMIN"]);
+  const currentUser = await getCurrentUser();
+  const userId = currentUser.userId!;
+
+  // Verify teacher has access to this class
+  await assertCanManageClass(input.classId, user.profileId!, role);
+
+  // Save the quiz to database
   const quizResult = await queryWithContext(
     userId,
     `INSERT INTO quizzes (
       book_id, created_by_id, questions, quiz_type,
-      page_range_start, page_range_end, checkpoint_page, status, is_published
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', true)
+      page_range_start, page_range_end, checkpoint_page
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING id`,
     [
-      book.id,
+      input.bookId,
       user.profileId,
-      JSON.stringify(quizPayload),
+      JSON.stringify(input.quizPayload),
       input.quizType,
       input.pageRangeStart ?? null,
       input.pageRangeEnd ?? null,
@@ -505,12 +527,30 @@ export const generateQuizForBookAsTeacher = async (input: {
     [input.classId, inserted.id, user.profileId]
   );
 
+  // If it's a checkpoint quiz, also create a checkpoint record
+  if (input.quizType === "checkpoint" && input.checkpointPage) {
+    console.log(`[saveAndAssignTeacherQuiz] Registering checkpoint for book ${input.bookId} at page ${input.checkpointPage}`);
+    try {
+      await queryWithContext(
+        userId,
+        `INSERT INTO quiz_checkpoints (
+          book_id, page_number, quiz_id, is_required, created_by_id
+        ) VALUES ($1, $2, $3, $4, $5)`,
+        [input.bookId, input.checkpointPage, inserted.id, true, user.profileId]
+      );
+    } catch (checkpointError) {
+      console.error("Failed to create checkpoint record:", checkpointError);
+      // We still don't fail the whole operation to prevent orphan quizzes, 
+      // but the log will help debugging if it continues.
+    }
+  }
+
   revalidateClassroom(input.classId);
   revalidatePath("/dashboard/library");
+  revalidatePath("/dashboard/student/read/" + input.bookId);
 
   return {
     quizId: inserted.id,
-    questionCount: quizPayload.questions.length,
-    contentSource,
   };
 };
+

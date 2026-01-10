@@ -122,15 +122,13 @@ export const QuizPlayer = ({
                   type="button"
                   onClick={() => handleSelect(questionIndex, optionIndex)}
                   disabled={status === "completed"}
-                  className={`btn-squish rounded-2xl border-4 px-5 py-4 text-left text-lg font-bold transition-all ${
-                    isSelected && status !== "completed"
+                  className={`btn-squish rounded-2xl border-4 px-5 py-4 text-left text-lg font-bold transition-all ${isSelected && status !== "completed"
                       ? "border-yellow-400 bg-yellow-100 text-yellow-900 shadow-lg"
                       : "border-purple-300 bg-white text-purple-900"
-                  } ${isCorrect ? "border-green-400 bg-gradient-to-r from-green-100 to-emerald-100 text-green-700" : ""} ${
-                    isWrong
+                    } ${isCorrect ? "border-green-400 bg-gradient-to-r from-green-100 to-emerald-100 text-green-700" : ""} ${isWrong
                       ? "border-red-400 bg-gradient-to-r from-red-100 to-pink-100 text-red-700"
                       : ""
-                  } ${!isSelected && status !== "completed" ? "hover:border-blue-400 hover:bg-blue-50" : ""} disabled:cursor-default`}
+                    } ${!isSelected && status !== "completed" ? "hover:border-blue-400 hover:bg-blue-50" : ""} disabled:cursor-default`}
                 >
                   <span className="flex items-center gap-3">
                     <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-current font-black">
@@ -147,26 +145,24 @@ export const QuizPlayer = ({
 
           {status === "completed" ? (
             <div
-              className={`mt-5 rounded-2xl border-4 p-4 ${
-                selectedAnswers[questionIndex] === question.answerIndex
+              className={`mt-5 rounded-2xl border-4 p-4 ${selectedAnswers[questionIndex] === question.answerIndex
                   ? "border-green-300 bg-green-50"
                   : "border-yellow-300 bg-yellow-50"
-              }`}
+                }`}
             >
               <p
-                className={`text-base font-bold ${
-                  selectedAnswers[questionIndex] === question.answerIndex
+                className={`text-base font-bold ${selectedAnswers[questionIndex] === question.answerIndex
                     ? "text-green-800"
                     : "text-yellow-800"
-                }`}
+                  }`}
               >
                 💡{" "}
                 {selectedAnswers[questionIndex] === question.answerIndex
                   ? question.correctFeedback ||
-                    question.explanation ||
-                    "Correct! Well done!"
+                  question.explanation ||
+                  "Correct! Well done!"
                   : question.incorrectFeedback ||
-                    `The correct answer is ${answerLabels[question.answerIndex]}.`}
+                  `The correct answer is ${answerLabels[question.answerIndex]}.`}
               </p>
             </div>
           ) : null}
@@ -198,13 +194,25 @@ export const QuizPlayer = ({
         </div>
       ) : null}
 
+      {status === "completed" && score !== null && bookId ? (
+        <button
+          type="button"
+          onClick={() =>
+            router.push(`/dashboard/student/read/${bookId}${returnPage ? `?page=${returnPage}` : ""}`)
+          }
+          className="btn-3d btn-squish mt-4 w-full rounded-3xl border-4 border-green-300 bg-gradient-to-r from-green-400 to-emerald-500 px-8 py-4 text-xl font-black text-white shadow-2xl hover:from-green-500 hover:to-emerald-600"
+        >
+          📖 Continue Reading
+        </button>
+      ) : null}
+
       {status === "completed" && score !== null && classId ? (
         <button
           type="button"
           onClick={() =>
             router.push(`/dashboard/student/classrooms/${classId}`)
           }
-          className="btn-3d btn-squish mt-4 w-full rounded-3xl border-4 border-blue-300 bg-gradient-to-r from-blue-400 to-indigo-500 px-8 py-4 text-xl font-black text-white shadow-2xl hover:from-blue-500 hover:to-indigo-600"
+          className="btn-3d btn-squish mt-2 w-full rounded-3xl border-4 border-blue-300 bg-gradient-to-r from-blue-400 to-indigo-500 px-8 py-4 text-xl font-black text-white shadow-2xl hover:from-blue-500 hover:to-indigo-600"
         >
           ⬅️ Back to classroom
         </button>

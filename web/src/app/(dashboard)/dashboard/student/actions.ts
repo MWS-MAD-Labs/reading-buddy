@@ -236,17 +236,23 @@ export const getPendingCheckpointForPage = async (input: {
   }
 
   // Find the latest required checkpoint at or before the current page
+  // We join with class_quiz_assignments and class_students to ensure we only 
+  // get checkpoints that are actually assigned to this specific student's class.
   const checkpointResult = await queryWithContext(
     user.userId,
-    `SELECT id, page_number, quiz_id, is_required
-     FROM quiz_checkpoints
-     WHERE book_id = $1
-       AND is_required = true
-       AND quiz_id IS NOT NULL
-       AND page_number <= $2
-     ORDER BY page_number DESC
+    `SELECT DISTINCT qc.id, qc.page_number, qc.quiz_id, qc.is_required
+     FROM quiz_checkpoints qc
+     JOIN class_quiz_assignments cqa ON qc.quiz_id = cqa.quiz_id
+     JOIN class_students cs ON cqa.class_id = cs.class_id
+     WHERE qc.book_id = $1
+       AND cs.student_id = $2
+       AND qc.is_required = true
+       AND qc.quiz_id IS NOT NULL
+       AND qc.page_number <= $3
+       AND cqa.is_active = true
+     ORDER BY qc.page_number DESC
      LIMIT 1`,
-    [input.bookId, input.currentPage],
+    [input.bookId, user.profileId, input.currentPage],
   );
 
   if (checkpointResult.rows.length === 0) {
