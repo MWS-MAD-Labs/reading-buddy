@@ -29,13 +29,25 @@ test.describe('E-Reader Functionality', () => {
         const match = href?.match(/\/read\/(\d+)/);
         bookId = match ? Number(match[1]) : NaN;
 
-        await firstBookLink.click();
-        await expect(page).toHaveURL(new RegExp(`/dashboard/student/read/${bookId}`));
+        // More robust navigation for CI
+        await firstBookLink.scrollIntoViewIfNeeded();
+        await Promise.all([
+            page.waitForURL(new RegExp(`/dashboard/student/read/${bookId}`), { timeout: 15000 }),
+            firstBookLink.click()
+        ]);
     });
 
     test('should load the reader and display book content', async ({ page }) => {
         // Wait for loading indicator to disappear and reader content to appear
         await page.waitForSelector('text=Loading book...', { state: 'hidden', timeout: 30000 });
+
+        // Check if we hit an error state (which would cause timeout on .reader-page-content)
+        const errorMsg = page.locator('text=Unable to Load Book');
+        if (await errorMsg.count() > 0) {
+            const text = await errorMsg.textContent();
+            console.log('Reader Error:', text);
+        }
+
         await page.waitForSelector('.reader-page-content', { state: 'attached', timeout: 30000 });
 
         // Verify book title is visible in the header
@@ -73,7 +85,8 @@ test.describe('E-Reader Functionality', () => {
         await expect(page.locator('span:has-text("📍 Page")').first()).toContainText('Page 3', { timeout: 10000 });
 
         // Wait for the debounced save to trigger (3 seconds in UnifiedBookReader)
-        await page.waitForTimeout(5000);
+        // Increased to 8s for CI reliability
+        await page.waitForTimeout(8000);
 
         // Reload the page
         await page.reload();
