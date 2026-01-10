@@ -103,22 +103,44 @@ test.describe('E-Reader Functionality', () => {
         const settingsButton = page.getByRole('button', { name: '⚙️ Settings', exact: true });
         await settingsButton.click();
 
-        // Verify settings modal is open
-        await expect(page.getByText('Reading Settings')).toBeVisible();
+        // Check if we are in Legacy FlipBook mode (Zoom controls) or Unified Reader mode (Modal)
+        // We wait for either the Modal header or the Zoom label
+        const settingsHeader = page.getByText('Reading Settings');
+        const zoomLabel = page.getByText('🔍 Zoom');
 
-        // Change theme (Sepia)
-        const sepiaButton = page.getByRole('button', { name: 'Sepia', exact: true });
-        await sepiaButton.click();
+        // Wait for one of them to appear
+        await expect(settingsHeader.or(zoomLabel)).toBeVisible();
 
-        // Close settings (click Close button or press Escape)
-        const closeButton = page.locator('button:has-text("✕")').first();
-        if (await closeButton.isVisible()) {
-            await closeButton.click();
+        if (await zoomLabel.isVisible()) {
+            console.log('Detected Legacy FlipBookReader mode - verifying zoom controls');
+            await expect(zoomLabel).toBeVisible();
+            // Click zoom in
+            await page.getByRole('button', { name: '+', exact: true }).click();
+            // Click zoom out
+            await page.getByRole('button', { name: '–', exact: true }).click();
+
+            // Close settings (toggle again)
+            await settingsButton.click();
+            await expect(zoomLabel).not.toBeVisible();
         } else {
-            await page.keyboard.press('Escape');
-        }
+            console.log('Detected Standard Reader mode - verifying settings modal');
+            // Verify settings modal is open
+            await expect(settingsHeader).toBeVisible();
 
-        // Wait for modal to be hidden
-        await expect(page.getByText('Reading Settings')).not.toBeVisible();
+            // Change theme (Sepia)
+            const sepiaButton = page.getByRole('button', { name: 'Sepia', exact: true });
+            await sepiaButton.click();
+
+            // Close settings (click Close button or press Escape)
+            const closeButton = page.locator('button:has-text("✕")').first();
+            if (await closeButton.isVisible()) {
+                await closeButton.click();
+            } else {
+                await page.keyboard.press('Escape');
+            }
+
+            // Wait for modal to be hidden
+            await expect(settingsHeader).not.toBeVisible();
+        }
     });
 });

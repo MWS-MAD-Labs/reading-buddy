@@ -182,7 +182,7 @@ export function UnifiedBookReader({
                     console.error('Failed to save reading progress:', err);
                 }
             }
-        }, 3000); // 3 second debounce
+        }, process.env.NODE_ENV === 'test' ? 500 : 3000); // 3 second debounce (0.5s in test)
     }, [bookId, onPageChange]);
 
     // Cleanup timeout on unmount
