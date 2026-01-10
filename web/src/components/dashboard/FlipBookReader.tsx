@@ -482,25 +482,25 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
         )}
 
         <div
-          className={`relative mx-auto ${isFullscreen ? "flex-1 flex items-center justify-center" : "rounded-lg"} ${isMobile && isPortrait && !isFullscreen ? "p-2" : isFullscreen ? "p-0" : "p-4"}`}
+          className={`reader-page-content relative mx-auto ${isFullscreen ? "flex-1 flex items-center justify-center" : "rounded-lg"} ${isMobile && isPortrait && !isFullscreen ? "p-2" : isFullscreen ? "p-0" : "p-4"}`}
           style={
             isFullscreen
               ? {
-                  // Clean white background for fullscreen
-                  background: "white",
-                }
+                // Clean white background for fullscreen
+                background: "white",
+              }
               : isMobile && isPortrait
                 ? {
-                    // Simple background for mobile portrait
-                    background: "transparent",
-                  }
+                  // Simple background for mobile portrait
+                  background: "transparent",
+                }
                 : {
-                    // Book-like background for desktop/landscape
-                    background:
-                      "linear-gradient(to right, #8B4513 0%, #A0522D 2%, transparent 2%, transparent 98%, #A0522D 98%, #8B4513 100%)",
-                    boxShadow:
-                      "0 10px 40px rgba(0,0,0,0.3), inset 0 0 20px rgba(139,69,19,0.2)",
-                  }
+                  // Book-like background for desktop/landscape
+                  background:
+                    "linear-gradient(to right, #8B4513 0%, #A0522D 2%, transparent 2%, transparent 98%, #A0522D 98%, #8B4513 100%)",
+                  boxShadow:
+                    "0 10px 40px rgba(0,0,0,0.3), inset 0 0 20px rgba(139,69,19,0.2)",
+                }
           }
         >
           {/* Book spine effect - only show on desktop/landscape, not in fullscreen */}
@@ -599,11 +599,11 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
                     isFullscreen
                       ? {} // No shadows in fullscreen
                       : {
-                          boxShadow:
-                            pageNumber % 2 === 0
-                              ? "inset 4px 0 8px rgba(0,0,0,0.05)" // Right page shadow
-                              : "inset -4px 0 8px rgba(0,0,0,0.05)", // Left page shadow
-                        }
+                        boxShadow:
+                          pageNumber % 2 === 0
+                            ? "inset 4px 0 8px rgba(0,0,0,0.05)" // Right page shadow
+                            : "inset -4px 0 8px rgba(0,0,0,0.05)", // Left page shadow
+                      }
                   }
                 >
                   {/* Book page content */}

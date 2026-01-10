@@ -54,9 +54,11 @@ async function main() {
                     pdf_url, 
                     cover_url,
                     page_count,
+                    page_images_prefix,
+                    page_images_count,
                     text_extraction_status
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING id, title, file_format
             `, [
                 "Test Book",
@@ -66,7 +68,9 @@ async function main() {
                 "http://localhost/test.pdf",
                 "http://localhost/cover.jpg",
                 10,
-                "completed"
+                "http://localhost/pages/test-book/",  // page images prefix
+                10,  // page images count
+                null  // don't set text_extraction_status to avoid text mode errors
             ]);
             bookResult.rows.push(dummyBook.rows[0]);
             console.log(`✅ Dummy book created: "${dummyBook.rows[0].title}"`);
