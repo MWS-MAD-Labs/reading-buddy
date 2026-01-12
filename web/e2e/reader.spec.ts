@@ -15,13 +15,13 @@ test.describe('E-Reader Functionality', () => {
         // 1. Login
         await loginWithCredentials(page);
 
-        // 2. Find a book to test with (we'll look for one on the dashboard)
-        await page.goto('/dashboard/student');
+        // 2. Go to the Library page where all books are listed
+        await page.goto('/dashboard/library');
 
-        // Wait for the library to load
-        await page.waitForSelector('text=Library');
+        // Wait for the library to load (should see the "Library" header)
+        await page.waitForSelector('h1:has-text("Library")');
 
-        // 1. Click on the first book card to open the modal
+        // 1. Click on the first book card (which is a button in LibraryCollection)
         const firstBookCard = page.locator('ul.grid li button').first();
         await expect(firstBookCard).toBeVisible();
         await firstBookCard.click();
