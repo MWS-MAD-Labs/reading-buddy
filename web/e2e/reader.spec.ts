@@ -21,19 +21,24 @@ test.describe('E-Reader Functionality', () => {
         // Wait for the library to load
         await page.waitForSelector('text=Library');
 
-        // Click on the first book we find
-        const firstBookLink = page.locator('a[href*="/dashboard/student/read/"]').first();
-        await expect(firstBookLink).toBeVisible();
+        // 1. Click on the first book card to open the modal
+        const firstBookCard = page.locator('ul.grid li button').first();
+        await expect(firstBookCard).toBeVisible();
+        await firstBookCard.click();
 
-        const href = await firstBookLink.getAttribute('href');
+        // 2. Click the "Read Book" link inside the modal
+        const readLink = page.locator('a[href*="/dashboard/student/read/"]').first();
+        await expect(readLink).toBeVisible();
+
+        const href = await readLink.getAttribute('href');
         const match = href?.match(/\/read\/(\d+)/);
         bookId = match ? Number(match[1]) : NaN;
 
         // More robust navigation for CI
-        await firstBookLink.scrollIntoViewIfNeeded();
+        await readLink.scrollIntoViewIfNeeded();
         await Promise.all([
             page.waitForURL(new RegExp(`/dashboard/student/read/${bookId}`), { timeout: 15000 }),
-            firstBookLink.click()
+            readLink.click()
         ]);
     });
 

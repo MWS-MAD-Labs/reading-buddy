@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { X, Loader2, MessageSquare, Star, AlertTriangle } from "lucide-react";
 import { StarRating } from "@/components/ui/star-rating";
 import { ReviewCard } from "@/components/dashboard/ReviewCard";
@@ -146,12 +147,13 @@ export function BookDetailsModal({ bookId, onClose, onReadBook }: BookDetailsMod
 
                                 {/* Read button */}
                                 {onReadBook && (
-                                    <button
+                                    <Link
+                                        href={`/dashboard/student/read/${book.id}`}
                                         onClick={() => onReadBook(book.id)}
                                         className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105"
                                     >
                                         📖 Read Book
-                                    </button>
+                                    </Link>
                                 )}
                             </div>
                         </div>
