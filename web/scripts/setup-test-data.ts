@@ -31,9 +31,9 @@ async function main() {
 
         // 2. Ensure profile exists
         await pool.query(`
-      INSERT INTO profiles (id, role, full_name, level, xp)
-      VALUES ($1, 'STUDENT', $2, 1, 0)
-      ON CONFLICT (id) DO NOTHING
+      INSERT INTO profiles (id, user_id, role, full_name, level, xp)
+      VALUES ($1, $1, 'STUDENT', $2, 1, 0)
+      ON CONFLICT (user_id) DO NOTHING
     `, [userId, testName]);
 
         console.log(`✅ Profile ensured for user`);

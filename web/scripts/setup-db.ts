@@ -145,9 +145,9 @@ async function setupDatabase() {
                 SECURITY DEFINER
                 AS $$
                 BEGIN
-                    INSERT INTO public.profiles (id, full_name, role)
-                    VALUES (_user_id, _full_name, _role)
-                    ON CONFLICT (id) DO UPDATE
+                    INSERT INTO public.profiles (id, user_id, full_name, role)
+                    VALUES (_user_id, _user_id, _full_name, _role)
+                    ON CONFLICT (user_id) DO UPDATE
                     SET 
                         full_name = EXCLUDED.full_name,
                         role = CASE 
