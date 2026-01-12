@@ -6,6 +6,23 @@ import dotenv from "dotenv";
 // Load environment variables from .env.local
 dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
 
+function readSqlMigrations(
+    migrationsDir: string,
+    opts?: { only?: (name: string) => boolean }
+): Array<{ name: string; sql: string }> {
+    if (!fs.existsSync(migrationsDir)) return [];
+    const files = fs
+        .readdirSync(migrationsDir)
+        .filter((file) => file.endsWith(".sql"))
+        .filter((file) => (opts?.only ? opts.only(file) : true))
+        .sort((a, b) => a.localeCompare(b));
+
+    return files.map((file) => ({
+        name: file,
+        sql: fs.readFileSync(path.join(migrationsDir, file), "utf8"),
+    }));
+}
+
 async function setupDatabase() {
     console.log("🚀 Starting database setup...");
 
@@ -128,6 +145,19 @@ async function setupDatabase() {
 
             // Execute the SQL
             await client.query(sqlContent);
+
+            // Apply required repo SQL migrations after the base schema, so CI has required tables.
+            const migrationsDir = path.resolve(__dirname, "../../sql/migrations");
+            const migrations = readSqlMigrations(migrationsDir, {
+                only: (name) => name.startsWith("20260112_"),
+            });
+            if (migrations.length > 0) {
+                console.log(`🧱 Applying ${migrations.length} migration(s) from: ${migrationsDir}`);
+                for (const migration of migrations) {
+                    console.log(`➡️  Running migration: ${migration.name}`);
+                    await client.query(migration.sql);
+                }
+            }
 
             // Remove interference from Supabase trigger
             await client.query("DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;");
