@@ -12,14 +12,31 @@ test.describe('E-Reader Functionality', () => {
             }
         });
 
+        test.slow(); // Mark test as slow (triples the timeout) to handle CI latency
+
         // 1. Login
+        console.log('Starting login...');
         await loginWithCredentials(page);
+        console.log('Login complete. Current URL:', page.url());
 
         // 2. Go to the Library page where all books are listed
+        console.log('Navigating to Library...');
         await page.goto('/dashboard/library');
+        console.log('Navigation complete. Current URL:', page.url());
+
+        // Check if we got redirected to login
+        if (page.url().includes('/login')) {
+            throw new Error('Redirected to login page after navigation to library');
+        }
 
         // Wait for the library to load (should see the "Library" header)
-        await page.waitForSelector('h1:has-text("Library")');
+        try {
+            await page.waitForSelector('h1:has-text("Library")', { timeout: 45000 });
+        } catch (e) {
+            console.log('Content on failure:', await page.content());
+            throw e;
+        }
+        console.log('Library page loaded.');
 
         // 1. Click on the first book card (which is a button in LibraryCollection)
         const firstBookCard = page.locator('ul.grid li button').first();
@@ -33,11 +50,12 @@ test.describe('E-Reader Functionality', () => {
         const href = await readLink.getAttribute('href');
         const match = href?.match(/\/read\/(\d+)/);
         bookId = match ? Number(match[1]) : NaN;
+        console.log('Book ID found:', bookId);
 
         // More robust navigation for CI
         await readLink.scrollIntoViewIfNeeded();
         await Promise.all([
-            page.waitForURL(new RegExp(`/dashboard/student/read/${bookId}`), { timeout: 15000 }),
+            page.waitForURL(new RegExp(`/dashboard/student/read/${bookId}`), { timeout: 30000 }),
             readLink.click()
         ]);
     });

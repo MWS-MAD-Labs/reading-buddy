@@ -66,7 +66,7 @@ async function main() {
                 "A book for E2E testing",
                 "pdf",
                 "http://localhost/test.pdf",
-                "http://localhost/cover.jpg",
+                null, // cover_url (null to avoid next/image errors in CI)
                 10,
                 "http://localhost/pages/test-book/",  // page images prefix
                 10,  // page images count
