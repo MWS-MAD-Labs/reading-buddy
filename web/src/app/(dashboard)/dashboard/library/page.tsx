@@ -13,10 +13,14 @@ export default async function LibraryPage() {
   const result = await queryWithContext(
     user.userId!,
     `SELECT
-      id, title, author, cover_url, description,
-      genre, language, publisher, publication_year, created_at
-    FROM books
-    ORDER BY created_at DESC`,
+      b.id, b.title, b.author, b.cover_url, b.description,
+      b.genre, b.language, b.publisher, b.publication_year, b.created_at,
+      COALESCE(AVG(br.rating) FILTER (WHERE br.status = 'APPROVED'), 0) as average_rating,
+      COUNT(br.id) FILTER (WHERE br.status = 'APPROVED') as review_count
+    FROM books b
+    LEFT JOIN book_reviews br ON br.book_id = b.id
+    GROUP BY b.id
+    ORDER BY b.created_at DESC`,
     [],
   );
 
@@ -31,6 +35,8 @@ export default async function LibraryPage() {
     publisher: book.publisher ?? null,
     publicationYear: book.publication_year ?? null,
     createdAt: book.created_at ?? null,
+    averageRating: book.average_rating ? parseFloat(book.average_rating) : null,
+    reviewCount: parseInt(book.review_count) || 0,
   }));
 
   return (

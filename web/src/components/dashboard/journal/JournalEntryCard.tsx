@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Share2, Clock, CheckCircle, XCircle, AlertTriangle, Loader2, Star, MessageSquare } from "lucide-react";
+import { StarRating } from "@/components/ui/star-rating";
 import type { JournalEntry } from "@/app/(dashboard)/dashboard/journal/journal-actions";
 import { deleteJournalEntry } from "@/app/(dashboard)/dashboard/journal/journal-actions";
+import { resubmitReview } from "@/app/(dashboard)/dashboard/library/review-actions";
 import { ShareJournalNoteModal } from "./ShareJournalNoteModal";
-import { Share2 } from "lucide-react";
 
 interface JournalEntryCardProps {
     entry: JournalEntry;
@@ -59,10 +61,18 @@ const entryTypeConfig: Record<
     },
 };
 
-export function JournalEntryCard({ entry }: JournalEntryCardProps) {
+export function JournalEntryCard({ entry: initialEntry }: JournalEntryCardProps) {
+    const [entry, setEntry] = useState(initialEntry);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
+
+    // Review editing state
+    const [isEditingReview, setIsEditingReview] = useState(false);
+    const [editRating, setEditRating] = useState(entry.review_rating || 0);
+    const [editComment, setEditComment] = useState(entry.review_comment || "");
+    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     const config = entryTypeConfig[entry.entry_type] ?? {
         icon: "📋",
@@ -88,12 +98,67 @@ export function JournalEntryCard({ entry }: JournalEntryCardProps) {
         }
     };
 
+    const handleResubmitReview = async () => {
+        if (!entry.review_id || editRating === 0 || editComment.trim().length < 10) {
+            setSubmitError("Please provide a rating and comment (min 10 characters).");
+            return;
+        }
+
+        setIsSubmittingReview(true);
+        setSubmitError(null);
+
+        try {
+            const result = await resubmitReview(entry.review_id, editRating, editComment);
+            if (result.success) {
+                setEntry((prev) => ({
+                    ...prev,
+                    review_rating: editRating,
+                    review_comment: editComment,
+                    review_status: "PENDING",
+                    review_rejection_feedback: null,
+                }));
+                setIsEditingReview(false);
+            } else {
+                setSubmitError(result.error || "Failed to resubmit review");
+            }
+        } catch (error) {
+            setSubmitError("An error occurred. Please try again.");
+        } finally {
+            setIsSubmittingReview(false);
+        }
+    };
+
+    const getStatusBadge = (status: string) => {
+        switch (status) {
+            case "PENDING":
+                return (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                        <Clock className="h-3 w-3" /> Pending Review
+                    </span>
+                );
+            case "APPROVED":
+                return (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700">
+                        <CheckCircle className="h-3 w-3" /> Approved
+                    </span>
+                );
+            case "REJECTED":
+                return (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">
+                        <XCircle className="h-3 w-3" /> Needs Revision
+                    </span>
+                );
+            default:
+                return null;
+        }
+    };
+
     return (
         <div
             className={`relative rounded-2xl border bg-gradient-to-br p-4 shadow-sm transition hover:shadow-md ${config.bgColor} ${config.borderColor}`}
         >
             {/* Timeline dot */}
-            <div className="absolute -left-[2.55rem] top-4 h-3 w-3 rounded-full bg-indigo-400 ring-4 ring-white" />
+            <div className={`absolute -left-[2.55rem] top-4 h-3 w-3 rounded-full ring-4 ring-white ${entry.review_status === 'REJECTED' ? 'bg-red-400' : 'bg-indigo-400'}`} />
 
             {/* Header */}
             <div className="mb-2 flex items-start justify-between gap-2">
@@ -103,7 +168,10 @@ export function JournalEntryCard({ entry }: JournalEntryCardProps) {
                         {config.label}
                     </span>
                 </div>
-                <span className="text-xs text-indigo-400">{time}</span>
+                <div className="flex items-center gap-2">
+                    {entry.review_status && getStatusBadge(entry.review_status)}
+                    <span className="text-xs text-indigo-400">{time}</span>
+                </div>
             </div>
 
             {/* Content */}
@@ -115,6 +183,79 @@ export function JournalEntryCard({ entry }: JournalEntryCardProps) {
                         entry.content
                     )}
                 </p>
+            )}
+
+            {/* Finished Book Review Section */}
+            {entry.entry_type === "finished_book" && entry.review_status && (
+                <div className="mb-3 rounded-xl bg-white/60 p-3">
+                    {/* Rejection Feedback */}
+                    {entry.review_status === "REJECTED" && entry.review_rejection_feedback && !isEditingReview && (
+                        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3">
+                            <div className="mb-1 flex items-center gap-1.5 text-xs font-bold text-red-700">
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                                Librarian Feedback
+                            </div>
+                            <p className="mb-2 text-xs text-red-600">{entry.review_rejection_feedback}</p>
+                            <button
+                                onClick={() => {
+                                    setIsEditingReview(true);
+                                    setEditRating(entry.review_rating || 0);
+                                    setEditComment(entry.review_comment || "");
+                                    setSubmitError(null);
+                                }}
+                                className="text-xs font-bold text-red-600 underline hover:text-red-700"
+                            >
+                                Revise Review
+                            </button>
+                        </div>
+                    )}
+
+                    {isEditingReview ? (
+                        <div className="space-y-3">
+                            <div>
+                                <label className="mb-1 block text-xs font-bold text-indigo-700">Rating</label>
+                                <StarRating value={editRating} onChange={setEditRating} size="md" />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-xs font-bold text-indigo-700">Comment (min 10 chars)</label>
+                                <textarea
+                                    value={editComment}
+                                    onChange={(e) => setEditComment(e.target.value)}
+                                    className="w-full rounded-lg border border-indigo-200 p-2 text-sm focus:border-indigo-400 focus:outline-none"
+                                    rows={3}
+                                />
+                            </div>
+                            {submitError && <p className="text-xs font-bold text-red-600">{submitError}</p>}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => handleResubmitReview()}
+                                    disabled={isSubmittingReview || editRating === 0 || editComment.trim().length < 10}
+                                    className="rounded-full bg-indigo-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-600 disabled:opacity-50"
+                                >
+                                    {isSubmittingReview ? <Loader2 className="h-3 w-3 animate-spin" /> : "Submit Revision"}
+                                </button>
+                                <button
+                                    onClick={() => setIsEditingReview(false)}
+                                    className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div>
+                            <div className="mb-2 flex items-center gap-2">
+                                <StarRating value={entry.review_rating || 0} size="sm" readonly />
+                            </div>
+                            {entry.review_comment && (
+                                <div className="flex gap-2">
+                                    <MessageSquare className="mt-0.5 h-3 w-3 shrink-0 text-indigo-400" />
+                                    <p className="text-sm text-gray-600 italic">&ldquo;{entry.review_comment}&rdquo;</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* Reading session details */}

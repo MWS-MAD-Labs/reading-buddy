@@ -32,6 +32,12 @@ export interface JournalEntry {
     book_title?: string;
     book_author?: string;
     book_cover_url?: string;
+    // Review data (for finished_book entries)
+    review_id?: string | null;
+    review_rating?: number | null;
+    review_comment?: string | null;
+    review_status?: "PENDING" | "APPROVED" | "REJECTED" | null;
+    review_rejection_feedback?: string | null;
 }
 
 export interface BookJournal {
@@ -88,7 +94,7 @@ export async function getJournalEntries(options?: {
     );
     const total = parseInt(countResult.rows[0]?.total ?? "0", 10);
 
-    // Get entries with book info
+    // Get entries with book info and review data for finished_book entries
     params.push(limit, offset);
     const result = await queryWithContext(
         user.userId,
@@ -96,9 +102,15 @@ export async function getJournalEntries(options?: {
       je.*,
       b.title as book_title,
       b.author as book_author,
-      b.cover_url as book_cover_url
+      b.cover_url as book_cover_url,
+      br.id as review_id,
+      br.rating as review_rating,
+      br.comment as review_comment,
+      br.status as review_status,
+      br.rejection_feedback as review_rejection_feedback
     FROM journal_entries je
     LEFT JOIN books b ON je.book_id = b.id
+    LEFT JOIN book_reviews br ON je.book_id = br.book_id AND je.student_id = br.student_id AND je.entry_type = 'finished_book'
     ${whereClause}
     ORDER BY je.created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,

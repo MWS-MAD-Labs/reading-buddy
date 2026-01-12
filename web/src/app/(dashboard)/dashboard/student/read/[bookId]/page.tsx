@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { queryWithContext } from "@/lib/db";
-import { UnifiedBookReader } from "@/components/dashboard/UnifiedBookReader";
+import { ReaderWithRatingPrompt } from "@/components/dashboard/ReaderWithRatingPrompt";
 import { buildPublicPrefixUrl, normalizeMinioUrl } from "@/lib/minioUtils";
 
 export const dynamic = "force-dynamic";
@@ -85,7 +85,7 @@ export default async function StudentReadPage({
         <h1 className="text-2xl font-black text-blue-900">{book.title}</h1>
         <p className="text-sm font-bold text-blue-700">by {book.author}</p>
       </div>
-      <UnifiedBookReader
+      <ReaderWithRatingPrompt
         bookId={book.id}
         bookTitle={book.title}
         pdfUrl={book.pdf_url}
@@ -95,6 +95,7 @@ export default async function StudentReadPage({
         textJsonUrl={book.text_json_url}
         textExtractionStatus={book.text_extraction_status}
         fileFormat={book.file_format || "pdf"}
+        totalPages={book.page_count}
       />
     </div>
   );

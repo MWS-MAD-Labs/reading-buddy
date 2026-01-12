@@ -71,6 +71,7 @@ type UnifiedBookReaderProps = {
     fileFormat?: "pdf" | "epub";
     onPageChange?: (pageNumber: number) => void;
     onComplete?: () => void;
+    showFinishButton?: boolean;
 };
 
 type ReaderMode = "text" | "epub" | "images" | "error" | "loading";
@@ -87,8 +88,8 @@ export function UnifiedBookReader({
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     fileFormat = "pdf",
     onPageChange,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     onComplete,
+    showFinishButton = false,
 }: UnifiedBookReaderProps) {
     const router = useRouter();
     const [readerMode, setReaderMode] = useState<ReaderMode>("loading");
@@ -96,6 +97,9 @@ export function UnifiedBookReader({
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(typeof initialPage === 'string' ? parseInt(initialPage, 10) : (initialPage || 0));
     const [isNotesPanelOpen, setIsNotesPanelOpen] = useState(false);
+    const [totalPageCount, setTotalPageCount] = useState<number | null>(null);
+
+    // Show finish button based on prop from parent (which controls timing)
 
     // Determine reader mode based on available data
     useEffect(() => {
@@ -125,6 +129,7 @@ export function UnifiedBookReader({
                     }
 
                     setTextContent(json);
+                    setTotalPageCount(json.totalPages);
                     setReaderMode("text");
                     return;
                 } catch (err) {
@@ -152,6 +157,7 @@ export function UnifiedBookReader({
             // Priority 5: No text yet, but has images - use legacy FlipBookReader
             // This handles existing books during migration
             if (pageImages && pageImages.count > 0) {
+                setTotalPageCount(pageImages.count);
                 setReaderMode("images");
                 return;
             }
@@ -283,6 +289,14 @@ export function UnifiedBookReader({
                         >
                             📝 Notes
                         </button>
+                        {showFinishButton && onComplete && (
+                            <button
+                                onClick={onComplete}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105 animate-pulse"
+                            >
+                                ✅ Finish Reading
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -309,6 +323,7 @@ export function UnifiedBookReader({
                     onPageChange={handlePageChange}
                     onTotalPages={(count) => {
                         console.log("📚 Reader reported total pages:", count);
+                        setTotalPageCount(count);
                         updateBookTotalPages(bookId, count).catch(console.error);
                     }}
                 />
@@ -334,6 +349,14 @@ export function UnifiedBookReader({
                         >
                             📝 Notes
                         </button>
+                        {showFinishButton && onComplete && (
+                            <button
+                                onClick={onComplete}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105 animate-pulse"
+                            >
+                                ✅ Finish Reading
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -380,6 +403,14 @@ export function UnifiedBookReader({
                         >
                             📝 Notes
                         </button>
+                        {showFinishButton && onComplete && (
+                            <button
+                                onClick={onComplete}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105 animate-pulse"
+                            >
+                                ✅ Finish Reading
+                            </button>
+                        )}
                     </div>
                 </div>
 

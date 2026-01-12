@@ -129,6 +129,15 @@ export default async function LibrarianPage() {
           >
             <span>Manage Book Badges</span>
           </Link>
+          <Link
+            href="/dashboard/librarian/reviews"
+            className={cn(
+              buttonVariants({ variant: "secondary", size: "md" }),
+              "no-underline",
+            )}
+          >
+            <span>📝 Moderate Reviews</span>
+          </Link>
         </CardContent>
       </Card>
 
