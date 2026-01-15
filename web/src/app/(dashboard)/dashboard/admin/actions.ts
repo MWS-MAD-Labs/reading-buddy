@@ -20,22 +20,53 @@ interface TransactionClient {
 
 export async function addUser(params: AddUserParams): Promise<void> {
   await transaction(async (client: TransactionClient) => {
-    // Hash password
-    const passwordHash = await bcrypt.hash(params.password, 10);
-
-    // Create user
-    const userResult = await client.query(
-      "INSERT INTO users (email, password_hash, name) VALUES ($1, $2, $3) RETURNING id",
-      [params.email, passwordHash, params.fullName],
+    // Check if user already exists (but might be missing profile)
+    const existingUser = await client.query(
+      "SELECT id FROM users WHERE email = $1",
+      [params.email],
     );
 
-    const userId = userResult.rows[0].id;
+    let userId: string;
 
-    // Create profile
+    if (existingUser.rows.length > 0) {
+      // User exists, check if they have a profile
+      userId = existingUser.rows[0].id as string;
+      const existingProfile = await client.query(
+        "SELECT id FROM profiles WHERE id = $1",
+        [userId],
+      );
+
+      if (existingProfile.rows.length > 0) {
+        // Both user and profile exist - this is a true duplicate
+        throw new Error(
+          `User with email ${params.email} already exists. Use edit function to update their details.`,
+        );
+      }
+
+      // User exists but profile doesn't - update the user and create profile
+      console.log(
+        `User ${params.email} exists without profile. Creating missing profile...`,
+      );
+      const passwordHash = await bcrypt.hash(params.password, 10);
+      await client.query(
+        "UPDATE users SET password_hash = $1, name = $2, updated_at = NOW() WHERE id = $3",
+        [passwordHash, params.fullName, userId],
+      );
+    } else {
+      // New user - create user record
+      const passwordHash = await bcrypt.hash(params.password, 10);
+      const userResult = await client.query(
+        "INSERT INTO users (email, password_hash, name) VALUES ($1, $2, $3) RETURNING id",
+        [params.email, passwordHash, params.fullName],
+      );
+      userId = userResult.rows[0].id as string;
+    }
+
+    // Create profile (id = user id for direct reference)
     await client.query(
-      `INSERT INTO profiles (user_id, email, full_name, role, access_level, xp, level, reading_streak, longest_streak)
-       VALUES ($1, $2, $3, $4, $5, 0, 1, 0, 0)`,
-      [userId, params.email, params.fullName, params.role, params.accessLevel],
+      `INSERT INTO profiles (id, full_name, role, access_level, xp, level, reading_streak, longest_streak)
+       VALUES ($1, $2, $3, $4, 0, 1, 0, 0)`,
+      [userId, params.fullName, params.role, params.accessLevel],
     );
   });
 }
