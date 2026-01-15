@@ -1,6 +1,6 @@
 "use server";
 
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { queryWithContext } from "@/lib/db";
 import { getWeeklyChallengeProgress } from "@/lib/weekly-challenges";
 import { checkAndAwardChallengeXP } from "@/lib/weekly-challenge-tracking";
 import { revalidatePath } from "next/cache";
@@ -20,16 +20,24 @@ export async function getWeeklyChallenge(
   userId: string,
 ): Promise<{ success: boolean; data?: WeeklyChallengeData; error?: string }> {
   try {
-    const supabase = getSupabaseAdminClient();
-    if (!supabase) {
-      return { success: false, error: "Database connection not available" };
+    // 1. Get profile ID
+    const profileResult = await queryWithContext(
+      userId,
+      `SELECT id FROM profiles WHERE user_id = $1`,
+      [userId]
+    );
+    const profileId = profileResult.rows[0]?.id;
+
+    if (!profileId) {
+      return { success: false, error: "Profile not found" };
     }
 
-    const result = await getWeeklyChallengeProgress(supabase, userId);
+    // 2. Get challenge progress
+    const result = await getWeeklyChallengeProgress(userId, profileId);
 
     // Auto-check and award XP if challenge is completed
     if (result.isCompleted) {
-      const awardResult = await checkAndAwardChallengeXP(supabase, userId);
+      const awardResult = await checkAndAwardChallengeXP(userId, profileId);
       if (awardResult.awarded) {
         revalidatePath("/dashboard/student");
         revalidatePath("/dashboard");

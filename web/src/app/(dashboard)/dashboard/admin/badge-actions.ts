@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getSession } from "@/lib/auth/server";
+import { query } from "@/lib/db";
 import { getMinioClient, getMinioBucketName } from "@/lib/minio";
 import {
   buildPublicObjectUrl,
@@ -30,29 +30,21 @@ interface UserWithRole {
 }
 
 async function getUserWithRole(): Promise<UserWithRole> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session?.user) {
     throw new Error("You must be signed in.");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) {
+  const role = session.user.role as UserRole | undefined;
+  if (!role) {
     throw new Error("Profile not found.");
   }
 
   return {
-    id: user.id,
-    email: user.email || "",
-    role: profile.role as UserRole,
+    id: session.user.id!,
+    email: session.user.email || "",
+    role: role,
   };
 }
 
@@ -88,25 +80,56 @@ export interface BadgeWithBook extends Badge {
   } | null;
 }
 
+interface BadgeRow {
+  id: string;
+  name: string;
+  description: string | null;
+  icon_url: string | null;
+  xp_reward: number;
+  badge_type: string;
+  tier: string;
+  category: string;
+  criteria: Record<string, unknown>;
+  book_id: number | null;
+  is_active: boolean;
+  display_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  book_title?: string | null;
+  book_author?: string | null;
+}
+
+function mapRowToBadge(row: BadgeRow): Badge {
+  return {
+    ...row,
+    badge_type: row.badge_type as BadgeType,
+    tier: row.tier as BadgeTier,
+    category: row.category as BadgeCategory,
+    criteria: row.criteria as unknown as BadgeCriteria,
+  };
+}
+
 export async function getAllBadges(): Promise<BadgeWithBook[]> {
   await requireAdminOrLibrarian();
 
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    throw new Error("Database connection not available.");
-  }
+  const result = await query<BadgeRow>(
+    `SELECT b.*, 
+            bk.title as book_title, 
+            bk.author as book_author
+     FROM badges b
+     LEFT JOIN books bk ON b.book_id = bk.id
+     ORDER BY b.display_order ASC`
+  );
 
-  const { data, error } = await supabaseAdmin
-    .from("badges")
-    .select("*, book:books(id, title, author)")
-    .order("display_order", { ascending: true });
-
-  if (error) {
-    console.error("Failed to fetch badges:", error);
-    throw new Error("Failed to fetch badges.");
-  }
-
-  return (data ?? []) as BadgeWithBook[];
+  return result.rows.map((row) => ({
+    ...mapRowToBadge(row),
+    book: row.book_id ? {
+      id: row.book_id,
+      title: row.book_title || "",
+      author: row.book_author || "",
+    } : null,
+  })) as BadgeWithBook[];
 }
 
 // ============================================================================
@@ -116,23 +139,12 @@ export async function getAllBadges(): Promise<BadgeWithBook[]> {
 export async function getBadgesForBook(bookId: number): Promise<Badge[]> {
   await requireAdminOrLibrarian();
 
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    throw new Error("Database connection not available.");
-  }
+  const result = await query<BadgeRow>(
+    `SELECT * FROM badges WHERE book_id = $1 ORDER BY created_at DESC`,
+    [bookId]
+  );
 
-  const { data, error } = await supabaseAdmin
-    .from("badges")
-    .select("*")
-    .eq("book_id", bookId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Failed to fetch book badges:", error);
-    throw new Error("Failed to fetch book badges.");
-  }
-
-  return (data ?? []) as Badge[];
+  return result.rows.map(row => mapRowToBadge(row));
 }
 
 // ============================================================================
@@ -154,10 +166,6 @@ export interface CreateBadgeInput {
 
 export async function createBadge(input: CreateBadgeInput): Promise<Badge> {
   const user = await requireAdminOrLibrarian();
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    throw new Error("Database connection not available.");
-  }
 
   // Validate required fields
   if (!input.name?.trim()) {
@@ -183,49 +191,45 @@ export async function createBadge(input: CreateBadgeInput): Promise<Badge> {
   // Get max display_order if not provided
   let displayOrder = input.display_order;
   if (displayOrder === undefined) {
-    const { data: maxOrder } = await supabaseAdmin
-      .from("badges")
-      .select("display_order")
-      .order("display_order", { ascending: false })
-      .limit(1)
-      .single();
-
-    displayOrder = (maxOrder?.display_order ?? 0) + 1;
+    const maxOrderResult = await query<{ display_order: number }>(
+      `SELECT display_order FROM badges ORDER BY display_order DESC LIMIT 1`
+    );
+    displayOrder = (maxOrderResult.rows[0]?.display_order ?? 0) + 1;
   }
 
-  const { data, error } = await supabaseAdmin
-    .from("badges")
-    .insert({
-      name: input.name.trim(),
-      description: input.description?.trim() || null,
-      badge_type: input.badge_type,
-      criteria: input.criteria,
-      tier: input.tier || "bronze",
-      xp_reward: input.xp_reward || 50,
-      category: input.category || "general",
-      icon_url: input.icon_url || null,
-      book_id: input.book_id || null,
-      display_order: displayOrder,
-      created_by: user.id,
-      is_active: true,
-    })
-    .select()
-    .single();
+  try {
+    const result = await query<BadgeRow>(
+      `INSERT INTO badges (name, description, badge_type, criteria, tier, xp_reward, category, icon_url, book_id, display_order, created_by, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true)
+       RETURNING *`,
+      [
+        input.name.trim(),
+        input.description?.trim() || null,
+        input.badge_type,
+        JSON.stringify(input.criteria),
+        input.tier || "bronze",
+        input.xp_reward || 50,
+        input.category || "general",
+        input.icon_url || null,
+        input.book_id || null,
+        displayOrder,
+        user.id,
+      ]
+    );
 
-  if (error) {
+    revalidatePath("/dashboard/admin");
+    revalidatePath("/dashboard/admin/badges");
+    revalidatePath("/dashboard/librarian");
+    revalidatePath("/dashboard/student/badges");
+
+    return mapRowToBadge(result.rows[0]);
+  } catch (error: any) {
     console.error("Failed to create badge:", error);
     if (error.code === "23505") {
       throw new Error("A badge with this name already exists.");
     }
     throw new Error("Failed to create badge.");
   }
-
-  revalidatePath("/dashboard/admin");
-  revalidatePath("/dashboard/admin/badges");
-  revalidatePath("/dashboard/librarian");
-  revalidatePath("/dashboard/student/badges");
-
-  return data as Badge;
 }
 
 // ============================================================================
@@ -249,23 +253,19 @@ export interface UpdateBadgeInput {
 
 export async function updateBadge(input: UpdateBadgeInput): Promise<Badge> {
   const user = await requireAdminOrLibrarian();
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    throw new Error("Database connection not available.");
-  }
 
   if (!input.id) {
     throw new Error("Badge ID is required.");
   }
 
   // Get the existing badge to check permissions
-  const { data: existingBadge, error: fetchError } = await supabaseAdmin
-    .from("badges")
-    .select("*")
-    .eq("id", input.id)
-    .single();
+  const existingResult = await query<BadgeRow>(
+    `SELECT * FROM badges WHERE id = $1`,
+    [input.id]
+  );
 
-  if (fetchError || !existingBadge) {
+  const existingBadge = existingResult.rows[0];
+  if (!existingBadge) {
     throw new Error("Badge not found.");
   }
 
@@ -294,45 +294,77 @@ export async function updateBadge(input: UpdateBadgeInput): Promise<Badge> {
   }
 
   // Build update object with only provided fields
-  const updates: Record<string, unknown> = {};
+  const updates: string[] = [];
+  const params: any[] = [];
+  let paramIndex = 1;
 
-  if (input.name !== undefined) updates.name = input.name.trim();
-  if (input.description !== undefined)
-    updates.description = input.description?.trim() || null;
-  if (input.badge_type !== undefined) updates.badge_type = input.badge_type;
-  if (input.criteria !== undefined) updates.criteria = input.criteria;
-  if (input.tier !== undefined) updates.tier = input.tier;
-  if (input.xp_reward !== undefined) updates.xp_reward = input.xp_reward;
-  if (input.category !== undefined) updates.category = input.category;
-  if (input.icon_url !== undefined) updates.icon_url = input.icon_url || null;
-  if (input.book_id !== undefined) updates.book_id = input.book_id;
-  if (input.display_order !== undefined)
-    updates.display_order = input.display_order;
-  if (input.is_active !== undefined) updates.is_active = input.is_active;
+  if (input.name !== undefined) {
+    updates.push(`name = $${paramIndex++}`);
+    params.push(input.name.trim());
+  }
+  if (input.description !== undefined) {
+    updates.push(`description = $${paramIndex++}`);
+    params.push(input.description?.trim() || null);
+  }
+  if (input.badge_type !== undefined) {
+    updates.push(`badge_type = $${paramIndex++}`);
+    params.push(input.badge_type);
+  }
+  if (input.criteria !== undefined) {
+    updates.push(`criteria = $${paramIndex++}`);
+    params.push(JSON.stringify(input.criteria));
+  }
+  if (input.tier !== undefined) {
+    updates.push(`tier = $${paramIndex++}`);
+    params.push(input.tier);
+  }
+  if (input.xp_reward !== undefined) {
+    updates.push(`xp_reward = $${paramIndex++}`);
+    params.push(input.xp_reward);
+  }
+  if (input.category !== undefined) {
+    updates.push(`category = $${paramIndex++}`);
+    params.push(input.category);
+  }
+  if (input.icon_url !== undefined) {
+    updates.push(`icon_url = $${paramIndex++}`);
+    params.push(input.icon_url || null);
+  }
+  if (input.book_id !== undefined) {
+    updates.push(`book_id = $${paramIndex++}`);
+    params.push(input.book_id);
+  }
+  if (input.display_order !== undefined) {
+    updates.push(`display_order = $${paramIndex++}`);
+    params.push(input.display_order);
+  }
+  if (input.is_active !== undefined) {
+    updates.push(`is_active = $${paramIndex++}`);
+    params.push(input.is_active);
+  }
 
-  updates.updated_at = new Date().toISOString();
+  updates.push(`updated_at = NOW()`);
+  params.push(input.id);
 
-  const { data, error } = await supabaseAdmin
-    .from("badges")
-    .update(updates)
-    .eq("id", input.id)
-    .select()
-    .single();
+  try {
+    const result = await query<BadgeRow>(
+      `UPDATE badges SET ${updates.join(", ")} WHERE id = $${paramIndex} RETURNING *`,
+      params
+    );
 
-  if (error) {
+    revalidatePath("/dashboard/admin");
+    revalidatePath("/dashboard/admin/badges");
+    revalidatePath("/dashboard/librarian");
+    revalidatePath("/dashboard/student/badges");
+
+    return mapRowToBadge(result.rows[0]);
+  } catch (error: any) {
     console.error("Failed to update badge:", error);
     if (error.code === "23505") {
       throw new Error("A badge with this name already exists.");
     }
     throw new Error("Failed to update badge.");
   }
-
-  revalidatePath("/dashboard/admin");
-  revalidatePath("/dashboard/admin/badges");
-  revalidatePath("/dashboard/librarian");
-  revalidatePath("/dashboard/student/badges");
-
-  return data as Badge;
 }
 
 // ============================================================================
@@ -343,22 +375,18 @@ export async function deleteBadge(
   badgeId: string,
 ): Promise<{ success: boolean }> {
   const user = await requireAdminOrLibrarian();
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    throw new Error("Database connection not available.");
-  }
 
   if (!badgeId) {
     throw new Error("Badge ID is required.");
   }
 
   // Get the badge details
-  const { data: badge } = await supabaseAdmin
-    .from("badges")
-    .select("*")
-    .eq("id", badgeId)
-    .single();
+  const badgeResult = await query<BadgeRow>(
+    `SELECT * FROM badges WHERE id = $1`,
+    [badgeId]
+  );
 
+  const badge = badgeResult.rows[0];
   if (!badge) {
     throw new Error("Badge not found.");
   }
@@ -384,15 +412,7 @@ export async function deleteBadge(
   }
 
   // Delete the badge
-  const { error } = await supabaseAdmin
-    .from("badges")
-    .delete()
-    .eq("id", badgeId);
-
-  if (error) {
-    console.error("Failed to delete badge:", error);
-    throw new Error("Failed to delete badge.");
-  }
+  await query(`DELETE FROM badges WHERE id = $1`, [badgeId]);
 
   revalidatePath("/dashboard/admin");
   revalidatePath("/dashboard/admin/badges");
@@ -425,19 +445,14 @@ export async function createBookCompletionBadge(input: {
   xp_reward?: number;
   icon_url?: string;
 }): Promise<Badge> {
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    throw new Error("Database connection not available.");
-  }
-
   // Get book details for default name/description
-  const { data: book, error: bookError } = await supabaseAdmin
-    .from("books")
-    .select("id, title, author")
-    .eq("id", input.bookId)
-    .single();
+  const bookResult = await query<{ id: number; title: string; author: string }>(
+    `SELECT id, title, author FROM books WHERE id = $1`,
+    [input.bookId]
+  );
 
-  if (bookError || !book) {
+  const book = bookResult.rows[0];
+  if (!book) {
     throw new Error("Book not found.");
   }
 
@@ -466,22 +481,12 @@ export async function getBooksForBadgeAssignment(): Promise<
   Array<{ id: number; title: string; author: string }>
 > {
   await requireAdminOrLibrarian();
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    throw new Error("Database connection not available.");
-  }
 
-  const { data, error } = await supabaseAdmin
-    .from("books")
-    .select("id, title, author")
-    .order("title", { ascending: true });
+  const result = await query<{ id: number; title: string; author: string }>(
+    `SELECT id, title, author FROM books ORDER BY title ASC`
+  );
 
-  if (error) {
-    console.error("Failed to fetch books:", error);
-    throw new Error("Failed to fetch books.");
-  }
-
-  return data ?? [];
+  return result.rows;
 }
 
 // ============================================================================
@@ -492,22 +497,13 @@ export async function reorderBadges(
   badgeOrders: Array<{ id: string; display_order: number }>,
 ): Promise<{ success: boolean }> {
   await requireAdminOrLibrarian();
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    throw new Error("Database connection not available.");
-  }
 
   // Update each badge's display_order
   for (const { id, display_order } of badgeOrders) {
-    const { error } = await supabaseAdmin
-      .from("badges")
-      .update({ display_order })
-      .eq("id", id);
-
-    if (error) {
-      console.error("Failed to reorder badge:", error);
-      throw new Error("Failed to reorder badges.");
-    }
+    await query(
+      `UPDATE badges SET display_order = $1 WHERE id = $2`,
+      [display_order, id]
+    );
   }
 
   revalidatePath("/dashboard/admin/badges");

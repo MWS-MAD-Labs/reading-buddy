@@ -123,9 +123,7 @@ async function verifyMobiStructure(
 
     // Check for MOBI signatures
     if (signature.startsWith("BOOKMOBI") || signature.startsWith("TEXTMOBI")) {
-      // Check compression type at offset 0xC to distinguish formats
-      const compressionBytes = await readBytesAtOffset(file, 0x0c, 2);
-      const compression = (compressionBytes[0] << 8) | compressionBytes[1];
+
 
       // AZW3 typically has MOBI version 8, but we'll treat all as compatible
       // The file extension will help us distinguish

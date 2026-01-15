@@ -4,7 +4,7 @@
  * Handles checking and awarding XP for completed weekly challenges
  */
 
-import { SupabaseClient } from "@supabase/supabase-js";
+import { queryWithContext } from "@/lib/db";
 import { getWeeklyChallengeProgress } from "./weekly-challenges";
 import { awardXP } from "./gamification";
 
@@ -35,22 +35,23 @@ function getWeekInfo(date: Date = new Date()): {
  * Check if a challenge has already been completed this week
  */
 export async function hasCompletedChallengeThisWeek(
-  supabase: SupabaseClient,
-  userId: string,
+  authUserId: string,
+  studentId: string,
   challengeId: string,
 ): Promise<boolean> {
   const { weekNumber, year } = getWeekInfo();
 
-  const { data, error } = await supabase
-    .from("weekly_challenge_completions")
-    .select("id")
-    .eq("student_id", userId)
-    .eq("challenge_id", challengeId)
-    .eq("week_number", weekNumber)
-    .eq("year", year)
-    .single();
+  const result = await queryWithContext(
+    authUserId,
+    `SELECT id FROM weekly_challenge_completions
+     WHERE student_id = $1
+       AND challenge_id = $2
+       AND week_number = $3
+       AND year = $4`,
+    [studentId, challengeId, weekNumber, year],
+  );
 
-  return !!data && !error;
+  return result.rows.length > 0;
 }
 
 /**
@@ -58,14 +59,14 @@ export async function hasCompletedChallengeThisWeek(
  * Returns true if XP was awarded, false if already awarded or not yet completed
  */
 export async function checkAndAwardChallengeXP(
-  supabase: SupabaseClient,
-  userId: string,
+  authUserId: string,
+  studentId: string,
 ): Promise<{ awarded: boolean; xpAmount?: number }> {
   try {
     // Get current challenge and progress
     const { challenge, isCompleted } = await getWeeklyChallengeProgress(
-      supabase,
-      userId,
+      authUserId,
+      studentId,
     );
 
     if (!isCompleted) {
@@ -74,8 +75,8 @@ export async function checkAndAwardChallengeXP(
 
     // Check if already awarded this week
     const alreadyCompleted = await hasCompletedChallengeThisWeek(
-      supabase,
-      userId,
+      authUserId,
+      studentId,
       challenge.id,
     );
 
@@ -87,8 +88,8 @@ export async function checkAndAwardChallengeXP(
     const { weekNumber, year } = getWeekInfo();
 
     await awardXP(
-      userId,
-      userId,
+      authUserId,
+      studentId,
       challenge.xpReward,
       "challenge_completed",
       `weekly_challenge_${challenge.id}`,
@@ -96,13 +97,13 @@ export async function checkAndAwardChallengeXP(
     );
 
     // Record completion
-    await supabase.from("weekly_challenge_completions").insert({
-      student_id: userId,
-      challenge_id: challenge.id,
-      week_number: weekNumber,
-      year: year,
-      xp_awarded: challenge.xpReward,
-    });
+    await queryWithContext(
+      authUserId,
+      `INSERT INTO weekly_challenge_completions
+       (student_id, challenge_id, week_number, year, xp_awarded)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [studentId, challenge.id, weekNumber, year, challenge.xpReward],
+    );
 
     return { awarded: true, xpAmount: challenge.xpReward };
   } catch (error) {
@@ -115,41 +116,46 @@ export async function checkAndAwardChallengeXP(
  * Get all challenge completions for a user
  */
 export async function getUserChallengeCompletions(
-  supabase: SupabaseClient,
-  userId: string,
+  authUserId: string,
+  studentId: string,
   limit: number = 10,
 ) {
-  const { data, error } = await supabase
-    .from("weekly_challenge_completions")
-    .select("*")
-    .eq("student_id", userId)
-    .order("completed_at", { ascending: false })
-    .limit(limit);
+  try {
+    const result = await queryWithContext(
+      authUserId,
+      `SELECT * FROM weekly_challenge_completions
+       WHERE student_id = $1
+       ORDER BY completed_at DESC
+       LIMIT $2`,
+      [studentId, limit],
+    );
 
-  if (error) {
+    return result.rows || [];
+  } catch (error) {
     console.error("Error fetching challenge completions:", error);
     return [];
   }
-
-  return data || [];
 }
 
 /**
  * Get total XP earned from challenges
  */
 export async function getTotalChallengeXP(
-  supabase: SupabaseClient,
-  userId: string,
+  authUserId: string,
+  studentId: string,
 ): Promise<number> {
-  const { data, error } = await supabase
-    .from("weekly_challenge_completions")
-    .select("xp_awarded")
-    .eq("student_id", userId);
+  try {
+    const result = await queryWithContext(
+      authUserId,
+      `SELECT SUM(xp_awarded) as total
+       FROM weekly_challenge_completions
+       WHERE student_id = $1`,
+      [studentId],
+    );
 
-  if (error) {
+    return parseInt(result.rows[0]?.total || "0");
+  } catch (error) {
     console.error("Error fetching total challenge XP:", error);
     return 0;
   }
-
-  return data?.reduce((sum, completion) => sum + completion.xp_awarded, 0) || 0;
 }

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/server";
 import {
   getBadgesWithProgress,
   getGamificationStats,
@@ -20,17 +20,14 @@ const categoryLabels: Record<BadgeCategory, { label: string }> = {
 };
 
 export default async function BadgesPage() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.profileId) {
     redirect("/login");
   }
 
-  const stats = await getGamificationStats(user.id, user.id);
-  const badgesWithProgress = await getBadgesWithProgress(user.id, user.id);
+  const stats = await getGamificationStats(user.userId!, user.profileId);
+  const badgesWithProgress = await getBadgesWithProgress(user.userId!, user.profileId);
 
   // Group badges by category
   const badgesByCategory = badgesWithProgress.reduce(

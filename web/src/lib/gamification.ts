@@ -67,6 +67,24 @@ export async function awardXP(
 
   const row = result.rows[0];
 
+  // Log level up to journal
+  if (row.level_up) {
+    try {
+      await queryWithContext(
+        userId,
+        `INSERT INTO journal_entries (student_id, entry_type, content, metadata)
+         VALUES ($1, 'achievement', $2, $3)`,
+        [
+          studentId,
+          `Reached Level ${row.new_level}! 🎉`,
+          JSON.stringify({ type: "level_up", level: row.new_level }),
+        ],
+      );
+    } catch (err) {
+      console.error("Failed to log level up to journal:", err);
+    }
+  }
+
   return {
     newXp: row.new_xp,
     newLevel: row.new_level,
@@ -74,6 +92,7 @@ export async function awardXP(
     xpAwarded: amount,
   };
 }
+
 
 // ============================================================================
 // Streak Functions (using database functions)
@@ -230,6 +249,28 @@ export async function evaluateBadges(
         );
 
         newBadges.push(badge as Badge);
+
+        // Log badge to journal
+        try {
+          await queryWithContext(
+            userId,
+            `INSERT INTO journal_entries (student_id, entry_type, content, book_id, metadata)
+             VALUES ($1, 'achievement', $2, $3, $4)`,
+            [
+              studentId,
+              `Earned Badge: ${badge.name} 🏅`,
+              context?.bookId || null,
+              JSON.stringify({
+                type: "badge_earned",
+                badge_id: badge.id,
+                badge_name: badge.name,
+                badge_icon: badge.icon_url,
+              }),
+            ],
+          );
+        } catch (err) {
+          console.error("Failed to log badge to journal:", err);
+        }
 
         // Award XP for the badge
         if (badge.xp_reward > 0) {
@@ -571,7 +612,7 @@ export async function getStudentBadges(
     `SELECT sb.*,
             b.id as badge_id, b.name, b.description, b.icon_url, b.xp_reward,
             b.badge_type, b.criteria, b.book_id as badge_book_id,
-            b.is_active, b.display_order
+            b.is_active, b.display_order, b.tier, b.category
      FROM student_badges sb
      JOIN badges b ON sb.badge_id = b.id
      WHERE sb.student_id = $1
@@ -597,6 +638,8 @@ export async function getStudentBadges(
       book_id: row.badge_book_id,
       is_active: row.is_active,
       display_order: row.display_order,
+      tier: row.tier,
+      category: row.category,
     },
   })) as StudentBadgeWithBadge[];
 }

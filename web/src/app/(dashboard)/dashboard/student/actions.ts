@@ -10,7 +10,9 @@ import {
   onBookCompleted,
   XP_REWARDS,
 } from "@/lib/gamification";
+import { createJournalEntry } from "@/app/(dashboard)/dashboard/journal/journal-actions";
 import type { Badge } from "@/types/database";
+
 
 // Track last page read to avoid duplicate XP awards
 const lastPageReadCache = new Map<string, number>();
@@ -46,11 +48,24 @@ export const recordReadingProgress = async (input: {
        VALUES ($1, $2, $3)
        ON CONFLICT (student_id, book_id)
        DO UPDATE SET current_page = $3, updated_at = NOW()
-       RETURNING *`,
+       RETURNING *, (xmax = 0) AS is_new`,
       [user.profileId, input.bookId, input.currentPage],
     );
 
-    console.log("📖 Progress save result:", { rows: result.rows });
+    const isNew = result.rows[0]?.is_new;
+
+    if (isNew) {
+      // Log started_book
+      try {
+        await createJournalEntry({
+          entryType: "started_book",
+          bookId: input.bookId,
+          content: "Started reading this book! 📚",
+        });
+      } catch (err) {
+        console.error("Failed to log started_book:", err);
+      }
+    }
   } catch (error) {
     console.error("❌ Failed to save progress:", error);
     throw error;
@@ -62,6 +77,21 @@ export const recordReadingProgress = async (input: {
   // Award XP for new pages read (avoid duplicates)
   if (input.currentPage > lastPage) {
     const newPagesRead = input.currentPage - lastPage;
+
+    // Log reading session periodically (every 5 pages or first page read)
+    if (lastPage === 0 || input.currentPage % 5 === 0) {
+      try {
+        await createJournalEntry({
+          entryType: "reading_session",
+          bookId: input.bookId,
+          pageRangeStart: lastPage === 0 ? 1 : lastPage,
+          pageRangeEnd: input.currentPage,
+          content: `Read up to page ${input.currentPage} 📖`,
+        });
+      } catch (err) {
+        console.error("Failed to log reading_session:", err);
+      }
+    }
 
     // Update streak (once per day)
     try {
@@ -206,17 +236,23 @@ export const getPendingCheckpointForPage = async (input: {
   }
 
   // Find the latest required checkpoint at or before the current page
+  // We join with class_quiz_assignments and class_students to ensure we only 
+  // get checkpoints that are actually assigned to this specific student's class.
   const checkpointResult = await queryWithContext(
     user.userId,
-    `SELECT id, page_number, quiz_id, is_required
-     FROM quiz_checkpoints
-     WHERE book_id = $1
-       AND is_required = true
-       AND quiz_id IS NOT NULL
-       AND page_number <= $2
-     ORDER BY page_number DESC
+    `SELECT DISTINCT qc.id, qc.page_number, qc.quiz_id, qc.is_required
+     FROM quiz_checkpoints qc
+     JOIN class_quiz_assignments cqa ON qc.quiz_id = cqa.quiz_id
+     JOIN class_students cs ON cqa.class_id = cs.class_id
+     WHERE qc.book_id = $1
+       AND cs.student_id = $2
+       AND qc.is_required = true
+       AND qc.quiz_id IS NOT NULL
+       AND qc.page_number <= $3
+       AND cqa.is_active = true
+     ORDER BY qc.page_number DESC
      LIMIT 1`,
-    [input.bookId, input.currentPage],
+    [input.bookId, user.profileId, input.currentPage],
   );
 
   if (checkpointResult.rows.length === 0) {
@@ -304,6 +340,21 @@ export const markBookAsCompleted = async (input: {
     throw new Error("Failed to mark book as completed.");
   }
 
+  // Log to journal
+  try {
+    const bookData = bookResult.rows[0];
+    await createJournalEntry({
+      entryType: "finished_book",
+      bookId: input.bookId,
+      content: `Finished reading ${bookData.title || "this book"}! 🏁`,
+      metadata: {
+        completed_at: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    console.error("Failed to log finished_book to journal:", err);
+  }
+
   // Trigger book completion rewards
   const result = await onBookCompleted(
     user.userId,
@@ -338,4 +389,40 @@ export const markBookAsCompleted = async (input: {
     leveledUp,
     newLevel: leveledUp ? currentLevel : undefined,
   };
+};
+
+export const updateBookTotalPages = async (bookId: number, totalPages: number) => {
+  const user = await getCurrentUser();
+
+  if (!user || !user.userId) {
+    throw new Error("You must be signed in to update book metadata.");
+  }
+
+  // Verify the book exists and check current page count
+  const bookResult = await queryWithContext(
+    user.userId,
+    `SELECT page_count FROM books WHERE id = $1`,
+    [bookId],
+  );
+
+  if (bookResult.rows.length === 0) {
+    throw new Error("Book not found.");
+  }
+
+  const currentCount = bookResult.rows[0].page_count;
+
+  // Only update if the new count is significantly different (e.g., > 10% difference)
+  // or if the current count is 1 or null.
+  // This prevents minor fluctuations based on screen size/parsing variations if any.
+  // For EPUBs, the reader calculates pages based on content, which is more accurate for the reader view.
+  if (!currentCount || currentCount <= 1 || Math.abs(currentCount - totalPages) > 5) {
+    console.log(`📚 Updating book ${bookId} page count: ${currentCount} -> ${totalPages}`);
+    await queryWithContext(
+      user.userId,
+      `UPDATE books SET page_count = $1 WHERE id = $2`,
+      [totalPages, bookId]
+    );
+  }
+
+  return { success: true };
 };

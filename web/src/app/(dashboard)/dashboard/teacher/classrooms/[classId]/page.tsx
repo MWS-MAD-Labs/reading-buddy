@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { query } from "@/lib/db";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { assertCanManageClass } from "@/lib/classrooms/permissions";
 import { ClassroomRoster } from "@/components/dashboard/ClassroomRoster";
@@ -10,6 +10,9 @@ import {
   getPublishedQuizzesByBook,
   getClassQuizAssignments,
 } from "@/app/(dashboard)/dashboard/teacher/actions";
+import { DiscussionStream } from "@/components/dashboard/DiscussionStream";
+import { getClassroomMessages } from "@/app/(dashboard)/dashboard/student/classrooms/[classId]/classroom-stream-actions";
+import { MessageSquare, LayoutDashboard, ClipboardList } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -28,66 +31,55 @@ const formatDate = (value: string | null) => {
 
 export default async function ManageClassroomPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ classId: string }>;
+  searchParams: Promise<{ view?: string }>;
 }) {
   const { classId: classIdParam } = await params;
+  const { view: viewParam } = await searchParams;
   const classId = Number.parseInt(classIdParam, 10);
+  const view = viewParam === "discussion" ? "discussion" : viewParam === "quizzes" ? "quizzes" : "overview";
+
   if (Number.isNaN(classId)) {
     notFound();
   }
 
   const { user, role } = await requireRole(["TEACHER", "ADMIN"]);
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    notFound();
-  }
 
   await assertCanManageClass(classId, user.id, role);
 
-  const { data: classroom, error: classroomError } = await supabaseAdmin
-    .from("classes")
-    .select("id, name, teacher_id")
-    .eq("id", classId)
-    .single();
+  const classroomResult = await query(
+    `SELECT id, name, teacher_id FROM classes WHERE id = $1`,
+    [classId]
+  );
 
-  if (classroomError || !classroom) {
-    console.error("Unable to load classroom", { classroomError, classId });
+  if (classroomResult.rows.length === 0) {
+    console.error("Unable to load classroom", { classId });
     notFound();
   }
 
-  const { data: teacherProfile, error: teacherProfileError } =
-    await supabaseAdmin
-      .from("profiles")
-      .select("full_name")
-      .eq("id", classroom.teacher_id)
-      .maybeSingle();
+  const classroom = classroomResult.rows[0];
 
-  if (teacherProfileError) {
-    console.error("Unable to load teacher profile", teacherProfileError);
-  }
+  const teacherProfileResult = await query(
+    `SELECT full_name FROM profiles WHERE id = $1`,
+    [classroom.teacher_id]
+  );
 
-  const { data: rosterData, error: rosterError } = await supabaseAdmin
-    .from("class_students")
-    .select("student_id, profiles(full_name)")
-    .eq("class_id", classId);
+  const teacherProfile = teacherProfileResult.rows[0] || null;
 
-  if (rosterError) {
-    console.error(rosterError);
-  }
+  const rosterResult = await query(
+    `SELECT cs.student_id, p.full_name
+     FROM class_students cs
+     LEFT JOIN profiles p ON cs.student_id = p.id
+     WHERE cs.class_id = $1`,
+    [classId]
+  );
 
-  const classStudents =
-    rosterData?.map((entry: any) => {
-      const profileData =
-        Array.isArray(entry.profiles) && entry.profiles.length > 0
-          ? entry.profiles[0]
-          : entry.profiles;
-      const profile = profileData as { full_name: string | null } | null;
-      return {
-        id: entry.student_id,
-        full_name: profile?.full_name ?? "Unknown student",
-      };
-    }) ?? [];
+  const classStudents = rosterResult.rows.map((row: any) => ({
+    id: row.student_id,
+    full_name: row.full_name ?? "Unknown student",
+  }));
 
   const rosterStudentIds = classStudents.map((student: any) => student.id);
 
@@ -101,56 +93,32 @@ export default async function ManageClassroomPage({
   }[] = [];
 
   if (rosterStudentIds.length > 0) {
-    const { data: readingsData, error: readingsError } = await supabaseAdmin
-      .from("student_books")
-      .select(
-        "student_id, current_page, started_at, completed_at, profiles!student_books_student_id_fkey(full_name), books(title, page_count)",
-      )
-      .in("student_id", rosterStudentIds)
-      .order("started_at", { ascending: false, nullsFirst: false })
-      .limit(10);
-
-    if (readingsError) {
-      console.error(readingsError);
-    }
-
-    // Transform array relationships to single objects
-    readings = (readingsData ?? []).map(
-      (entry: {
-        student_id: string;
-        current_page: number | null;
-        started_at: string | null;
-        completed_at: string | null;
-        profiles:
-          | { full_name: string | null }
-          | { full_name: string | null }[]
-          | null;
-        books:
-          | { title: string; page_count: number | null }
-          | { title: string; page_count: number | null }[]
-          | null;
-      }) => {
-        const profileData =
-          Array.isArray(entry.profiles) && entry.profiles.length > 0
-            ? entry.profiles[0]
-            : entry.profiles;
-        const bookData =
-          Array.isArray(entry.books) && entry.books.length > 0
-            ? entry.books[0]
-            : entry.books;
-        return {
-          student_id: entry.student_id,
-          current_page: entry.current_page,
-          started_at: entry.started_at,
-          completed_at: entry.completed_at,
-          profiles: profileData as { full_name: string | null } | null,
-          books: bookData as {
-            title: string;
-            page_count: number | null;
-          } | null,
-        };
-      },
+    const readingsResult = await query(
+      `SELECT 
+        sb.student_id,
+        sb.current_page,
+        sb.started_at,
+        sb.completed_at,
+        p.full_name,
+        b.title,
+        b.page_count
+       FROM student_books sb
+       LEFT JOIN profiles p ON sb.student_id = p.id
+       LEFT JOIN books b ON sb.book_id = b.id
+       WHERE sb.student_id = ANY($1)
+       ORDER BY sb.started_at DESC NULLS LAST
+       LIMIT 10`,
+      [rosterStudentIds]
     );
+
+    readings = readingsResult.rows.map((row: any) => ({
+      student_id: row.student_id,
+      current_page: row.current_page,
+      started_at: row.started_at,
+      completed_at: row.completed_at,
+      profiles: { full_name: row.full_name },
+      books: { title: row.title, page_count: row.page_count },
+    }));
   }
 
   let quizAttempts: {
@@ -161,168 +129,107 @@ export default async function ManageClassroomPage({
   }[] = [];
 
   if (rosterStudentIds.length > 0) {
-    const { data: quizData, error: quizError } = await supabaseAdmin
-      .from("quiz_attempts")
-      .select(
-        "score, submitted_at, profiles!quiz_attempts_student_id_fkey(full_name), quizzes(id, books(title))",
-      )
-      .in("student_id", rosterStudentIds)
-      .order("submitted_at", { ascending: false })
-      .limit(10);
-
-    if (quizError) {
-      console.error(quizError);
-    }
-
-    // Transform nested array relationships (profiles, quizzes.books) to single objects
-    quizAttempts = (quizData ?? []).map(
-      (entry: {
-        score: number;
-        submitted_at: string | null;
-        profiles:
-          | { full_name: string | null }
-          | { full_name: string | null }[]
-          | null;
-        quizzes:
-          | {
-              id?: number;
-              books?:
-                | { title: string | null }
-                | { title: string | null }[]
-                | null;
-            }
-          | Array<{
-              id?: number;
-              books?:
-                | { title: string | null }
-                | { title: string | null }[]
-                | null;
-            }>
-          | null;
-      }) => {
-        const profileData =
-          Array.isArray(entry.profiles) && entry.profiles.length > 0
-            ? entry.profiles[0]
-            : entry.profiles;
-
-        const quizInfo =
-          Array.isArray(entry.quizzes) && entry.quizzes.length > 0
-            ? entry.quizzes[0]
-            : entry.quizzes;
-        const quiz = quizInfo as {
-          id?: number;
-          books?: { title: string | null } | { title: string | null }[] | null;
-        } | null;
-
-        const bookData =
-          quiz && Array.isArray(quiz.books) && quiz.books.length > 0
-            ? quiz.books[0]
-            : quiz?.books;
-
-        return {
-          ...entry,
-          profiles: profileData as { full_name: string | null } | null,
-          quizzes: quiz
-            ? {
-                books: bookData as { title: string | null } | null,
-              }
-            : null,
-        };
-      },
+    const quizAttemptsResult = await query(
+      `SELECT 
+        qa.score,
+        qa.submitted_at,
+        p.full_name,
+        b.title as book_title
+       FROM quiz_attempts qa
+       LEFT JOIN profiles p ON qa.student_id = p.id
+       LEFT JOIN quizzes q ON qa.quiz_id = q.id
+       LEFT JOIN books b ON q.book_id = b.id
+       WHERE qa.student_id = ANY($1)
+       ORDER BY qa.submitted_at DESC
+       LIMIT 10`,
+      [rosterStudentIds]
     );
+
+    quizAttempts = quizAttemptsResult.rows.map((row: any) => ({
+      score: row.score,
+      submitted_at: row.submitted_at,
+      profiles: { full_name: row.full_name },
+      quizzes: { books: { title: row.book_title } },
+    }));
   }
 
-  const { data: studentDirectory, error: studentDirectoryError } =
-    await supabaseAdmin
-      .from("profiles")
-      .select("id, full_name")
-      .eq("role", "STUDENT");
+  const studentDirectoryResult = await query(
+    `SELECT id, full_name FROM profiles WHERE role = 'STUDENT'`
+  );
 
-  if (studentDirectoryError) {
-    console.error(studentDirectoryError);
-  }
+  const studentDirectory = studentDirectoryResult.rows;
 
-  const { data: allAssignments, error: assignmentsError } = await supabaseAdmin
-    .from("class_students")
-    .select("student_id");
+  const allAssignmentsResult = await query(
+    `SELECT student_id FROM class_students`
+  );
 
-  if (assignmentsError) {
-    console.error(assignmentsError);
-  }
+  const allAssignments = allAssignmentsResult.rows;
 
   const assignedIds = new Set(
-    (allAssignments ?? [])
+    allAssignments
       .map((entry: any) => entry.student_id)
       .filter((id): id is string => Boolean(id)),
   );
   const rosterIdSet = new Set(rosterStudentIds);
 
-  const availableStudents =
-    studentDirectory
-      ?.filter(
-        (student) =>
-          rosterIdSet.has(student.id) || !assignedIds.has(student.id),
-      )
-      .map((student: any) => ({
-        id: student.id,
-        full_name: student.full_name ?? "",
-      })) ?? [];
+  const availableStudents = studentDirectory
+    .filter(
+      (student: any) =>
+        rosterIdSet.has(student.id) || !assignedIds.has(student.id),
+    )
+    .map((student: any) => ({
+      id: student.id,
+      full_name: student.full_name ?? "",
+    }));
 
-  const { data: assignedBookRows, error: assignedBooksError } =
-    await supabaseAdmin
-      .from("class_books")
-      .select("book_id, assigned_at, books(id, title, author, cover_url)")
-      .eq("class_id", classId)
-      .order("assigned_at", { ascending: false });
+  const assignedBooksResult = await query(
+    `SELECT 
+      cb.book_id,
+      cb.assigned_at,
+      b.id,
+      b.title,
+      b.author,
+      b.cover_url
+     FROM class_books cb
+     LEFT JOIN books b ON cb.book_id = b.id
+     WHERE cb.class_id = $1
+     ORDER BY cb.assigned_at DESC`,
+    [classId]
+  );
 
-  if (assignedBooksError) {
-    console.error(assignedBooksError);
-  }
+  const assignedBookRows = assignedBooksResult.rows;
 
-  const assignedBooks =
-    assignedBookRows?.map((entry: any) => {
-      const bookData =
-        Array.isArray(entry.books) && entry.books.length > 0
-          ? entry.books[0]
-          : entry.books;
-      const book = bookData as {
-        id: number;
-        title: string;
-        author: string | null;
-        cover_url: string | null;
-      } | null;
-      return {
-        book_id: entry.book_id,
-        title: book?.title ?? "Untitled",
-        author: book?.author ?? null,
-        cover_url: book?.cover_url ?? null,
-        assigned_at: entry.assigned_at ?? null,
-      };
-    }) ?? [];
+  const assignedBooks = assignedBookRows.map((row: any) => ({
+    book_id: row.book_id,
+    title: row.title ?? "Untitled",
+    author: row.author ?? null,
+    cover_url: row.cover_url ?? null,
+    assigned_at: row.assigned_at ?? null,
+  }));
 
-  const { data: allBooksData, error: allBooksError } = await supabaseAdmin
-    .from("books")
-    .select("id, title, author, cover_url");
+  const allBooksResult = await query(
+    `SELECT id, title, author, cover_url FROM books`
+  );
 
-  if (allBooksError) {
-    console.error(allBooksError);
-  }
+  const allBooksData = allBooksResult.rows;
 
-  const availableBooks =
-    allBooksData
-      ?.filter(
-        (book) =>
-          !assignedBooks.some((assigned) => assigned.book_id === book.id),
-      )
-      .map((book: any) => ({
-        id: book.id,
-        title: book.title,
-        author: book.author ?? null,
-        cover_url: book.cover_url ?? null,
-      })) ?? [];
+  const availableBooks = allBooksData
+    .filter(
+      (book: any) =>
+        !assignedBooks.some((assigned) => assigned.book_id === book.id),
+    )
+    .map((book: any) => ({
+      id: book.id,
+      title: book.title,
+      author: book.author ?? null,
+      cover_url: book.cover_url ?? null,
+    }));
+
+  // Get discussion messages if in discussion view
+  const messages = view === "discussion" ? await getClassroomMessages(classId) : [];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <section className="rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_25px_70px_rgba(147,118,255,0.2)]">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -343,158 +250,229 @@ export default async function ManageClassroomPage({
             &larr; Back to dashboard
           </Link>
         </div>
-      </section>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4 rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(79,70,229,0.18)]">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-rose-400">
-              Student Progress
-            </p>
-            <h2 className="text-xl font-black text-indigo-950">
-              Reading updates
-            </h2>
-            <p className="text-sm text-indigo-500">
-              Latest progress from this classroom only.
-            </p>
-          </div>
-          <div className={tableWrapperClass}>
-            <table className={tableClass}>
-              <thead className={headClass}>
-                <tr>
-                  <th className={cellClass}>Student</th>
-                  <th className={cellClass}>Book</th>
-                  <th className={cellClass}>Current page</th>
-                  <th className={cellClass}>Updated</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-indigo-50">
-                {readings.length > 0 ? (
-                  readings.map((entry: any) => (
-                    <tr
-                      key={`${entry.student_id}-${entry.books?.title ?? "book"}`}
-                      className="hover:bg-indigo-50/60"
-                    >
-                      <td className={cellClass}>
-                        {entry.profiles?.full_name ?? "Unknown student"}
-                      </td>
-                      <td className={cellClass}>{entry.books?.title ?? "—"}</td>
-                      <td className={cellClass}>
-                        {entry.current_page ?? 0} /{" "}
-                        {entry.books?.page_count ?? "—"}
-                      </td>
-                      <td className={cellClass}>
-                        {formatDate(entry.completed_at ?? entry.started_at)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className={`${cellClass} text-center text-indigo-400`}
-                    >
-                      No updates yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="space-y-4 rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(16,185,129,0.18)]">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-sky-400">
-              Quiz tracker
-            </p>
-            <h2 className="text-xl font-black text-indigo-950">
-              Recent quiz attempts
-            </h2>
-            <p className="text-sm text-indigo-500">
-              See how this class is performing.
-            </p>
-          </div>
-          <div className={tableWrapperClass}>
-            <table className={tableClass}>
-              <thead className={headClass}>
-                <tr>
-                  <th className={cellClass}>Student</th>
-                  <th className={cellClass}>Book</th>
-                  <th className={cellClass}>Score</th>
-                  <th className={cellClass}>Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-indigo-50">
-                {quizAttempts.length > 0 ? (
-                  quizAttempts.map((attempt, index) => (
-                    <tr key={index} className="hover:bg-indigo-50/60">
-                      <td className={cellClass}>
-                        {attempt.profiles?.full_name ?? "Unknown student"}
-                      </td>
-                      <td className={cellClass}>
-                        {attempt.quizzes?.books?.title ?? "—"}
-                      </td>
-                      <td className={cellClass}>{attempt.score}%</td>
-                      <td className={cellClass}>
-                        {formatDate(attempt.submitted_at)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className={`${cellClass} text-center text-indigo-400`}
-                    >
-                      No attempts yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        {/* Navigation Tabs */}
+        <div className="mt-8 flex gap-2 border-b border-indigo-100 pb-1">
+          <Link
+            href={`/dashboard/teacher/classrooms/${classId}`}
+            className={`
+              flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors rounded-t-lg
+              ${view === 'overview'
+                ? 'text-indigo-600 border-b-2 border-indigo-500 bg-indigo-50/50'
+                : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-50'
+              }
+            `}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Overview
+          </Link>
+          <Link
+            href={`/dashboard/teacher/classrooms/${classId}?view=quizzes`}
+            className={`
+              flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors rounded-t-lg
+              ${view === 'quizzes'
+                ? 'text-indigo-600 border-b-2 border-indigo-500 bg-indigo-50/50'
+                : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-50'
+              }
+            `}
+          >
+            <ClipboardList className="h-4 w-4" />
+            Quizzes
+          </Link>
+          <Link
+            href={`/dashboard/teacher/classrooms/${classId}?view=discussion`}
+            className={`
+              flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors rounded-t-lg
+              ${view === 'discussion'
+                ? 'text-indigo-600 border-b-2 border-indigo-500 bg-indigo-50/50'
+                : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-50'
+              }
+            `}
+          >
+            <MessageSquare className="h-4 w-4" />
+            Discussion
+          </Link>
         </div>
       </section>
 
-      <section className="rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_25px_70px_rgba(255,173,109,0.2)]">
-        <ClassroomRoster
-          classId={classId}
-          students={classStudents}
-          allStudents={availableStudents}
-        />
-      </section>
+      {view === "overview" && (
+        <div className="space-y-8 animate-in fade-in duration-500">
+          <section className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-4 rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(79,70,229,0.18)]">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-rose-400">
+                  Student Progress
+                </p>
+                <h2 className="text-xl font-black text-indigo-950">
+                  Reading updates
+                </h2>
+                <p className="text-sm text-indigo-500">
+                  Latest progress from this classroom only.
+                </p>
+              </div>
+              <div className={tableWrapperClass}>
+                <table className={tableClass}>
+                  <thead className={headClass}>
+                    <tr>
+                      <th className={cellClass}>Student</th>
+                      <th className={cellClass}>Book</th>
+                      <th className={cellClass}>Current page</th>
+                      <th className={cellClass}>Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-indigo-50">
+                    {readings.length > 0 ? (
+                      readings.map((entry: any) => (
+                        <tr
+                          key={`${entry.student_id}-${entry.books?.title ?? "book"}`}
+                          className="hover:bg-indigo-50/60"
+                        >
+                          <td className={cellClass}>
+                            {entry.profiles?.full_name ?? "Unknown student"}
+                          </td>
+                          <td className={cellClass}>{entry.books?.title ?? "—"}</td>
+                          <td className={cellClass}>
+                            {entry.current_page ?? 0} /{" "}
+                            {entry.books?.page_count ?? "—"}
+                          </td>
+                          <td className={cellClass}>
+                            {formatDate(entry.completed_at ?? entry.started_at)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className={`${cellClass} text-center text-indigo-400`}
+                        >
+                          No updates yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-      <ClassReadingList
-        classId={classId}
-        assignedBooks={assignedBooks}
-        availableBooks={availableBooks}
-      />
+            <div className="space-y-4 rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(16,185,129,0.18)]">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-sky-400">
+                  Quiz tracker
+                </p>
+                <h2 className="text-xl font-black text-indigo-950">
+                  Recent quiz attempts
+                </h2>
+                <p className="text-sm text-indigo-500">
+                  See how this class is performing.
+                </p>
+              </div>
+              <div className={tableWrapperClass}>
+                <table className={tableClass}>
+                  <thead className={headClass}>
+                    <tr>
+                      <th className={cellClass}>Student</th>
+                      <th className={cellClass}>Book</th>
+                      <th className={cellClass}>Score</th>
+                      <th className={cellClass}>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-indigo-50">
+                    {quizAttempts.length > 0 ? (
+                      quizAttempts.map((attempt, index) => (
+                        <tr key={index} className="hover:bg-indigo-50/60">
+                          <td className={cellClass}>
+                            {attempt.profiles?.full_name ?? "Unknown student"}
+                          </td>
+                          <td className={cellClass}>
+                            {attempt.quizzes?.books?.title ?? "—"}
+                          </td>
+                          <td className={cellClass}>{attempt.score}%</td>
+                          <td className={cellClass}>
+                            {formatDate(attempt.submitted_at)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className={`${cellClass} text-center text-indigo-400`}
+                        >
+                          No attempts yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
 
-      {assignedBooks.length > 0 && (
-        <section className="space-y-6">
-          <div className="rounded-[32px] border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-4">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1">
-              <p className="text-xs font-black uppercase tracking-wide text-purple-600">
-                Quiz Assignments
+          <section className="rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_25px_70px_rgba(255,173,109,0.2)]">
+            <ClassroomRoster
+              classId={classId}
+              students={classStudents}
+              allStudents={availableStudents}
+            />
+          </section>
+
+          <ClassReadingList
+            classId={classId}
+            assignedBooks={assignedBooks}
+            availableBooks={availableBooks}
+          />
+        </div>
+      )}
+
+      {view === "quizzes" && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+          <section className="rounded-[32px] border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-6">
+            <div className="mb-4">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1">
+                <p className="text-xs font-black uppercase tracking-wide text-purple-600">
+                  Quiz Management
+                </p>
+              </div>
+              <h2 className="text-2xl font-black text-indigo-950">
+                Create & Assign Quizzes
+              </h2>
+              <p className="text-sm text-indigo-500">
+                Create AI-generated quizzes or assign existing quizzes to your class.
               </p>
             </div>
-            <h2 className="text-xl font-black text-indigo-950">
-              Assign Quizzes to Class
-            </h2>
-            <p className="text-sm text-indigo-500">
-              Assign quizzes created by librarians for each book below.
-            </p>
-          </div>
+          </section>
 
-          {assignedBooks.map((book: any) => (
-            <BookQuizSection
-              key={book.book_id}
-              classId={classId}
-              bookId={book.book_id}
-              bookTitle={book.title}
-            />
-          ))}
+          {assignedBooks.length > 0 ? (
+            <div className="space-y-4">
+              {assignedBooks.map((book: any) => (
+                <BookQuizSection
+                  key={book.book_id}
+                  classId={classId}
+                  bookId={book.book_id}
+                  bookTitle={book.title}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[32px] border border-dashed border-purple-300 bg-white/80 p-12 text-center">
+              <div className="mb-4 text-5xl">📚</div>
+              <h3 className="text-lg font-bold text-indigo-950">No Books Assigned</h3>
+              <p className="text-sm text-indigo-500">
+                Assign books to your class first to create quizzes for them.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {view === "discussion" && (
+        <section className="animate-in fade-in duration-500">
+          <DiscussionStream
+            classId={classId}
+            initialMessages={messages}
+            currentUserId={user.id}
+          />
         </section>
       )}
     </div>

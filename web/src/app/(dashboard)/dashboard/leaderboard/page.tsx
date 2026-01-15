@@ -1,5 +1,5 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/server";
+import { query } from "@/lib/db";
 import { redirect } from "next/navigation";
 import {
   StudentLeaderboard,
@@ -13,37 +13,30 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function LeaderboardPage() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId) {
     redirect("/login");
   }
 
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    redirect("/dashboard");
-  }
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  // Fetch role
+  const profileResult = await query(
+    `SELECT role FROM profiles WHERE id = $1`,
+    [user.userId]
+  );
 
-  const role = profile?.role || "STUDENT";
+  const role = profileResult.rows[0]?.role || "STUDENT";
   const isStudent = role === "STUDENT";
 
   // Fetch full leaderboards (50 entries)
   const studentLeaderboardResult = await getStudentLeaderboard(
-    user.id,
-    user.id,
+    user.userId,
+    user.userId,
     50,
   );
   const staffLeaderboardResult = await getStaffLeaderboard(
-    user.id,
-    user.id,
+    user.userId,
+    user.userId,
     50,
   );
 

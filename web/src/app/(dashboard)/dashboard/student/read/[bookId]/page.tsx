@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { queryWithContext } from "@/lib/db";
-import { BookReader } from "@/components/dashboard/BookReader";
-import { buildPublicPrefixUrl } from "@/lib/minioUtils";
+import { ReaderWithRatingPrompt } from "@/components/dashboard/ReaderWithRatingPrompt";
+import { buildPublicPrefixUrl, normalizeMinioUrl } from "@/lib/minioUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -28,10 +28,14 @@ export default async function StudentReadPage({
     notFound();
   }
 
-  // Get book details
+  // Get book details including new text-based reader columns
   const bookResult = await queryWithContext(
     user.userId,
-    `SELECT * FROM books WHERE id = $1`,
+    `SELECT 
+      id, title, author, pdf_url, page_count,
+      page_images_prefix, page_images_count,
+      file_format, original_file_url, text_json_url, text_extraction_status
+     FROM books WHERE id = $1`,
     [bookId],
   );
 
@@ -43,10 +47,16 @@ export default async function StudentReadPage({
   const pageImages =
     book.page_images_prefix && book.page_images_count
       ? {
-          baseUrl: buildPublicPrefixUrl(book.page_images_prefix),
-          count: book.page_images_count,
-        }
+        baseUrl: buildPublicPrefixUrl(book.page_images_prefix),
+        count: book.page_images_count,
+      }
       : null;
+
+  // Determine EPUB URL for native rendering (for epub files that haven't been converted)
+  // Normalize the URL to use current MinIO endpoint configuration
+  const epubUrl = book.file_format === "epub" && book.original_file_url
+    ? normalizeMinioUrl(book.original_file_url)
+    : null;
 
   // Get student's reading progress
   const progressResult = await queryWithContext(
@@ -75,13 +85,17 @@ export default async function StudentReadPage({
         <h1 className="text-2xl font-black text-blue-900">{book.title}</h1>
         <p className="text-sm font-bold text-blue-700">by {book.author}</p>
       </div>
-      <BookReader
+      <ReaderWithRatingPrompt
         bookId={book.id}
-        pdfUrl={book.pdf_url}
-        initialPage={initialPage}
-        expectedPages={book.page_count}
-        pageImages={pageImages}
         bookTitle={book.title}
+        pdfUrl={book.pdf_url}
+        epubUrl={epubUrl}
+        initialPage={initialPage}
+        pageImages={pageImages}
+        textJsonUrl={book.text_json_url}
+        textExtractionStatus={book.text_extraction_status}
+        fileFormat={book.file_format || "pdf"}
+        totalPages={book.page_count}
       />
     </div>
   );

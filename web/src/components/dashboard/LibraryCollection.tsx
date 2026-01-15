@@ -2,7 +2,9 @@
 
 import { useMemo, useState, type ChangeEvent } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Star } from "lucide-react";
+import { BookDetailsModal } from "./BookDetailsModal";
 
 export type LibraryBook = {
   id: number;
@@ -15,6 +17,8 @@ export type LibraryBook = {
   publisher: string | null;
   publicationYear: number | null;
   createdAt: string | null;
+  averageRating?: number | null;
+  reviewCount?: number;
 };
 
 type FilterValue = "ALL" | string;
@@ -43,12 +47,14 @@ type LibraryCollectionProps = {
 };
 
 export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [authorFilter, setAuthorFilter] = useState<FilterValue>("ALL");
   const [publisherFilter, setPublisherFilter] = useState<FilterValue>("ALL");
   const [genreFilter, setGenreFilter] = useState<FilterValue>("ALL");
   const [languageFilter, setLanguageFilter] = useState<FilterValue>("ALL");
   const [yearFilter, setYearFilter] = useState<FilterValue>("ALL");
+  const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
 
   const authorOptions = useMemo(
     () => buildStringOptions(books.map((book: any) => book.author)),
@@ -116,6 +122,11 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
     languageFilter,
     yearFilter,
   ]);
+
+  const handleReadBook = (bookId: number) => {
+    setSelectedBookId(null);
+    router.push(`/dashboard/student/read/${bookId}`);
+  };
 
   return (
     <section className="space-y-4 md:space-y-6">
@@ -225,63 +236,56 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5 lg:grid-cols-3 xl:grid-cols-4">
           {filteredBooks.map((book: any) => (
             <li key={book.id} className="flex justify-center">
-              <Link
-                href={`/dashboard/student/read/${book.id}`}
-                className="group block w-full max-w-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+              <button
+                onClick={() => setSelectedBookId(book.id)}
+                className="group block w-full max-w-xs text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
               >
-                <div className="h-full [perspective:2000px]">
-                  <div className="relative h-full min-h-[24rem] rounded-2xl border-2 border-purple-300 bg-white shadow-md transition-transform duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
-                    <div className="absolute inset-0 flex h-full w-full flex-col gap-3 p-3 [backface-visibility:hidden]">
-                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-purple-50 shadow-inner transition-colors duration-300 group-hover:bg-white">
-                        {book.coverUrl ? (
-                          <Image
-                            src={book.coverUrl}
-                            alt={book.title}
-                            fill
-                            className="object-contain p-3 transition-opacity duration-300 group-hover:opacity-0"
-                            sizes="(max-width: 768px) 100vw, 33vw"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-sm font-semibold text-purple-400">
-                            No cover
-                          </div>
-                        )}
+                <div className="h-full rounded-2xl border-2 border-purple-300 bg-white p-3 shadow-md transition-all hover:border-purple-400 hover:shadow-lg">
+                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-purple-50 shadow-inner">
+                    {book.coverUrl ? (
+                      <Image
+                        src={book.coverUrl}
+                        alt={book.title}
+                        fill
+                        className="object-contain p-3"
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-sm font-semibold text-purple-400">
+                        No cover
                       </div>
-                      <div className="space-y-1">
-                        <h2 className="text-lg font-black text-purple-900">
-                          {book.title}
-                          {book.publicationYear ? (
-                            <span className="ml-1 text-sm font-semibold text-purple-500">
-                              ({book.publicationYear})
-                            </span>
-                          ) : null}
-                        </h2>
-                        <p className="text-base font-bold text-purple-600">
-                          by {book.author}
-                        </p>
+                    )}
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    <h2 className="line-clamp-2 text-lg font-black text-purple-900">
+                      {book.title}
+                      {book.publicationYear ? (
+                        <span className="ml-1 text-sm font-semibold text-purple-500">
+                          ({book.publicationYear})
+                        </span>
+                      ) : null}
+                    </h2>
+                    <p className="text-sm font-bold text-purple-600">
+                      by {book.author}
+                    </p>
+
+                    {/* Rating badge */}
+                    {book.averageRating && book.averageRating > 0 ? (
+                      <div className="flex items-center gap-1 pt-1">
+                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                        <span className="text-sm font-bold text-amber-600">
+                          {book.averageRating.toFixed(1)}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          ({book.reviewCount})
+                        </span>
                       </div>
-                    </div>
-                    <div className="absolute inset-0 flex h-full w-full flex-col rounded-2xl bg-gradient-to-b from-purple-600/90 via-purple-700/90 to-indigo-800/90 p-3 text-white [backface-visibility:hidden] [transform:rotateY(180deg)]">
-                      <h3 className="text-lg font-black">
-                        {book.title}
-                        {book.publicationYear ? (
-                          <span className="ml-1 text-sm font-semibold text-white/80">
-                            ({book.publicationYear})
-                          </span>
-                        ) : null}
-                      </h3>
-                      <p className="text-sm font-semibold text-white/80">
-                        {book.author}
-                      </p>
-                      <div className="mt-3 flex-1 rounded-xl bg-white/10 p-3 text-sm leading-relaxed">
-                        {book.description
-                          ? book.description
-                          : "No description yet. Flip back to see the cover!"}
-                      </div>
-                    </div>
+                    ) : (
+                      <p className="pt-1 text-xs text-gray-400">No ratings yet</p>
+                    )}
                   </div>
                 </div>
-              </Link>
+              </button>
             </li>
           ))}
         </ul>
@@ -296,6 +300,15 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
               : "No books match your filters. Try adjusting your search!"}
           </p>
         </div>
+      )}
+
+      {/* Book Details Modal */}
+      {selectedBookId && (
+        <BookDetailsModal
+          bookId={selectedBookId}
+          onClose={() => setSelectedBookId(null)}
+          onReadBook={handleReadBook}
+        />
       )}
     </section>
   );

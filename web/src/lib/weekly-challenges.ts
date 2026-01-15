@@ -5,7 +5,7 @@
  * Challenges automatically rotate every Monday.
  */
 
-import { SupabaseClient } from "@supabase/supabase-js";
+import { queryWithContext } from "@/lib/db";
 
 export type WeeklyChallengeType = {
   id: string;
@@ -79,11 +79,13 @@ const CHALLENGE_POOL: WeeklyChallengeType[] = [
  * Get the current week number of the year
  */
 function getWeekNumber(date: Date = new Date()): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+  );
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
 /**
@@ -117,8 +119,8 @@ export function getCurrentWeekChallenge(): WeeklyChallengeType {
  * Calculate progress for the current week's challenge
  */
 export async function getWeeklyChallengeProgress(
-  supabase: SupabaseClient,
   userId: string,
+  studentId: string,
 ): Promise<{
   challenge: WeeklyChallengeType;
   progress: number;
@@ -128,60 +130,74 @@ export async function getWeeklyChallengeProgress(
   const { start, end } = getWeekBounds();
 
   let progress = 0;
+  const startIso = start.toISOString();
+  const endIso = end.toISOString();
 
   switch (challenge.type) {
     case "pages": {
       // Count pages read this week from xp_transactions
-      const { data } = await supabase
-        .from("xp_transactions")
-        .select("amount, source")
-        .eq("student_id", userId)
-        .eq("source", "page_read")
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString());
+      const result = await queryWithContext(
+        userId,
+        `SELECT SUM(amount) as total
+         FROM xp_transactions
+         WHERE student_id = $1
+           AND source = 'page_read'
+           AND created_at >= $2
+           AND created_at <= $3`,
+        [studentId, startIso, endIso],
+      );
 
-      progress = data?.reduce((sum, tx) => sum + tx.amount, 0) || 0;
+      progress = parseInt(result.rows[0]?.total || "0");
       break;
     }
 
     case "books": {
       // Count books completed this week
-      const { count } = await supabase
-        .from("student_books")
-        .select("*", { count: "exact", head: true })
-        .eq("student_id", userId)
-        .not("completed_at", "is", null)
-        .gte("completed_at", start.toISOString())
-        .lte("completed_at", end.toISOString());
+      const result = await queryWithContext(
+        userId,
+        `SELECT COUNT(*) as count
+         FROM student_books
+         WHERE student_id = $1
+           AND completed_at IS NOT NULL
+           AND completed_at >= $2
+           AND completed_at <= $3`,
+        [studentId, startIso, endIso],
+      );
 
-      progress = count || 0;
+      progress = parseInt(result.rows[0]?.count || "0");
       break;
     }
 
     case "quizzes": {
       // Count quizzes completed this week
-      const { count } = await supabase
-        .from("quiz_attempts")
-        .select("*", { count: "exact", head: true })
-        .eq("student_id", userId)
-        .gte("submitted_at", start.toISOString())
-        .lte("submitted_at", end.toISOString());
+      const result = await queryWithContext(
+        userId,
+        `SELECT COUNT(*) as count
+         FROM quiz_attempts
+         WHERE student_id = $1
+           AND submitted_at >= $2
+           AND submitted_at <= $3`,
+        [studentId, startIso, endIso],
+      );
 
-      progress = count || 0;
+      progress = parseInt(result.rows[0]?.count || "0");
       break;
     }
 
     case "streak": {
       // Count unique days read this week
-      const { data } = await supabase
-        .from("xp_transactions")
-        .select("created_at")
-        .eq("student_id", userId)
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString());
+      const result = await queryWithContext(
+        userId,
+        `SELECT created_at
+         FROM xp_transactions
+         WHERE student_id = $1
+           AND created_at >= $2
+           AND created_at <= $3`,
+        [studentId, startIso, endIso],
+      );
 
       const uniqueDays = new Set(
-        data?.map(tx => new Date(tx.created_at).toDateString())
+        result.rows.map((tx: any) => new Date(tx.created_at).toDateString()),
       );
       progress = uniqueDays.size;
       break;
@@ -189,15 +205,18 @@ export async function getWeeklyChallengeProgress(
 
     case "perfect_quizzes": {
       // Count perfect quiz scores this week
-      const { count } = await supabase
-        .from("quiz_attempts")
-        .select("*", { count: "exact", head: true })
-        .eq("student_id", userId)
-        .gte("score", 100)
-        .gte("submitted_at", start.toISOString())
-        .lte("submitted_at", end.toISOString());
+      const result = await queryWithContext(
+        userId,
+        `SELECT COUNT(*) as count
+         FROM quiz_attempts
+         WHERE student_id = $1
+           AND score >= 100
+           AND submitted_at >= $2
+           AND submitted_at <= $3`,
+        [studentId, startIso, endIso],
+      );
 
-      progress = count || 0;
+      progress = parseInt(result.rows[0]?.count || "0");
       break;
     }
   }

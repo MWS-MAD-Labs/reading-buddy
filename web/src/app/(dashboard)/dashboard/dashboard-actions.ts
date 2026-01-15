@@ -13,12 +13,12 @@ export async function getReadingJourneyData(userId: string, profileId: string) {
 
     const statsWithLegacyFields = stats
       ? {
-          ...stats,
-          // Legacy aliases to keep older UI pieces safe
-          total_xp: stats.xp ?? 0,
-          current_level_min_xp: 0,
-          next_level_min_xp: (stats.xp ?? 0) + (stats.xp_to_next_level ?? 0),
-        }
+        ...stats,
+        // Legacy aliases to keep older UI pieces safe
+        total_xp: stats.xp ?? 0,
+        current_level_min_xp: 0,
+        next_level_min_xp: (stats.xp ?? 0) + (stats.xp_to_next_level ?? 0),
+      }
       : null;
 
     // Get current reading book
@@ -33,7 +33,9 @@ export async function getReadingJourneyData(userId: string, profileId: string) {
         b.title,
         b.author,
         b.cover_url,
-        b.page_count
+        b.page_count,
+        b.page_text_content,
+        b.file_format
       FROM student_books sb
       JOIN books b ON sb.book_id = b.id
       WHERE sb.student_id = $1
@@ -45,10 +47,24 @@ export async function getReadingJourneyData(userId: string, profileId: string) {
     let currentBook = null;
     if (currentReadingResult.rows.length > 0) {
       const row = currentReadingResult.rows[0];
-      const estimatedTotalPages = row.page_count || 300;
+
+      // Handle EPUB/Text fallback for total pages
+      let totalPages = row.page_count || 300;
+
+      // If page_count is 1 (often a placeholder for extracted text books) 
+      // check if we have totalPages in page_text_content
+      if ((totalPages === 1 || !row.page_count) && row.page_text_content) {
+        const textContent = row.page_text_content as any;
+        if (textContent.totalPages && typeof textContent.totalPages === 'number') {
+          totalPages = textContent.totalPages;
+        } else if (Array.isArray(textContent.pages) && textContent.pages.length > 0) {
+          totalPages = textContent.pages.length;
+        }
+      }
+
       const currentPage = row.current_page || 1;
       const progressPercentage = Math.min(
-        (currentPage / estimatedTotalPages) * 100,
+        (currentPage / totalPages) * 100,
         100,
       );
 
@@ -58,7 +74,7 @@ export async function getReadingJourneyData(userId: string, profileId: string) {
         author: row.author,
         cover_url: row.cover_url,
         current_page: currentPage,
-        total_pages: estimatedTotalPages,
+        total_pages: totalPages,
         progress_percentage: progressPercentage,
       };
     }

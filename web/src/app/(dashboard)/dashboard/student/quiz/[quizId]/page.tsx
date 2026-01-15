@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { QuizPlayer } from "@/components/dashboard/QuizPlayer";
 import { query } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +25,7 @@ export default async function StudentQuizPage({
   searchParams,
 }: PageProps) {
   const awaitedSearchParams = searchParams ? await searchParams : undefined;
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect("/login");

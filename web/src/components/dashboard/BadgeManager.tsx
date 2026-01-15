@@ -623,7 +623,7 @@ function BadgeFormModal({
     e.preventDefault();
 
     // Build criteria object based on type
-    let criteria: BadgeCriteria = { type: criteriaType };
+    const criteria: BadgeCriteria = { type: criteriaType };
     const selectedCriteriaConfig = CRITERIA_TYPES.find(
       (c) => c.value === criteriaType,
     );

@@ -71,13 +71,25 @@ jobs:
           NEXTAUTH_SECRET: test-secret-for-ci-cd-pipeline-only
           NEXTAUTH_URL: http://localhost:3000
 
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./web/coverage/coverage-final.json
+          flags: unittests
+          name: codecov-production
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
       - name: Install Playwright browsers
         working-directory: ./web
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests
         working-directory: ./web
-        run: npm run test:e2e
+        run: |
+          npm run db:setup
+          npx tsx scripts/setup-test-data.ts
+          npm run test:e2e
         env:
           NODE_ENV: test
           # PostgreSQL test database configuration
@@ -90,6 +102,15 @@ jobs:
           # NextAuth configuration for tests
           NEXTAUTH_SECRET: test-secret-for-ci-cd-pipeline-only
           NEXTAUTH_URL: http://localhost:3000
+          NEXT_PUBLIC_APP_URL: https://reads.mws.web.id
+          NEXT_PUBLIC_RAG_API_URL: https://rag.mws.web.id/
+          # Dummy MinIO configuration for E2E tests (URLs won't be fetched)
+          MINIO_ENDPOINT: localhost
+          MINIO_PORT: 9000
+          MINIO_ACCESS_KEY: test-access-key
+          MINIO_SECRET_KEY: test-secret-key
+          MINIO_BUCKET_NAME: test-bucket
+          MINIO_USE_SSL: "false"
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

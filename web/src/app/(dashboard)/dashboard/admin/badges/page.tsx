@@ -1,7 +1,9 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { requireRole } from "@/lib/auth/roleCheck";
+import {
+  getAllBadges,
+  getBooksForBadgeAssignment,
+} from "../badge-actions";
 import {
   BadgeManager,
   type UserPermissions,
@@ -10,65 +12,29 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function AdminBadgesPage() {
-  const supabase = await createSupabaseServerClient();
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    redirect("/dashboard");
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Check if user is admin or librarian
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || !["ADMIN", "LIBRARIAN"].includes(profile.role)) {
-    redirect("/dashboard");
-  }
+  // Authenticate and check role using NextAuth
+  const { user, role } = await requireRole(["ADMIN", "LIBRARIAN"]);
 
   // Build permissions object based on role
-  const isAdmin = profile.role === "ADMIN";
-  const isLibrarian = profile.role === "LIBRARIAN";
+  const isAdmin = role === "ADMIN";
+  const isLibrarian = role === "LIBRARIAN";
 
   const permissions: UserPermissions = {
-    role: profile.role as "ADMIN" | "LIBRARIAN",
+    role: role as "ADMIN" | "LIBRARIAN",
     userId: user.id,
     canCreateAllBadges: isAdmin,
     canEditSystemBadges: isAdmin,
     canOnlyCreateBookBadges: isLibrarian,
   };
 
-  // Fetch all badges with book info
-  const { data: badges, error: badgesError } = await supabaseAdmin
-    .from("badges")
-    .select("*, book:books(id, title, author)")
-    .order("display_order", { ascending: true });
-
-  if (badgesError) {
-    console.error("Failed to fetch badges:", badgesError);
-  }
+  // Fetch all badges and books using server actions
+  const [badges, books] = await Promise.all([
+    getAllBadges(),
+    getBooksForBadgeAssignment(),
+  ]);
 
   // Debug: Log badges count
-  console.log(`[Badge Management] Fetched ${badges?.length ?? 0} badges`);
-
-  // Fetch all books for the dropdown
-  const { data: books, error: booksError } = await supabaseAdmin
-    .from("books")
-    .select("id, title, author")
-    .order("title", { ascending: true });
-
-  if (booksError) {
-    console.error("Failed to fetch books:", booksError);
-  }
+  console.log(`[Badge Management] Fetched ${badges.length} badges`);
 
   // Header text based on role
   const headerDescription = isAdmin
@@ -96,8 +62,8 @@ export default async function AdminBadgesPage() {
       {/* Badge Manager Component */}
       <div className="rounded-[28px] border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(147,118,255,0.18)]">
         <BadgeManager
-          initialBadges={badges ?? []}
-          books={books ?? []}
+          initialBadges={badges}
+          books={books}
           permissions={permissions}
         />
       </div>

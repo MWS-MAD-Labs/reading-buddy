@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { assignQuizToClass, unassignQuizFromClass } from '@/app/(dashboard)/dashboard/teacher/actions';
+import { TeacherQuizCreator } from './TeacherQuizCreator';
+import { Sparkles, Plus } from 'lucide-react';
 
 type AvailableQuiz = {
   id: number;
@@ -45,6 +47,7 @@ export const ClassQuizList = ({
   const [isAssigning, setIsAssigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedQuizId, setSelectedQuizId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState<string>('');
 
@@ -91,11 +94,19 @@ export const ClassQuizList = ({
     }
   };
 
+  const handleQuizCreated = () => {
+    setIsCreateOpen(false);
+    router.refresh();
+  };
+
   const formatQuizLabel = (quiz: AvailableQuiz) => {
     if (quiz.quiz_type === 'checkpoint') {
       return `Checkpoint Quiz (Page ${quiz.checkpoint_page})`;
     }
-    return `Classroom Quiz (Pages ${quiz.page_range_start}-${quiz.page_range_end})`;
+    if (quiz.page_range_start && quiz.page_range_end) {
+      return `Classroom Quiz (Pages ${quiz.page_range_start}-${quiz.page_range_end})`;
+    }
+    return 'Classroom Quiz (Full Book)';
   };
 
   const formatDate = (dateString: string | null) => {
@@ -111,17 +122,49 @@ export const ClassQuizList = ({
           <h2 className="text-xl font-black text-indigo-950">{bookTitle}</h2>
           <p className="text-sm font-medium text-indigo-500">Assign quizzes created by librarians to your class.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => unassignedQuizzes.length > 0 && setIsFormOpen((value) => !value)}
-          disabled={unassignedQuizzes.length === 0}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-purple-400 to-pink-500 text-white shadow-[0_12px_30px_rgba(168,85,247,0.45)] transition hover:shadow-[0_16px_35px_rgba(168,85,247,0.5)] disabled:opacity-40"
-          aria-label="Assign quiz to class"
-        >
-          +
-        </button>
+        <div className="flex gap-2">
+          {/* Create Quiz Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsCreateOpen((value) => !value);
+              setIsFormOpen(false);
+            }}
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-4 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_16px_35px_rgba(99,102,241,0.5)]"
+          >
+            <Sparkles className="h-4 w-4" />
+            Create Quiz
+          </button>
+          {/* Assign Quiz Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (unassignedQuizzes.length > 0) {
+                setIsFormOpen((value) => !value);
+                setIsCreateOpen(false);
+              }
+            }}
+            disabled={unassignedQuizzes.length === 0}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-purple-400 to-pink-500 text-white shadow-[0_12px_30px_rgba(168,85,247,0.45)] transition hover:shadow-[0_16px_35px_rgba(168,85,247,0.5)] disabled:opacity-40"
+            aria-label="Assign quiz to class"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
+      {/* Create Quiz Form */}
+      {isCreateOpen && (
+        <TeacherQuizCreator
+          classId={classId}
+          bookId={bookId}
+          bookTitle={bookTitle}
+          onQuizCreated={handleQuizCreated}
+          onCancel={() => setIsCreateOpen(false)}
+        />
+      )}
+
+      {/* Assign Existing Quiz Form */}
       {isFormOpen && (
         <form onSubmit={handleAssign} className="flex flex-col gap-3">
           <select
@@ -184,13 +227,27 @@ export const ClassQuizList = ({
             </button>
           </div>
         ))}
-        {assignedQuizzes.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-purple-200 bg-purple-50/60 p-6 text-center text-purple-400">
-            No quizzes assigned yet.{' '}
-            {unassignedQuizzes.length > 0
-              ? 'Use the + button to assign a quiz.'
-              : 'No quizzes available for this book yet.'}
-          </p>
+        {assignedQuizzes.length === 0 && !isCreateOpen && (
+          <div className="rounded-2xl border border-dashed border-purple-200 bg-purple-50/60 p-6 text-center">
+            <p className="text-purple-400">
+              No quizzes assigned yet.
+            </p>
+            {unassignedQuizzes.length === 0 && availableQuizzes.length === 0 && (
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(true)}
+                className="mt-3 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl"
+              >
+                <Sparkles className="h-4 w-4" />
+                Create Your First Quiz
+              </button>
+            )}
+            {unassignedQuizzes.length > 0 && (
+              <p className="mt-2 text-sm text-purple-400">
+                Use the + button to assign an existing quiz, or create a new one.
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>

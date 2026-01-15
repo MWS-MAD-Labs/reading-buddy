@@ -1,7 +1,7 @@
 "use server";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/server";
+import { query } from "@/lib/db";
 import { checkAndAwardChallengeXP } from "@/lib/weekly-challenge-tracking";
 import { revalidatePath } from "next/cache";
 
@@ -11,20 +11,25 @@ import { revalidatePath } from "next/cache";
  * (e.g., after reading pages, completing books/quizzes)
  */
 export async function checkWeeklyChallengeCompletion() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId) {
     return { success: false, error: "Not authenticated" };
   }
 
-  const supabaseAdmin = getSupabaseAdminClient();
-  if (!supabaseAdmin) {
-    return { success: false, error: "Database connection not available" };
+  // Get profile ID
+  const profileResult = await query(
+    `SELECT id FROM profiles WHERE user_id = $1`,
+    [user.userId]
+  );
+
+  const profileId = profileResult.rows[0]?.id;
+
+  if (!profileId) {
+    return { success: false, error: "Profile not found" };
   }
-  const result = await checkAndAwardChallengeXP(supabaseAdmin, user.id);
+
+  const result = await checkAndAwardChallengeXP(user.userId, profileId);
 
   if (result.awarded) {
     // Revalidate pages to show updated XP

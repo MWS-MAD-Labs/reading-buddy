@@ -51,7 +51,7 @@ export const getObjectKeyFromPublicUrl = (publicUrl: string | null | undefined) 
     const pathParts = parsed.pathname
       .split('/')
       .filter(Boolean)
-      .map((segment: any) => decodeSegment(segment));
+      .map((segment: string) => decodeSegment(segment));
     if (!pathParts.length) {
       return null;
     }
@@ -70,4 +70,24 @@ export const buildPageImageKey = (bookId: number, pageNumber: number) => {
   const prefix = buildBookAssetsPrefix(bookId);
   const suffix = String(pageNumber).padStart(4, '0');
   return `${prefix}/page-${suffix}.jpg`;
+};
+
+/**
+ * Normalize a stored MinIO URL to use the current endpoint configuration.
+ * This handles cases where URLs were stored with a different endpoint (e.g., minioapi.mws.web.id)
+ * but we now need to access them via a different endpoint (e.g., direct IP).
+ */
+export const normalizeMinioUrl = (storedUrl: string | null | undefined): string | null => {
+  if (!storedUrl) {
+    return null;
+  }
+
+  const objectKey = getObjectKeyFromPublicUrl(storedUrl);
+  if (!objectKey) {
+    // If we can't extract the object key, return the original URL
+    return storedUrl;
+  }
+
+  // Rebuild the URL using the current endpoint configuration
+  return buildPublicObjectUrl(objectKey);
 };

@@ -4,7 +4,7 @@
  * Provides a wrapper function to add rate limiting to Next.js API route handlers.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { rateLimit, rateLimitExceeded, getClientIdentifier, getUserIdentifier, rateLimitConfig } from '@/lib/rate-limit';
 
 type RateLimitType = keyof typeof rateLimitConfig;

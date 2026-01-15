@@ -50,6 +50,16 @@ const navLinks: NavLink[] = [
     roles: ["ADMIN", "STUDENT"],
   },
   {
+    href: "/dashboard/journal",
+    label: "Journal",
+    emoji: "📓",
+    color: "from-amber-400 to-yellow-400",
+    textColor: "text-amber-600",
+    bgColor: "bg-amber-100",
+    borderColor: "border-amber-300",
+    roles: ["ADMIN", "STUDENT"],
+  },
+  {
     href: "/dashboard/teacher",
     label: "Teacher",
     emoji: "👨‍🏫",
@@ -59,6 +69,7 @@ const navLinks: NavLink[] = [
     borderColor: "border-rose-300",
     roles: ["ADMIN", "TEACHER"],
   },
+
   {
     href: "/dashboard/librarian",
     label: "Librarian",
@@ -133,9 +144,8 @@ export const MobileNav = ({ userRole }: MobileNavProps) => {
 
       {/* Drawer */}
       <div
-        className={`fixed right-0 top-0 z-[9999] h-full w-80 max-w-[85vw] transform bg-gradient-to-br from-purple-50 via-pink-50 to-yellow-50 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
+        className={`fixed right-0 top-0 z-[9999] h-full w-80 max-w-[85vw] transform bg-gradient-to-br from-purple-50 via-pink-50 to-yellow-50 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden ${isOpen ? "translate-x-0" : "translate-x-full"
+          }`}
       >
         <div className="flex h-full flex-col">
           {/* Header */}
@@ -173,10 +183,9 @@ export const MobileNav = ({ userRole }: MobileNavProps) => {
                       href={link.href}
                       className={`
                         flex min-h-[56px] items-center gap-3 rounded-2xl border-4 px-5 py-3 text-base font-black transition-all active:scale-95
-                        ${
-                          isActive
-                            ? `bg-gradient-to-r ${link.color} text-white shadow-lg ${link.borderColor}`
-                            : `${link.bgColor} ${link.textColor} ${link.borderColor} hover:scale-105 hover:shadow-md`
+                        ${isActive
+                          ? `bg-gradient-to-r ${link.color} text-white shadow-lg ${link.borderColor}`
+                          : `${link.bgColor} ${link.textColor} ${link.borderColor} hover:scale-105 hover:shadow-md`
                         }
                       `}
                     >

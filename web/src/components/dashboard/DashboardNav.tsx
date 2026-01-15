@@ -48,6 +48,16 @@ const navLinks: NavLink[] = [
     roles: ["ADMIN", "STUDENT"],
   },
   {
+    href: "/dashboard/journal",
+    label: "Journal",
+    emoji: "📓",
+    color: "from-amber-400 to-yellow-400",
+    textColor: "text-amber-600",
+    bgColor: "bg-amber-100",
+    borderColor: "border-amber-300",
+    roles: ["ADMIN", "STUDENT"],
+  },
+  {
     href: "/dashboard/teacher",
     label: "Teacher",
     emoji: "👨‍🏫",
@@ -106,10 +116,9 @@ export const DashboardNav = ({ userRole }: DashboardNavProps) => {
               btn-squish hover-bounce
               min-h-[44px]
               rounded-2xl border-4 px-6 py-3 text-base font-black transition-all
-              ${
-                isActive
-                  ? `bg-gradient-to-r ${link.color} text-white shadow-lg ${link.borderColor}`
-                  : `${link.bgColor} ${link.textColor} ${link.borderColor} hover:scale-105 hover:shadow-md`
+              ${isActive
+                ? `bg-gradient-to-r ${link.color} text-white shadow-lg ${link.borderColor}`
+                : `${link.bgColor} ${link.textColor} ${link.borderColor} hover:scale-105 hover:shadow-md`
               }
             `}
           >

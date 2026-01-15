@@ -77,7 +77,10 @@ jobs:
 
       - name: Run E2E tests
         working-directory: ./web
-        run: npm run test:e2e
+        run: |
+          npm run db:setup
+          npx tsx scripts/setup-test-data.ts
+          npm run test:e2e
         env:
           NODE_ENV: test
           # PostgreSQL test database configuration
@@ -90,6 +93,13 @@ jobs:
           # NextAuth configuration for tests
           NEXTAUTH_SECRET: test-secret-for-ci-cd-pipeline-only
           NEXTAUTH_URL: http://localhost:3000
+          # Dummy MinIO configuration for E2E tests (URLs won't be fetched)
+          MINIO_ENDPOINT: localhost
+          MINIO_PORT: 9000
+          MINIO_ACCESS_KEY: test-access-key
+          MINIO_SECRET_KEY: test-secret-key
+          MINIO_BUCKET_NAME: test-bucket
+          MINIO_USE_SSL: "false"
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

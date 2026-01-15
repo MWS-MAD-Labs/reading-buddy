@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { query } from "@/lib/db";
 import { onQuizCompleted } from "@/lib/gamification";
+import { getCurrentUser } from "@/lib/auth/server";
 import type { Badge } from "@/types/database";
 
 export const submitQuizAttempt = async (input: {
@@ -17,30 +17,17 @@ export const submitQuizAttempt = async (input: {
   xpAwarded: number;
   scorePercent: number;
 }> => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-  if (!user) {
+  if (!user || !user.userId || !user.profileId) {
     throw new Error("You must be signed in to submit a quiz.");
   }
 
   // Get user's profile ID
-  console.log("[submitQuizAttempt] Auth user.id:", user.id);
+  console.log("[submitQuizAttempt] Auth user.userId:", user.userId);
+  console.log("[submitQuizAttempt] Auth user.profileId:", user.profileId);
 
-  const profileResult = await query(
-    `SELECT id, user_id FROM profiles WHERE user_id = $1 OR id = $1`,
-    [user.id],
-  );
-
-  console.log("[submitQuizAttempt] Profile lookup result:", profileResult.rows);
-
-  if (profileResult.rows.length === 0) {
-    throw new Error("User profile not found.");
-  }
-
-  const profileId = profileResult.rows[0].id;
+  const profileId = user.profileId;
 
   // Insert quiz attempt using PostgreSQL
   const insertResult = await query(
@@ -57,7 +44,7 @@ export const submitQuizAttempt = async (input: {
   // Award XP and evaluate badges for quiz completion
   const totalQuestions = input.totalQuestions || input.answers.length;
   const result = await onQuizCompleted(
-    user.id,
+    user.userId,
     profileId,
     input.quizId,
     input.score,

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { SupabaseProvider } from "@/components/providers/SupabaseProvider";
 import { NextAuthProvider } from "@/components/providers/NextAuthProvider";
 import { getServerEnv } from "@/lib/env";
 
@@ -46,7 +45,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <NextAuthProvider>
-          <SupabaseProvider>{children}</SupabaseProvider>
+          {children}
         </NextAuthProvider>
       </body>
     </html>

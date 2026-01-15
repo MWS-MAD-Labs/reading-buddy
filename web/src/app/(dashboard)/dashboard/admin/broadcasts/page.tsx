@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BroadcastManager } from "@/components/dashboard/BroadcastManager";
 import { requireRole } from "@/lib/auth/roleCheck";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { query } from "@/lib/db";
 import type { LoginBroadcast } from "@/lib/broadcasts";
 
 export const dynamic = "force-dynamic";
@@ -10,33 +10,23 @@ type BroadcastRow = LoginBroadcast & { isActive?: boolean };
 
 export default async function AdminBroadcastsPage() {
   await requireRole(["ADMIN"]);
-  const supabase = getSupabaseAdminClient();
-  if (!supabase) {
-    return (
-      <div className="p-6 text-center text-red-600">
-        Database connection not available.
-      </div>
-    );
-  }
 
-  const { data } = await supabase
-    .from("login_broadcasts")
-    .select(
-      "id, title, body, tone, link_label, link_url, created_at, is_active",
-    )
-    .order("created_at", { ascending: false });
+  const { rows } = await query(
+    `SELECT id, title, body, tone, link_label, link_url, created_at, is_active
+     FROM login_broadcasts
+     ORDER BY created_at DESC`
+  );
 
-  const broadcasts: BroadcastRow[] =
-    data?.map((row: any) => ({
-      id: row.id,
-      title: row.title,
-      body: row.body,
-      tone: (row.tone ?? "info") as LoginBroadcast["tone"],
-      linkLabel: row.link_label,
-      linkUrl: row.link_url,
-      createdAt: row.created_at,
-      isActive: row.is_active,
-    })) ?? [];
+  const broadcasts: BroadcastRow[] = rows.map((row: any) => ({
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    tone: (row.tone ?? "info") as LoginBroadcast["tone"],
+    linkLabel: row.link_label,
+    linkUrl: row.link_url,
+    createdAt: row.created_at,
+    isActive: row.is_active,
+  }));
 
   return (
     <div className="space-y-6">
