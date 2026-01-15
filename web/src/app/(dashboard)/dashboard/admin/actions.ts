@@ -62,10 +62,10 @@ export async function addUser(params: AddUserParams): Promise<void> {
       userId = userResult.rows[0].id as string;
     }
 
-    // Create profile (id = user id for direct reference)
+    // Create profile (id and user_id both reference the user)
     await client.query(
-      `INSERT INTO profiles (id, full_name, role, access_level, xp, level, reading_streak, longest_streak)
-       VALUES ($1, $2, $3, $4, 0, 1, 0, 0)`,
+      `INSERT INTO profiles (id, user_id, full_name, role, access_level, xp, level, reading_streak, longest_streak)
+       VALUES ($1, $1, $2, $3, $4, 0, 1, 0, 0)`,
       [userId, params.fullName, params.role, params.accessLevel],
     );
   });
