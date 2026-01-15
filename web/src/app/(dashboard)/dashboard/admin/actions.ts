@@ -32,7 +32,7 @@ export async function addUser(params: AddUserParams): Promise<void> {
       // User exists, check if they have a profile
       userId = existingUser.rows[0].id as string;
       const existingProfile = await client.query(
-        "SELECT id FROM profiles WHERE id = $1",
+        "SELECT id FROM profiles WHERE user_id = $1",
         [userId],
       );
 
