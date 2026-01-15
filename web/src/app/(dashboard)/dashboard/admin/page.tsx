@@ -18,7 +18,7 @@ export default async function AdminDashboardPage() {
       p.access_level,
       u.email
     FROM profiles p
-    JOIN users u ON p.id = u.id
+    JOIN users u ON p.user_id = u.id
     ORDER BY p.updated_at DESC
   `);
 
