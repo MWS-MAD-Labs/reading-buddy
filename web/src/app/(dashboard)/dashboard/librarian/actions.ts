@@ -221,16 +221,11 @@ export const saveBookMetadata = async (input: {
       [insertedBook.id, ...input.accessLevels],
     );
 
-    // Queue render job
-    try {
-      await queryWithContext(
-        user.userId,
-        `INSERT INTO book_render_jobs (book_id, status) VALUES ($1, $2)`,
-        [insertedBook.id, "pending"],
-      );
-    } catch (jobError) {
-      console.error("Unable to queue render job:", jobError);
-    }
+    // Note: Book is ready for text extraction. The librarian can trigger
+    // text extraction from the book management interface when needed.
+    console.log(
+      `Book ${insertedBook.id} uploaded - ready for text extraction`,
+    );
 
     revalidatePath("/dashboard/library");
     revalidatePath("/dashboard/librarian");
@@ -417,13 +412,13 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
   const textContent =
     book.text_extracted_at && book.page_text_content
       ? (book.page_text_content as {
-          pages: {
-            pageNumber: number;
-            text: string;
-            wordCount?: number;
-          }[];
-          totalWords: number;
-        })
+        pages: {
+          pageNumber: number;
+          text: string;
+          wordCount?: number;
+        }[];
+        totalWords: number;
+      })
       : null;
 
   const pages =
@@ -517,10 +512,10 @@ export const generateQuizForBookWithContent = async (input: {
   const textContent =
     book.text_extracted_at && book.page_text_content
       ? (book.page_text_content as {
-          pages: { pageNumber: number; text: string; wordCount?: number }[];
-          totalPages: number;
-          totalWords: number;
-        })
+        pages: { pageNumber: number; text: string; wordCount?: number }[];
+        totalPages: number;
+        totalWords: number;
+      })
       : null;
 
   const questionCount = input.questionCount ?? 5;
@@ -1068,9 +1063,9 @@ export const generateBookDescription = async (input: {
     const textContent =
       bookRecord?.text_extracted_at && bookRecord.page_text_content
         ? (bookRecord.page_text_content as {
-            pages: { pageNumber: number; text: string }[];
-            totalWords: number;
-          })
+          pages: { pageNumber: number; text: string }[];
+          totalWords: number;
+        })
         : null;
 
     const pagesFromText = textContent?.pages?.map((page: any) => ({
@@ -1084,12 +1079,12 @@ export const generateBookDescription = async (input: {
     const previewPage =
       !pagesFromText?.length && input.textPreview
         ? [
-            {
-              pageNumber: 0,
-              text: input.textPreview,
-              wordCount: input.textPreview.split(/\s+/).length,
-            },
-          ]
+          {
+            pageNumber: 0,
+            text: input.textPreview,
+            wordCount: input.textPreview.split(/\s+/).length,
+          },
+        ]
         : null;
 
     const pdfUrl =
