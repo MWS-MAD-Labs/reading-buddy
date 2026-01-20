@@ -172,9 +172,7 @@ export const saveBookMetadata = async (input: {
 }) => {
   const user = await ensureLibrarianOrAdmin();
 
-  if (!input.accessLevels?.length) {
-    throw new Error("At least one access level is required.");
-  }
+  // Access levels are optional - books with no levels are "draft" books not visible to students
 
   try {
     // Insert book and return id
@@ -254,9 +252,7 @@ export const updateBookMetadata = async (input: {
 }) => {
   const user = await ensureLibrarianOrAdmin();
 
-  if (!input.accessLevels?.length) {
-    throw new Error("At least one access level is required.");
-  }
+  // Access levels are optional - books with no levels are "draft" books not visible to students
 
   // Build dynamic UPDATE query
   const setParts: string[] = [

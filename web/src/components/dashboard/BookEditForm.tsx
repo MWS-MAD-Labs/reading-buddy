@@ -293,10 +293,7 @@ export const BookEditForm = ({
       return;
     }
 
-    if (!accessLevels.length) {
-      setError("Select at least one access level.");
-      return;
-    }
+    // Access levels are optional - books with no levels are "draft" books
 
     const hasNewPdf = pdfFile && pdfFile.size > 0;
     const hasNewCover = coverFile && coverFile.size > 0;
@@ -613,18 +610,17 @@ export const BookEditForm = ({
               type="button"
               onClick={handleGenerateDescription}
               disabled={generatingDescription || status !== "idle"}
-              className={`rounded-lg border-2 px-4 py-2 text-sm font-bold text-white shadow transition disabled:opacity-50 ${
-                generatingDescription
-                  ? "animate-pulse border-purple-400 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 bg-[length:200%_100%] animate-[gradient_2s_ease-in-out_infinite]"
-                  : "border-indigo-300 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
-              }`}
+              className={`rounded-lg border-2 px-4 py-2 text-sm font-bold text-white shadow transition disabled:opacity-50 ${generatingDescription
+                ? "animate-pulse border-purple-400 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 bg-[length:200%_100%] animate-[gradient_2s_ease-in-out_infinite]"
+                : "border-indigo-300 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+                }`}
               style={
                 generatingDescription
                   ? {
-                      animation:
-                        "pulse 1.5s ease-in-out infinite, gradient 2s ease-in-out infinite",
-                      backgroundSize: "200% 100%",
-                    }
+                    animation:
+                      "pulse 1.5s ease-in-out infinite, gradient 2s ease-in-out infinite",
+                    backgroundSize: "200% 100%",
+                  }
                   : undefined
               }
             >
@@ -666,7 +662,7 @@ export const BookEditForm = ({
             ))}
           </div>
           <p className="text-xs text-indigo-500">
-            Choose who can access this title. Select at least one group.
+            Choose who can access this title. Leave empty for draft books.
           </p>
         </fieldset>
 
@@ -729,8 +725,8 @@ export const BookEditForm = ({
 
       {/* Progress Indicators */}
       {status === "uploading_pdf" ||
-      status === "uploading_cover" ||
-      uploadProgress.pdf > 0 ? (
+        status === "uploading_cover" ||
+        uploadProgress.pdf > 0 ? (
         <div className="space-y-3 rounded-2xl border-2 border-purple-200 bg-purple-50 p-4">
           <div>
             <div className="mb-1 flex items-center justify-between text-sm font-semibold text-purple-700">
