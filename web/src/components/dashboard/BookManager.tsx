@@ -11,11 +11,7 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
-import {
-  deleteBook,
-  renderBookImages,
-  extractBookText,
-} from "@/app/(dashboard)/dashboard/librarian/actions";
+import { deleteBook } from "@/app/(dashboard)/dashboard/librarian/actions";
 import {
   ACCESS_LEVEL_OPTIONS,
   type AccessLevelValue,
@@ -157,8 +153,7 @@ export const BookManager = ({
     "ALL",
   );
   const [isDeleting, startDeleteTransition] = useTransition();
-  const [renderingBookId, setRenderingBookId] = useState<number | null>(null);
-  const [extractingBookId, setExtractingBookId] = useState<number | null>(null);
+
   const [actionMenu, setActionMenu] = useState<{
     id: number;
     anchor: HTMLElement;
@@ -192,11 +187,15 @@ export const BookManager = ({
     return () => cancelAnimationFrame(rafId);
   }, [actionMenu]);
 
-  // Click outside handler
-  useEffect(() => {
-    if (!actionMenu) return;
+  // Click outside handler - use ref to avoid stale closure issues
+  const actionMenuRef = useRef(actionMenu);
+  actionMenuRef.current = actionMenu;
 
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      // Only handle if menu is open
+      if (!actionMenuRef.current) return;
+
       const target = e.target as HTMLElement;
 
       // Ignore clicks on the menu itself
@@ -208,10 +207,10 @@ export const BookManager = ({
       setActionMenu(null);
     };
 
-    // Use mousedown for faster response
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [actionMenu]);
+    // Use click event (not mousedown) to ensure button onClick fires first
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []); // Empty deps - handler uses ref for current state
 
   const sortedBooks = useMemo(
     () =>
@@ -333,53 +332,7 @@ export const BookManager = ({
     });
   };
 
-  const handleRender = async (book: ManagedBookRecord) => {
-    setRenderingBookId(book.id);
-    setFeedback(null);
 
-    try {
-      const result = await renderBookImages(book.id);
-      if ("success" in result && result.success) {
-        setFeedback({ type: "success", message: result.message });
-        router.refresh();
-      } else if ("error" in result) {
-        setFeedback({
-          type: "error",
-          message: result.error || "Rendering failed",
-        });
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to render book.";
-      setFeedback({ type: "error", message });
-    } finally {
-      setRenderingBookId(null);
-    }
-  };
-
-  const handleExtractText = async (book: ManagedBookRecord) => {
-    setExtractingBookId(book.id);
-    setFeedback(null);
-
-    try {
-      const result = await extractBookText(book.id);
-      if (result.success) {
-        setFeedback({
-          type: "success",
-          message: `${result.totalWords} words extracted from "${book.title}"`,
-        });
-        router.refresh();
-      } else {
-        setFeedback({ type: "error", message: result.message });
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to extract text.";
-      setFeedback({ type: "error", message });
-    } finally {
-      setExtractingBookId(null);
-    }
-  };
 
   return (
     <section className="space-y-5">
@@ -611,7 +564,7 @@ export const BookManager = ({
                           {book.accessLevels.map((level: any) => {
                             const badge =
                               ACCESS_BADGES[
-                                level as keyof typeof ACCESS_BADGES
+                              level as keyof typeof ACCESS_BADGES
                               ];
                             return (
                               <span
@@ -619,7 +572,7 @@ export const BookManager = ({
                                 className={clsx(
                                   "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
                                   badge?.color ??
-                                    "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                  "bg-indigo-100 text-indigo-600 border-indigo-300",
                                 )}
                               >
                                 {badge?.label ?? level.slice(0, 2)}
@@ -639,28 +592,7 @@ export const BookManager = ({
                       >
                         📝
                       </button>
-                      {!book.pageImagesCount && (
-                        <button
-                          type="button"
-                          onClick={() => handleRender(book)}
-                          disabled={renderingBookId === book.id}
-                          className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-emerald-300 bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-600 transition hover:bg-emerald-200 active:scale-95 disabled:opacity-40"
-                          aria-label="Render images"
-                        >
-                          {renderingBookId === book.id ? "🎨" : "🎨"}
-                        </button>
-                      )}
-                      {!book.textExtractedAt && (
-                        <button
-                          type="button"
-                          onClick={() => handleExtractText(book)}
-                          disabled={extractingBookId === book.id}
-                          className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-amber-300 bg-amber-100 px-4 py-2 text-sm font-black text-amber-700 transition hover:bg-amber-200 active:scale-95 disabled:opacity-40"
-                          aria-label="Extract text"
-                        >
-                          {extractingBookId === book.id ? "🧾" : "🧾"}
-                        </button>
-                      )}
+
                       <button
                         type="button"
                         onClick={() => handleEdit(book)}
@@ -749,7 +681,7 @@ export const BookManager = ({
                               {book.accessLevels.map((level: any) => {
                                 const badge =
                                   ACCESS_BADGES[
-                                    level as keyof typeof ACCESS_BADGES
+                                  level as keyof typeof ACCESS_BADGES
                                   ];
                                 return (
                                   <span
@@ -757,7 +689,7 @@ export const BookManager = ({
                                     className={clsx(
                                       "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
                                       badge?.color ??
-                                        "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                      "bg-indigo-100 text-indigo-600 border-indigo-300",
                                     )}
                                   >
                                     {badge?.label ?? level.slice(0, 2)}
@@ -774,13 +706,15 @@ export const BookManager = ({
                             <button
                               type="button"
                               data-action-button
-                              onClick={(e) =>
-                                setActionMenu((prev) =>
-                                  prev?.id === book.id
-                                    ? null
-                                    : { id: book.id, anchor: e.currentTarget },
-                                )
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Toggle menu: close if same book, open if different/none
+                                if (actionMenu?.id === book.id) {
+                                  setActionMenu(null);
+                                } else {
+                                  setActionMenu({ id: book.id, anchor: e.currentTarget });
+                                }
+                              }}
                               className="h-10 w-10 rounded-full border border-indigo-200 bg-white/80 text-lg font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50"
                               aria-haspopup="true"
                               aria-expanded={actionMenu?.id === book.id}
@@ -829,40 +763,7 @@ export const BookManager = ({
                   <span aria-hidden>📝</span>
                   <span>Quizzes</span>
                 </button>
-                {!book.pageImagesCount && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActionMenu(null);
-                      void handleRender(book);
-                    }}
-                    disabled={renderingBookId === book.id}
-                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
-                  >
-                    <span aria-hidden>🎨</span>
-                    <span>
-                      {renderingBookId === book.id ? "Rendering…" : "Render"}
-                    </span>
-                  </button>
-                )}
-                {!book.textExtractedAt && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActionMenu(null);
-                      void handleExtractText(book);
-                    }}
-                    disabled={extractingBookId === book.id}
-                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50 disabled:opacity-50"
-                  >
-                    <span aria-hidden>🧾</span>
-                    <span>
-                      {extractingBookId === book.id
-                        ? "Extracting…"
-                        : "Extract text"}
-                    </span>
-                  </button>
-                )}
+
                 <button
                   type="button"
                   onClick={() => {
