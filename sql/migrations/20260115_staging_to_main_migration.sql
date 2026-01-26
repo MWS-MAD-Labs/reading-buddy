@@ -131,7 +131,29 @@ CREATE TRIGGER update_book_reviews_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================================
--- 3. CLASSROOM DISCUSSION STREAM
+-- 3. CLASS QUIZ ASSIGNMENTS
+-- ============================================================================
+
+-- Create class_quiz_assignments table for assigning quizzes to classrooms
+CREATE TABLE IF NOT EXISTS class_quiz_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  quiz_id INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+  assigned_by UUID NOT NULL REFERENCES profiles(id),
+  assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  due_date TIMESTAMPTZ,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(class_id, quiz_id)
+);
+
+-- Indexes for class_quiz_assignments
+CREATE INDEX IF NOT EXISTS idx_class_quiz_assignments_class ON class_quiz_assignments(class_id);
+CREATE INDEX IF NOT EXISTS idx_class_quiz_assignments_quiz ON class_quiz_assignments(quiz_id);
+CREATE INDEX IF NOT EXISTS idx_class_quiz_assignments_active ON class_quiz_assignments(class_id, is_active) WHERE is_active = true;
+
+-- ============================================================================
+-- 4. CLASSROOM DISCUSSION STREAM
 -- ============================================================================
 
 -- Classroom messages table with threading support

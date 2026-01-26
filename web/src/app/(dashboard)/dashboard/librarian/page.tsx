@@ -34,7 +34,7 @@ export default async function LibrarianPage() {
       b.genre, b.language, b.description, b.page_count, b.pdf_url, b.cover_url,
       b.created_at, b.page_images_count, b.page_images_rendered_at,
       b.text_extracted_at, b.text_extraction_error, b.text_extraction_attempts,
-      b.last_extraction_attempt_at
+      b.last_extraction_attempt_at, b.file_format
     FROM books b
     ORDER BY b.created_at DESC`,
     [],
@@ -85,6 +85,7 @@ export default async function LibrarianPage() {
       textExtractionError: book.text_extraction_error ?? null,
       textExtractionAttempts: book.text_extraction_attempts ?? 0,
       lastExtractionAttemptAt: book.last_extraction_attempt_at ?? null,
+      fileFormat: book.file_format ?? "pdf",
     }),
   );
 

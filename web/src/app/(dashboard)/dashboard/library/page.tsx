@@ -35,15 +35,17 @@ export default async function LibraryPage() {
       [userAccessLevel],
     );
   } else {
-    // For staff or students without access level set, show all books
+    // For staff or students without access level set, show all published books
+    // (i.e., books that have at least one access level - not draft books)
     result = await queryWithContext(
       user.userId!,
-      `SELECT
+      `SELECT DISTINCT
         b.id, b.title, b.author, b.cover_url, b.description,
         b.genre, b.language, b.publisher, b.publication_year, b.created_at,
         COALESCE(AVG(br.rating) FILTER (WHERE br.status = 'APPROVED'), 0) as average_rating,
         COUNT(br.id) FILTER (WHERE br.status = 'APPROVED') as review_count
       FROM books b
+      INNER JOIN book_access ba ON b.id = ba.book_id
       LEFT JOIN book_reviews br ON br.book_id = b.id
       GROUP BY b.id
       ORDER BY b.created_at DESC`,

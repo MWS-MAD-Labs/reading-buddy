@@ -440,116 +440,152 @@ export const BookUploadForm = ({
 
       setUploadedBookId(saveResult.bookId);
 
-      // Start automatic rendering/conversion
-      setStatus("rendering");
-
-      let renderResult;
+      // Process based on file format
       if (detectedFormat === "epub") {
-        setRenderingProgress("Converting EPUB to images...");
-        // Import and call the EPUB conversion action
-        const { convertEpubToImages } = await import(
+        // EPUB files work natively - no processing needed!
+        // EpubFlipReader handles text and images directly from the file
+        setStatus("rendering");
+        setRenderingProgress("EPUB file ready! No additional processing needed.");
+
+        // Mark as ready in database
+        const { markBookAsReady } = await import(
           "@/app/(dashboard)/dashboard/librarian/actions"
         );
-        renderResult = await convertEpubToImages(saveResult.bookId);
+        await markBookAsReady(saveResult.bookId, "epub");
+
+        setSuccess("EPUB uploaded successfully! Ready for reading.");
+
       } else if (["mobi", "azw", "azw3"].includes(detectedFormat || "")) {
+        // MOBI/AZW formats need conversion to images
+        setStatus("rendering");
         const formatUpper = detectedFormat?.toUpperCase();
-        setRenderingProgress(`Converting ${formatUpper} to images...`);
-        // Import and call the MOBI conversion action
+        setRenderingProgress(`Converting ${formatUpper} to readable format...`);
+
         const { convertMobiToImages } = await import(
           "@/app/(dashboard)/dashboard/librarian/actions"
         );
-        renderResult = await convertMobiToImages(saveResult.bookId);
-      } else {
-        setRenderingProgress("Starting book rendering...");
-        renderResult = await renderBookImages(saveResult.bookId);
-      }
+        const renderResult = await convertMobiToImages(saveResult.bookId);
 
-      if (!renderResult.success) {
-        throw new Error(renderResult.message);
-      }
+        if (!renderResult.success) {
+          throw new Error(renderResult.message);
+        }
 
-      setRenderingProgress(
-        "Rendering in progress (this may take a few minutes)...",
-      );
+        // Poll for conversion completion
+        let attempts = 0;
+        const maxAttempts = 120;
+        let renderComplete = false;
 
-      // Poll for render completion
-      let attempts = 0;
-      const maxAttempts = 120; // 10 minutes max
-      let renderComplete = false;
+        while (attempts < maxAttempts && !renderComplete) {
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          attempts++;
 
-      while (attempts < maxAttempts && !renderComplete) {
-        await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
-        attempts++;
+          const renderStatus = await checkRenderStatus(saveResult.bookId);
 
-        const renderStatus = await checkRenderStatus(saveResult.bookId);
-
-        if (renderStatus.completed) {
-          renderComplete = true;
-          setRenderingProgress(
-            `Rendering complete! ${renderStatus.pageCount} pages rendered.`,
-          );
-        } else if (renderStatus.error) {
-          throw new Error(`Rendering failed: ${renderStatus.error}`);
-        } else {
-          // Show progress as "X / Y pages"
-          if (renderStatus.processedPages && renderStatus.totalPages) {
+          if (renderStatus.completed) {
+            renderComplete = true;
+            setRenderingProgress(`Conversion complete! ${renderStatus.pageCount} pages ready.`);
+          } else if (renderStatus.error) {
+            throw new Error(`Conversion failed: ${renderStatus.error}`);
+          } else if (renderStatus.processedPages && renderStatus.totalPages) {
             setRenderingPageProgress({
               current: renderStatus.processedPages,
               total: renderStatus.totalPages,
             });
             setRenderingProgress(
-              `Rendering: ${renderStatus.processedPages} / ${renderStatus.totalPages} pages`,
+              `Converting: ${renderStatus.processedPages} / ${renderStatus.totalPages} pages`,
             );
           } else {
-            setRenderingProgress(`Rendering: ${attempts * 5}s elapsed`);
+            setRenderingProgress(`Converting: ${attempts * 5}s elapsed`);
           }
         }
-      }
 
-      if (!renderComplete) {
-        setRenderingProgress(
-          "Rendering is taking longer than expected. It will continue in the background.",
+        setSuccess(
+          renderComplete
+            ? `${formatUpper} converted successfully! Ready for reading.`
+            : `${formatUpper} uploaded. Conversion continues in background.`,
         );
-      }
 
-      // Start automatic text extraction
-      setStatus("extracting_text");
-      setRenderingProgress(
-        "Extracting text from PDF for AI quiz generation...",
-      );
+      } else {
+        // PDF: Try text extraction first, only render images if it's a scanned PDF
+        setStatus("extracting_text");
+        setRenderingProgress("Analyzing PDF content...");
 
-      try {
-        const extractResult = await extractBookText(saveResult.bookId);
-        if (extractResult.success) {
-          setRenderingProgress(
-            `Text extraction complete! ${extractResult.totalWords} words extracted.`,
-          );
-        } else {
-          console.warn("Text extraction failed:", extractResult.message);
-          setRenderingProgress(
-            `⚠️ Text extraction failed: ${extractResult.message}`,
-          );
-          setError(
-            `Book uploaded but text extraction failed: ${extractResult.message}. You can retry manually from the book list.`,
-          );
+        try {
+          const extractResult = await extractBookText(saveResult.bookId);
+
+          if (extractResult.success) {
+            // PDF has extractable text - ready for TextFlipReader!
+            setRenderingProgress(
+              `✓ Text extracted: ${extractResult.totalWords?.toLocaleString()} words`,
+            );
+            setSuccess("PDF uploaded with text content! Ready for reading.");
+
+          } else if (extractResult.errorType === "insufficient_text") {
+            // Scanned PDF - need to render as images
+            setRenderingProgress("Scanned PDF detected. Rendering pages as images...");
+            setStatus("rendering");
+
+            const renderResult = await renderBookImages(saveResult.bookId);
+
+            if (!renderResult.success) {
+              throw new Error(renderResult.message);
+            }
+
+            // Poll for render completion
+            let attempts = 0;
+            const maxAttempts = 120;
+            let renderComplete = false;
+
+            while (attempts < maxAttempts && !renderComplete) {
+              await new Promise((resolve) => setTimeout(resolve, 5000));
+              attempts++;
+
+              const renderStatus = await checkRenderStatus(saveResult.bookId);
+
+              if (renderStatus.completed) {
+                renderComplete = true;
+                setRenderingProgress(
+                  `✓ Rendered ${renderStatus.pageCount} pages as images`,
+                );
+              } else if (renderStatus.error) {
+                throw new Error(`Rendering failed: ${renderStatus.error}`);
+              } else if (renderStatus.processedPages && renderStatus.totalPages) {
+                setRenderingPageProgress({
+                  current: renderStatus.processedPages,
+                  total: renderStatus.totalPages,
+                });
+                setRenderingProgress(
+                  `Rendering: ${renderStatus.processedPages} / ${renderStatus.totalPages} pages`,
+                );
+              } else {
+                setRenderingProgress(`Rendering: ${attempts * 5}s elapsed`);
+              }
+            }
+
+            setSuccess(
+              renderComplete
+                ? "Scanned PDF uploaded! Using image-based reader."
+                : "Scanned PDF uploaded. Image rendering continues in background.",
+            );
+
+          } else {
+            // Other extraction error - log but don't fail
+            console.warn("Text extraction issue:", extractResult.message);
+            setRenderingProgress(`⚠️ ${extractResult.message}`);
+            setSuccess("PDF uploaded. You may need to retry text extraction manually.");
+          }
+        } catch (extractErr) {
+          console.warn("Text extraction error:", extractErr);
+          const errorMessage =
+            extractErr instanceof Error
+              ? extractErr.message
+              : "Unknown error occurred";
+          setRenderingProgress(`⚠️ Processing issue: ${errorMessage}`);
+          // Don't fail the upload - just warn
+          setSuccess("PDF uploaded. Processing encountered an issue - please check the book status.");
         }
-      } catch (extractErr) {
-        console.warn("Text extraction error:", extractErr);
-        const errorMessage =
-          extractErr instanceof Error
-            ? extractErr.message
-            : "Unknown error occurred";
-        setRenderingProgress(`⚠️ Text extraction failed: ${errorMessage}`);
-        setError(
-          `Book uploaded but text extraction failed: ${errorMessage}. You can retry manually from the book list.`,
-        );
       }
 
-      setSuccess(
-        renderComplete
-          ? "Book uploaded, rendered, and text extracted successfully!"
-          : "Book uploaded successfully. Rendering continues in background.",
-      );
       form.reset();
       setPageCount(null);
       setPdfDetectionState("idle");

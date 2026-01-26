@@ -63,6 +63,7 @@ export const EpubFlipReader = forwardRef<
 
   const [pages, setPages] = useState<ParsedPage[]>([]);
   const [totalPages, setTotalPages] = useState(0);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   // Ensure initialPage is treated as a number
   const basePage =
     typeof initialPage === "string"
@@ -134,6 +135,19 @@ export const EpubFlipReader = forwardRef<
         const metadata = await book.loaded.metadata;
         const title = metadata.title || bookTitle || "Unknown Title";
         const author = metadata.creator || "Unknown Author";
+
+        // Try to extract cover image
+        let coverUrl: string | null = null;
+        try {
+          const coverHref = await book.coverUrl();
+          if (coverHref) {
+            coverUrl = coverHref;
+            setCoverImageUrl(coverHref);
+            console.log("📚 Cover image found:", coverHref);
+          }
+        } catch (coverErr) {
+          console.warn("Could not extract cover image:", coverErr);
+        }
 
         // Get spine items (chapters)
         const spine = book.spine;
@@ -618,9 +632,25 @@ export const EpubFlipReader = forwardRef<
             if (index === 0 && page.type === "cover") {
               const meta = JSON.parse(page.content || "{}");
               return (
-                <div key={`cover-${index}`} className="book-cover">
-                  <div className="cover-title">{meta.title}</div>
-                  <div className="cover-author">{meta.author}</div>
+                <div key={`cover-${index}`} className="book-cover relative overflow-hidden">
+                  {/* Show cover image if available */}
+                  {coverImageUrl ? (
+                    <img
+                      src={coverImageUrl}
+                      alt={`Cover of ${meta.title}`}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={(e) => {
+                        // If image fails to load, hide it and show text fallback
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    /* Text fallback - only shown when no cover image */
+                    <div className="relative z-10 flex flex-col items-center justify-center h-full p-8">
+                      <div className="cover-title text-center">{meta.title}</div>
+                      <div className="cover-author text-center">{meta.author}</div>
+                    </div>
+                  )}
                 </div>
               );
             }

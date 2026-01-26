@@ -208,16 +208,18 @@ export const saveBookMetadata = async (input: {
 
     const insertedBook = bookResult.rows[0];
 
-    // Insert book access levels
-    const accessValues = input.accessLevels
-      .map((level, idx) => `($1, $${idx + 2})`)
-      .join(", ");
+    // Insert book access levels (only if any are selected)
+    if (input.accessLevels.length > 0) {
+      const accessValues = input.accessLevels
+        .map((level, idx) => `($1, $${idx + 2})`)
+        .join(", ");
 
-    await queryWithContext(
-      user.userId,
-      `INSERT INTO book_access (book_id, access_level) VALUES ${accessValues}`,
-      [insertedBook.id, ...input.accessLevels],
-    );
+      await queryWithContext(
+        user.userId,
+        `INSERT INTO book_access (book_id, access_level) VALUES ${accessValues}`,
+        [insertedBook.id, ...input.accessLevels],
+      );
+    }
 
     // Note: Book is ready for text extraction. The librarian can trigger
     // text extraction from the book management interface when needed.
@@ -1428,4 +1430,65 @@ export const convertMobiToImages = async (bookId: number) => {
       message: `MOBI/AZW conversion failed: ${message}`,
     };
   }
+};
+
+/**
+ * Mark a book as ready for reading without processing.
+ * Used for EPUB files which work natively without any conversion/extraction.
+ */
+export const markBookAsReady = async (
+  bookId: number,
+  format: "epub" | "pdf_text" | "pdf_images",
+) => {
+  const user = await ensureLibrarianOrAdmin();
+
+  // Update book status based on format
+  let updateQuery: string;
+  let updateParams: any[];
+
+  switch (format) {
+    case "epub":
+      // EPUBs are ready immediately - mark text_extraction_status as 'completed'
+      // since EpubFlipReader handles everything natively
+      updateQuery = `
+        UPDATE books SET 
+          text_extraction_status = 'completed',
+          text_extracted_at = NOW(),
+          text_extraction_method = 'native_epub'
+        WHERE id = $1
+      `;
+      updateParams = [bookId];
+      break;
+
+    case "pdf_text":
+      // PDF with extractable text - already handled by extractBookText
+      updateQuery = `
+        UPDATE books SET 
+          text_extraction_status = 'completed'
+        WHERE id = $1
+      `;
+      updateParams = [bookId];
+      break;
+
+    case "pdf_images":
+      // Scanned PDF using image fallback - set status to indicate image mode
+      updateQuery = `
+        UPDATE books SET 
+          text_extraction_status = 'image_fallback',
+          text_extraction_error = 'Scanned PDF - using image-based reader'
+        WHERE id = $1
+      `;
+      updateParams = [bookId];
+      break;
+
+    default:
+      throw new Error(`Unknown format: ${format}`);
+  }
+
+  await queryWithContext(user.userId, updateQuery, updateParams);
+
+  revalidatePath("/dashboard/librarian");
+  revalidatePath("/dashboard/library");
+
+  return { success: true };
 };
