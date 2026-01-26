@@ -78,8 +78,16 @@ async function main() {
 
         console.log(`✅ Found ${bookResult.rows.length} book(s) to use for testing.`);
 
-        // Assign books to student if not already assigned
+        // Ensure books have access level set (required for library visibility)
         for (const book of bookResult.rows) {
+            // Add book_access record if not exists (needed for library page INNER JOIN)
+            await pool.query(`
+                INSERT INTO book_access (book_id, access_level)
+                VALUES ($1, 'JHS')
+                ON CONFLICT DO NOTHING
+            `, [book.id]);
+
+            // Assign books to student if not already assigned
             await pool.query(`
                 INSERT INTO student_books (student_id, book_id, current_page, completed)
                 VALUES ($1, $2, 1, false)
