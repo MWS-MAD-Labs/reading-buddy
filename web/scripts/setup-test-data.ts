@@ -83,7 +83,7 @@ async function main() {
             // Add book_access record if not exists (needed for library page INNER JOIN)
             await pool.query(`
                 INSERT INTO book_access (book_id, access_level)
-                VALUES ($1, 'JHS')
+                VALUES ($1, 'JUNIOR_HIGH')
                 ON CONFLICT DO NOTHING
             `, [book.id]);
 
