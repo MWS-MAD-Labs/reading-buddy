@@ -139,58 +139,42 @@ export async function getTeacherOverview(
     );
     const studentIds = studentsResult.rows.map((row: any) => row.student_id);
 
-    // Get total assignments count
-    const totalAssignmentsResult = await queryWithContext(
+    // Get assignment counts in a single round-trip
+    const countsResult = await queryWithContext(
       userId,
-      studentIds.length > 0
-        ? `SELECT COUNT(*) as count FROM student_books WHERE student_id = ANY($1)`
-        : `SELECT 0 as count`,
-      studentIds.length > 0 ? [studentIds] : [],
-    );
-    const totalAssignments = parseInt(
-      totalAssignmentsResult.rows[0]?.count || "0",
+      `SELECT
+        (SELECT COUNT(*) FROM student_books WHERE student_id = ANY($1::uuid[])) AS total_assignments,
+        (SELECT COUNT(*) FROM student_books WHERE student_id = ANY($1::uuid[]) AND completed_at IS NOT NULL) AS completed_assignments,
+        (SELECT COUNT(*) FROM class_books WHERE class_id = ANY($2::int[])) AS active_assignments`,
+      [studentIds, classIds],
     );
 
-    // Get completed assignments count
-    const completedAssignmentsResult = await queryWithContext(
-      userId,
-      studentIds.length > 0
-        ? `SELECT COUNT(*) as count FROM student_books WHERE student_id = ANY($1) AND completed_at IS NOT NULL`
-        : `SELECT 0 as count`,
-      studentIds.length > 0 ? [studentIds] : [],
-    );
+    const counts = countsResult.rows[0] ?? {};
+    const totalAssignments = parseInt(counts.total_assignments || "0");
     const completedAssignments = parseInt(
-      completedAssignmentsResult.rows[0]?.count || "0",
+      counts.completed_assignments || "0",
     );
-
-    // Get active assignments count
-    const activeAssignmentsResult = await queryWithContext(
-      userId,
-      `SELECT COUNT(*) as count FROM class_books WHERE class_id = ANY($1)`,
-      [classIds],
-    );
-    const activeAssignments = parseInt(
-      activeAssignmentsResult.rows[0]?.count || "0",
-    );
+    const activeAssignments = parseInt(counts.active_assignments || "0");
 
     // Get recent completions
-    const recentCompletionsResult = await queryWithContext(
-      userId,
+    const recentCompletionsResult =
       studentIds.length > 0
-        ? `SELECT
-          sb.student_id,
-          sb.completed_at,
-          p.full_name as student_name,
-          b.title as book_title
-        FROM student_books sb
-        JOIN profiles p ON sb.student_id = p.id
-        JOIN books b ON sb.book_id = b.id
-        WHERE sb.student_id = ANY($1) AND sb.completed_at IS NOT NULL
-        ORDER BY sb.completed_at DESC
-        LIMIT 3`
-        : `SELECT NULL as student_id, NULL as completed_at, NULL as student_name, NULL as book_title WHERE false`,
-      studentIds.length > 0 ? [studentIds] : [],
-    );
+        ? await queryWithContext(
+          userId,
+          `SELECT
+            sb.student_id,
+            sb.completed_at,
+            p.full_name as student_name,
+            b.title as book_title
+          FROM student_books sb
+          JOIN profiles p ON sb.student_id = p.id
+          JOIN books b ON sb.book_id = b.id
+          WHERE sb.student_id = ANY($1::uuid[]) AND sb.completed_at IS NOT NULL
+          ORDER BY sb.completed_at DESC
+          LIMIT 3`,
+          [studentIds],
+        )
+        : { rows: [] as any[] };
 
     const completionRate =
       totalAssignments > 0

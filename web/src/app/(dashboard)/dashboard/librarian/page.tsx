@@ -34,30 +34,18 @@ export default async function LibrarianPage() {
       b.genre, b.language, b.description, b.page_count, b.pdf_url, b.cover_url,
       b.created_at, b.page_images_count, b.page_images_rendered_at,
       b.text_extracted_at, b.text_extraction_error, b.text_extraction_attempts,
-      b.last_extraction_attempt_at, b.file_format
+      b.last_extraction_attempt_at, b.file_format,
+      COALESCE(
+        ARRAY_AGG(DISTINCT ba.access_level)
+        FILTER (WHERE ba.access_level IS NOT NULL),
+        '{}'
+      ) AS access_levels
     FROM books b
+    LEFT JOIN book_access ba ON ba.book_id = b.id
+    GROUP BY b.id
     ORDER BY b.created_at DESC`,
     [],
   );
-
-  // Get access levels for each book
-  const bookIds = booksResult.rows.map((book: any) => book.id);
-  const accessLevelsMap: Record<number, AccessLevelValue[]> = {};
-
-  if (bookIds.length > 0) {
-    const accessResult = await queryWithContext(
-      user.userId!,
-      `SELECT book_id, access_level FROM book_access WHERE book_id = ANY($1)`,
-      [bookIds],
-    );
-
-    accessResult.rows.forEach((row: any) => {
-      if (!accessLevelsMap[row.book_id]) {
-        accessLevelsMap[row.book_id] = [];
-      }
-      accessLevelsMap[row.book_id].push(row.access_level as AccessLevelValue);
-    });
-  }
 
   const managedBooks: ManagedBookRecord[] = booksResult.rows.map(
     (book: any) => ({
@@ -78,7 +66,7 @@ export default async function LibrarianPage() {
       pdfUrl: book.pdf_url,
       coverUrl: book.cover_url,
       createdAt: book.created_at,
-      accessLevels: accessLevelsMap[book.id] ?? [],
+      accessLevels: (book.access_levels ?? []) as AccessLevelValue[],
       pageImagesCount: book.page_images_count ?? null,
       pageImagesRenderedAt: book.page_images_rendered_at ?? null,
       textExtractedAt: book.text_extracted_at ?? null,

@@ -10,13 +10,15 @@ import {
   buildPublicObjectUrl,
 } from "@/lib/minioUtils";
 import { withRateLimit } from "@/lib/middleware/withRateLimit";
-import { writeFile, unlink } from "fs/promises";
+import { createReadStream, createWriteStream } from "fs";
+import { stat, unlink } from "fs/promises";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { tmpdir } from "os";
 import { join } from "path";
 import { randomUUID } from "crypto";
-import { Pool } from "pg";
+import { query } from "@/lib/db";
+import { pipeline } from "stream/promises";
 
 const execAsync = promisify(exec);
 
@@ -68,24 +70,15 @@ async function convertMobiHandler(
       );
     }
 
-    const chunks: Buffer[] = [];
     const stream = await minioClient.getObject(bucketName, objectKey);
-
-    await new Promise<void>((resolve, reject) => {
-      stream.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-      stream.on("end", () => resolve());
-      stream.on("error", reject);
-    });
-
-    const mobiBuffer = Buffer.concat(chunks);
-    console.log(`Downloaded ${formatUpper}: ${mobiBuffer.length} bytes`);
 
     // 2. Save MOBI/AZW/AZW3 to temp file
     const tempId = randomUUID();
     const inputPath = join(tmpdir(), `${tempId}.${format}`);
     const pdfPath = join(tmpdir(), `${tempId}.pdf`);
-
-    await writeFile(inputPath, mobiBuffer);
+    await pipeline(stream, createWriteStream(inputPath));
+    const { size: inputSize } = await stat(inputPath);
+    console.log(`Downloaded ${formatUpper}: ${inputSize} bytes`);
     console.log(`Saved ${formatUpper} to: ${inputPath}`);
 
     // 3. Convert to PDF using Calibre with Kindle-optimized settings
@@ -116,20 +109,14 @@ async function convertMobiHandler(
     }
 
     // 4. Upload converted PDF to MinIO
-    const pdfBuffer = await import("fs/promises").then((fs) =>
-      fs.readFile(pdfPath),
-    );
     const pdfObjectKey = `books/converted/${bookId}.pdf`;
 
-    await minioClient.putObject(
-      bucketName,
-      pdfObjectKey,
-      pdfBuffer,
-      pdfBuffer.length,
-      {
-        "Content-Type": "application/pdf",
-      },
-    );
+    const pdfStats = await stat(pdfPath);
+    const pdfStream = createReadStream(pdfPath);
+
+    await minioClient.putObject(bucketName, pdfObjectKey, pdfStream, pdfStats.size, {
+      "Content-Type": "application/pdf",
+    });
 
     console.log(`Uploaded converted PDF to MinIO: ${pdfObjectKey}`);
 
@@ -137,18 +124,15 @@ async function convertMobiHandler(
     const pdfPublicUrl = buildPublicObjectUrl(pdfObjectKey);
 
     // 6. Update database with converted PDF URL
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     try {
-      await pool.query(
-        'UPDATE books SET pdf_url = $1 WHERE id = $2',
-        [pdfPublicUrl, bookId]
-      );
+      await query("UPDATE books SET pdf_url = $1 WHERE id = $2", [
+        pdfPublicUrl,
+        bookId,
+      ]);
       console.log(`Updated book ${bookId} with pdf_url: ${pdfPublicUrl}`);
     } catch (updateError) {
       console.error("Error updating book:", updateError);
       // Don't fail the request, PDF is already uploaded
-    } finally {
-      await pool.end();
     }
 
     // 7. Cleanup temp files

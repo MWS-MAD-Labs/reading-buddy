@@ -10,13 +10,15 @@ import {
   buildPublicObjectUrl,
 } from "@/lib/minioUtils";
 import { withRateLimit } from "@/lib/middleware/withRateLimit";
-import { writeFile, unlink } from "fs/promises";
+import { createReadStream, createWriteStream } from "fs";
+import { stat, unlink } from "fs/promises";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { tmpdir } from "os";
 import { join } from "path";
 import { randomUUID } from "crypto";
 import { query } from "@/lib/db";
+import { pipeline } from "stream/promises";
 
 const execAsync = promisify(exec);
 
@@ -66,24 +68,15 @@ async function convertEpubHandler(
       );
     }
 
-    const chunks: Buffer[] = [];
     const stream = await minioClient.getObject(bucketName, objectKey);
-
-    await new Promise<void>((resolve, reject) => {
-      stream.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-      stream.on("end", () => resolve());
-      stream.on("error", reject);
-    });
-
-    const epubBuffer = Buffer.concat(chunks);
-    console.log(`Downloaded EPUB: ${epubBuffer.length} bytes`);
 
     // 2. Save EPUB to temp file
     const tempId = randomUUID();
     const epubPath = join(tmpdir(), `${tempId}.epub`);
     const pdfPath = join(tmpdir(), `${tempId}.pdf`);
-
-    await writeFile(epubPath, epubBuffer);
+    await pipeline(stream, createWriteStream(epubPath));
+    const { size: epubSize } = await stat(epubPath);
+    console.log(`Downloaded EPUB: ${epubSize} bytes`);
     console.log(`Saved EPUB to: ${epubPath}`);
 
     // 3. Convert EPUB to PDF using Calibre
@@ -114,20 +107,14 @@ async function convertEpubHandler(
     }
 
     // 4. Upload converted PDF to MinIO
-    const pdfBuffer = await import("fs/promises").then((fs) =>
-      fs.readFile(pdfPath),
-    );
     const pdfObjectKey = `books/converted/${bookId}.pdf`;
 
-    await minioClient.putObject(
-      bucketName,
-      pdfObjectKey,
-      pdfBuffer,
-      pdfBuffer.length,
-      {
-        "Content-Type": "application/pdf",
-      },
-    );
+    const pdfStats = await stat(pdfPath);
+    const pdfStream = createReadStream(pdfPath);
+
+    await minioClient.putObject(bucketName, pdfObjectKey, pdfStream, pdfStats.size, {
+      "Content-Type": "application/pdf",
+    });
 
     console.log(`Uploaded converted PDF to MinIO: ${pdfObjectKey}`);
 
