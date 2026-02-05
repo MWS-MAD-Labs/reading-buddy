@@ -19,6 +19,7 @@ import {
 import {
   ACCESS_LEVEL_OPTIONS,
   type AccessLevelValue,
+  normalizeAccessLevels,
 } from "@/constants/accessLevels";
 import type { ManagedBookRecord } from "@/components/dashboard/BookManager";
 
@@ -58,7 +59,7 @@ export const BookEditForm = ({
   const [status, setStatus] = useState<UploadState>("idle");
   const [selectedAccessLevels, setSelectedAccessLevels] = useState<
     Set<AccessLevelValue>
-  >(new Set(book.accessLevels));
+  >(new Set(normalizeAccessLevels(book.accessLevels)));
   const [pageCount, setPageCount] = useState<number | null>(book.pageCount);
   const [pdfDetectionState, setPdfDetectionState] =
     useState<PdfDetectionState>("idle");
@@ -465,7 +466,7 @@ export const BookEditForm = ({
     formRef.current?.reset();
     setError(null);
     setSuccess(null);
-    setSelectedAccessLevels(new Set(book.accessLevels));
+    setSelectedAccessLevels(new Set(normalizeAccessLevels(book.accessLevels)));
     setPageCount(book.pageCount);
     setPdfDetectionState("idle");
     setPdfDetectionMessage(null);

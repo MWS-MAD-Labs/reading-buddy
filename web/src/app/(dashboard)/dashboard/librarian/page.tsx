@@ -4,6 +4,7 @@ import { queryWithContext } from "@/lib/db";
 import { BookManagementSection } from "@/components/dashboard/BookManagementSection";
 import type { ManagedBookRecord } from "@/components/dashboard/BookManager";
 import type { AccessLevelValue } from "@/constants/accessLevels";
+import { normalizeAccessLevels } from "@/constants/accessLevels";
 import { requireRole } from "@/lib/auth/roleCheck";
 import {
   Badge,
@@ -36,9 +37,9 @@ export default async function LibrarianPage() {
       b.text_extracted_at, b.text_extraction_error, b.text_extraction_attempts,
       b.last_extraction_attempt_at, b.file_format,
       COALESCE(
-        ARRAY_AGG(DISTINCT ba.access_level)
+        ARRAY_AGG(DISTINCT ba.access_level::text)
         FILTER (WHERE ba.access_level IS NOT NULL),
-        '{}'
+        '{}'::text[]
       ) AS access_levels
     FROM books b
     LEFT JOIN book_access ba ON ba.book_id = b.id
@@ -66,7 +67,7 @@ export default async function LibrarianPage() {
       pdfUrl: book.pdf_url,
       coverUrl: book.cover_url,
       createdAt: book.created_at,
-      accessLevels: (book.access_levels ?? []) as AccessLevelValue[],
+      accessLevels: normalizeAccessLevels(book.access_levels) as AccessLevelValue[],
       pageImagesCount: book.page_images_count ?? null,
       pageImagesRenderedAt: book.page_images_rendered_at ?? null,
       textExtractedAt: book.text_extracted_at ?? null,

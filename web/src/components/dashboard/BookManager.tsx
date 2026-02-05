@@ -15,6 +15,7 @@ import { deleteBook } from "@/app/(dashboard)/dashboard/librarian/actions";
 import {
   ACCESS_LEVEL_OPTIONS,
   type AccessLevelValue,
+  normalizeAccessLevels,
 } from "@/constants/accessLevels";
 import {
   Alert,
@@ -312,7 +313,8 @@ export const BookManager = ({
         return false;
       }
 
-      if (accessFilter !== "ALL" && !book.accessLevels.includes(accessFilter)) {
+      const bookAccessLevels = normalizeAccessLevels(book.accessLevels);
+      if (accessFilter !== "ALL" && !bookAccessLevels.includes(accessFilter)) {
         return false;
       }
 
@@ -585,33 +587,38 @@ export const BookManager = ({
                       </div>
                     </div>
 
-                    {book.accessLevels.length > 0 && (
-                      <div className="mb-4">
-                        <p className="mb-2 text-sm font-black text-blue-600">
-                          Access Levels:
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {book.accessLevels.map((level: any) => {
-                            const badge =
-                              ACCESS_BADGES[
-                              level as keyof typeof ACCESS_BADGES
-                              ];
-                            return (
-                              <span
-                                key={`${book.id}-${level}`}
-                                className={clsx(
-                                  "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
-                                  badge?.color ??
-                                  "bg-indigo-100 text-indigo-600 border-indigo-300",
-                                )}
-                              >
-                                {badge?.label ?? level.slice(0, 2)}
-                              </span>
-                            );
-                          })}
+                    {(() => {
+                      const accessLevels = normalizeAccessLevels(book.accessLevels);
+                      if (!accessLevels.length) return null;
+
+                      return (
+                        <div className="mb-4">
+                          <p className="mb-2 text-sm font-black text-blue-600">
+                            Access Levels:
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {accessLevels.map((level) => {
+                              const badge =
+                                ACCESS_BADGES[
+                                level as keyof typeof ACCESS_BADGES
+                                ];
+                              return (
+                                <span
+                                  key={`${book.id}-${level}`}
+                                  className={clsx(
+                                    "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
+                                    badge?.color ??
+                                    "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                  )}
+                                >
+                                  {badge?.label ?? level.slice(0, 2)}
+                                </span>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -706,30 +713,35 @@ export const BookManager = ({
                           {getContentStatusBadge(book)}
                         </td>
                         <td className="px-4 py-3 text-xs">
-                          {book.accessLevels.length ? (
-                            <div className="flex flex-wrap gap-2">
-                              {book.accessLevels.map((level: any) => {
-                                const badge =
-                                  ACCESS_BADGES[
-                                  level as keyof typeof ACCESS_BADGES
-                                  ];
-                                return (
-                                  <span
-                                    key={`${book.id}-${level}`}
-                                    className={clsx(
-                                      "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
-                                      badge?.color ??
-                                      "bg-indigo-100 text-indigo-600 border-indigo-300",
-                                    )}
-                                  >
-                                    {badge?.label ?? level.slice(0, 2)}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <span className="text-purple-300">—</span>
-                          )}
+                          {(() => {
+                            const accessLevels = normalizeAccessLevels(book.accessLevels);
+                            if (!accessLevels.length) {
+                              return <span className="text-purple-300">—</span>;
+                            }
+
+                            return (
+                              <div className="flex flex-wrap gap-2">
+                                {accessLevels.map((level) => {
+                                  const badge =
+                                    ACCESS_BADGES[
+                                    level as keyof typeof ACCESS_BADGES
+                                    ];
+                                  return (
+                                    <span
+                                      key={`${book.id}-${level}`}
+                                      className={clsx(
+                                        "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
+                                        badge?.color ??
+                                        "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                      )}
+                                    >
+                                      {badge?.label ?? level.slice(0, 2)}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="relative px-4 py-3 text-right">
                           <div className="flex items-center justify-end">
