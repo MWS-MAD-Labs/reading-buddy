@@ -54,6 +54,18 @@ const EpubFlipReader = dynamic(
     }
 );
 
+const PdfBookReader = dynamic(
+    () => import("./PdfBookReader").then((mod) => mod.PdfBookReader),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="flex h-96 items-center justify-center">
+                <div className="text-lg font-semibold text-purple-600">Loading PDF reader...</div>
+            </div>
+        ),
+    }
+);
+
 type PageImageInfo = {
     baseUrl: string;
     count: number;
@@ -74,7 +86,7 @@ type UnifiedBookReaderProps = {
     showFinishButton?: boolean;
 };
 
-type ReaderMode = "text" | "epub" | "images" | "error" | "loading";
+type ReaderMode = "text" | "epub" | "images" | "pdf" | "error" | "loading";
 
 export function UnifiedBookReader({
     bookId,
@@ -145,12 +157,10 @@ export function UnifiedBookReader({
                 return;
             }
 
-            // Priority 4: Extraction failed - show error (no image fallback per user requirement)
+            // Priority 4: Extraction failed - use PdfBookReader for scanned PDFs
+            // This handles scanned/image-based PDFs that couldn't have text extracted
             if (textExtractionStatus === "failed") {
-                setError(
-                    "This book could not be processed for reading. It may be a scanned document or have an unsupported format. Please contact your librarian."
-                );
-                setReaderMode("error");
+                setReaderMode("pdf");
                 return;
             }
 
@@ -334,6 +344,61 @@ export function UnifiedBookReader({
                         <span className="font-medium">📍 Page {currentPage}</span>
                         <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                             📚 EPUB Mode
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href={`/dashboard/journal/${bookId}`}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                        >
+                            📓 Book Journal
+                        </Link>
+                        <button
+                            onClick={() => setIsNotesPanelOpen(true)}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
+                        >
+                            📝 Notes
+                        </button>
+                        {showFinishButton && onComplete && (
+                            <button
+                                onClick={onComplete}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105 animate-pulse"
+                            >
+                                ✅ Finish Reading
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Notes Panel */}
+                <ReaderNotesPanel
+                    bookId={bookId}
+                    currentPage={currentPage}
+                    isOpen={isNotesPanelOpen}
+                    onClose={() => setIsNotesPanelOpen(false)}
+                    onPageJump={(page) => handlePageChange(page)}
+                />
+            </div>
+        );
+    }
+
+    // PDF mode - use PdfBookReader for scanned PDFs or direct PDF viewing
+    // This handles books where text extraction failed (likely scanned documents)
+    if (readerMode === "pdf") {
+        return (
+            <div className="space-y-4">
+                <PdfBookReader
+                    bookId={bookId}
+                    pdfUrl={pdfUrl}
+                    initialPage={initialPage}
+                    expectedPages={totalPageCount ?? undefined}
+                />
+
+                {/* Reader Actions Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-white/80 p-3">
+                    <div className="flex items-center gap-2 text-sm text-indigo-600">
+                        <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            📄 PDF Mode (Scanned)
                         </span>
                     </div>
                     <div className="flex items-center gap-2">

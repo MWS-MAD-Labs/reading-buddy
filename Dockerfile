@@ -19,8 +19,12 @@ RUN apt-get update && apt-get install -y \
     libgif-dev \
     librsvg2-dev \
     libpixman-1-dev \
+    # PDF rendering tools (pdfinfo, pdftocairo) for scanned/image PDFs
+    poppler-utils \
     # Calibre for EPUB conversion
     calibre \
+    # tsx CLI for running background TypeScript scripts in production
+    && npm install -g tsx@4.7.2 \
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
 

@@ -115,6 +115,24 @@ const getContentStatusBadge = (book: ManagedBookRecord) => {
     );
   }
 
+  // Legacy PDFs with page images are still readable
+  if (book.pageImagesCount && book.pageImagesCount > 0) {
+    return (
+      <Badge
+        variant="sky"
+        size="sm"
+        title={
+          book.textExtractionError
+            ? `Using page images (text extraction issue: ${book.textExtractionError})`
+            : "Using page images"
+        }
+        className="rounded-full"
+      >
+        📷 Images
+      </Badge>
+    );
+  }
+
   if (book.textExtractionError) {
     return (
       <Badge
@@ -124,20 +142,6 @@ const getContentStatusBadge = (book: ManagedBookRecord) => {
         className="cursor-help rounded-full"
       >
         ✗ Failed
-      </Badge>
-    );
-  }
-
-  // Legacy PDFs with page images are still readable
-  if (book.pageImagesCount && book.pageImagesCount > 0) {
-    return (
-      <Badge
-        variant="sky"
-        size="sm"
-        title="Using page images (legacy)"
-        className="rounded-full"
-      >
-        📷 Images
       </Badge>
     );
   }

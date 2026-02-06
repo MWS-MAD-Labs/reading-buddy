@@ -936,14 +936,25 @@ export const renderBookImages = async (bookId: number) => {
   // Trigger rendering in background (non-blocking)
   // Note: In production, this should use a proper job queue
   const { spawn } = await import("child_process");
+  const { existsSync } = await import("fs");
+  const path = await import("path");
   const scriptPath = `${process.cwd()}/scripts/render-book-images.ts`;
 
-  spawn("npx", ["tsx", scriptPath, `--bookId=${bookId}`], {
+  // Next.js standalone output may omit `node_modules/.bin`, so prefer a direct
+  // local bin path when present, otherwise fall back to the global `tsx` CLI.
+  const localTsxBin = path.join(
+    process.cwd(),
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "tsx.cmd" : "tsx",
+  );
+  const tsxCommand = existsSync(localTsxBin) ? localTsxBin : "tsx";
+
+  spawn(tsxCommand, [scriptPath, `--bookId=${bookId}`], {
     detached: true,
     stdio: "ignore",
     env: {
       ...process.env,
-      PATH: "/opt/homebrew/opt/node@20/bin:" + process.env.PATH,
     },
   }).unref();
 
