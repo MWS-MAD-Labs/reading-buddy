@@ -52,7 +52,7 @@ Reading Buddy transforms traditional school libraries into interactive digital l
 ### Prerequisites
 
 - **Docker** & Docker Compose
-- **Supabase** account ([supabase.com](https://supabase.com))
+- **PostgreSQL** (included in docker-compose)
 - **MinIO** server (self-hosted S3 storage)
 - **AI Provider:** Google Gemini API key OR Local RAG/Diffuser setup
 
@@ -65,17 +65,18 @@ cd reading-companion
 
 # 2. Configure environment
 cp .env.example .env
-nano .env  # Add your Supabase, MinIO, and AI credentials
+nano .env  # Add your database, MinIO, and AI credentials
 
-# 3. Set up database
-# Go to Supabase dashboard → SQL Editor
-# Run: notes/2024-12-14/deployment/DATABASE_SETUP.md
+# 3. Start services
+docker-compose -f docker-compose.selfhosted.yml up -d
 
-# 4. Deploy with Docker
-docker-compose up --build -d
+# 4. Set up database
+docker exec -i reading-buddy-postgres psql -U reading_buddy -d reading_buddy < sql/self-hosted/schema.sql
 
 # 5. Create admin user
-# Sign up via app, then set role to 'ADMIN' in Supabase
+# Sign up via app, then set role to 'ADMIN' in database:
+# docker exec -it reading-buddy-postgres psql -U reading_buddy -d reading_buddy
+# UPDATE profiles SET role = 'ADMIN' WHERE email = 'your-email@example.com';
 
 # 6. Access application
 open http://localhost:3000
@@ -90,7 +91,8 @@ open http://localhost:3000
 | Layer | Technology |
 |-------|-----------|
 | **Frontend** | Next.js 15, React 19, TypeScript, Tailwind CSS |
-| **Backend** | Supabase (PostgreSQL + Auth + RLS) |
+| **Backend** | PostgreSQL (self-hosted) |
+| **Auth** | NextAuth.js |
 | **Storage** | MinIO (S3-compatible, self-hosted) |
 | **AI** | Google Gemini 2.5 Flash OR Local RAG + Diffuser |
 | **PDF** | pdfjs-dist, react-pdf, canvas rendering |
@@ -233,15 +235,24 @@ npm run test:quiz-generation    # Test AI quiz generation
 ### Environment Variables
 
 ```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+# Database (PostgreSQL)
+DB_HOST=postgres
+DB_PORT=5432
+DB_NAME=reading_buddy
+DB_USER=reading_buddy
+DB_PASSWORD=your-secure-password
+
+# Or use DATABASE_URL
+DATABASE_URL=postgresql://reading_buddy:password@postgres:5432/reading_buddy
+
+# NextAuth
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-nextauth-secret
 
 # MinIO
-MINIO_ENDPOINT=minio.example.com
-MINIO_PORT=443
-MINIO_USE_SSL=true
+MINIO_ENDPOINT=minio
+MINIO_PORT=9000
+MINIO_USE_SSL=false
 MINIO_ACCESS_KEY=your-access-key
 MINIO_SECRET_KEY=your-secret-key
 MINIO_BUCKET_NAME=reading-buddy
@@ -306,12 +317,12 @@ Every push to `staging` or `main` triggers:
 
 ## 🏛️ Architecture
 
-### Hybrid Backend Approach
+### Hybrid Self-Hosted Approach
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Next.js   │────▶│  Supabase    │────▶│ PostgreSQL  │
-│  Frontend   │     │  (Auth+RLS)  │     │  Database   │
+│   Next.js   │────▶│  NextAuth    │────▶│ PostgreSQL  │
+│  Frontend   │     │  (Auth)      │     │  Database   │
 └─────────────┘     └──────────────┘     └─────────────┘
        │
        │
@@ -331,10 +342,11 @@ Every push to `staging` or `main` triggers:
 ```
 
 **Benefits:**
-- ✅ Managed database with RLS security
+- ✅ Self-hosted database with full control
 - ✅ Low-cost, self-hosted file storage
 - ✅ Flexible AI provider options
 - ✅ Scalable & maintainable
+- ✅ No vendor lock-in
 
 ---
 

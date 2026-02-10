@@ -60,6 +60,9 @@ export const BookEditForm = ({
   const [selectedAccessLevels, setSelectedAccessLevels] = useState<
     Set<AccessLevelValue>
   >(new Set(normalizeAccessLevels(book.accessLevels)));
+  const [isPictureBook, setIsPictureBook] = useState<boolean>(
+    book.isPictureBook ?? false,
+  );
   const [pageCount, setPageCount] = useState<number | null>(book.pageCount);
   const [pdfDetectionState, setPdfDetectionState] =
     useState<PdfDetectionState>("idle");
@@ -382,6 +385,7 @@ export const BookEditForm = ({
         pdfUrl,
         coverUrl,
         pageCount: resolvedPageCount,
+        isPictureBook,
       });
 
       // If new PDF was uploaded, trigger re-rendering
@@ -467,6 +471,7 @@ export const BookEditForm = ({
     setError(null);
     setSuccess(null);
     setSelectedAccessLevels(new Set(normalizeAccessLevels(book.accessLevels)));
+    setIsPictureBook(book.isPictureBook ?? false);
     setPageCount(book.pageCount);
     setPdfDetectionState("idle");
     setPdfDetectionMessage(null);
@@ -602,7 +607,7 @@ export const BookEditForm = ({
           </p>
         </label>
 
-        <div className="space-y-2 md:col-span-2">
+        <fieldset className="space-y-2 text-base font-bold text-purple-700 md:col-span-2">
           <div className="flex items-center justify-between">
             <label className="text-base font-bold text-purple-700">
               Description
@@ -611,17 +616,18 @@ export const BookEditForm = ({
               type="button"
               onClick={handleGenerateDescription}
               disabled={generatingDescription || status !== "idle"}
-              className={`rounded-lg border-2 px-4 py-2 text-sm font-bold text-white shadow transition disabled:opacity-50 ${generatingDescription
-                ? "animate-pulse border-purple-400 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 bg-[length:200%_100%] animate-[gradient_2s_ease-in-out_infinite]"
-                : "border-indigo-300 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
-                }`}
+              className={`rounded-lg border-2 px-4 py-2 text-sm font-bold text-white shadow transition disabled:opacity-50 ${
+                generatingDescription
+                  ? "animate-pulse border-purple-400 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 bg-[length:200%_100%] animate-[gradient_2s_ease-in-out_infinite]"
+                  : "border-indigo-300 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+              }`}
               style={
                 generatingDescription
                   ? {
-                    animation:
-                      "pulse 1.5s ease-in-out infinite, gradient 2s ease-in-out infinite",
-                    backgroundSize: "200% 100%",
-                  }
+                      animation:
+                        "pulse 1.5s ease-in-out infinite, gradient 2s ease-in-out infinite",
+                      backgroundSize: "200% 100%",
+                    }
                   : undefined
               }
             >
@@ -642,6 +648,25 @@ export const BookEditForm = ({
             className="w-full rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 font-semibold text-purple-900 outline-none transition-all"
             placeholder="Quick summary for librarians and AI quiz prompts."
           />
+        </fieldset>
+
+        <div className="space-y-2 md:col-span-2">
+          <label className="flex items-center gap-3 rounded-2xl border-4 border-purple-300 bg-purple-50 p-4">
+            <input
+              type="checkbox"
+              name="picture-book"
+              checked={isPictureBook}
+              onChange={(e) => setIsPictureBook(e.target.checked)}
+              className="h-6 w-6 rounded border-purple-400 text-purple-600 focus:ring-2 focus:ring-purple-300"
+            />
+            <div className="flex-1">
+              <p className="font-semibold text-purple-900">📖 Picture Book</p>
+              <p className="text-sm text-purple-700">
+                Check for books with illustrations. Each page will be rendered
+                as an image for optimal viewing.
+              </p>
+            </div>
+          </label>
         </div>
 
         <fieldset className="space-y-2 text-base font-bold text-purple-700 md:col-span-2">
@@ -726,8 +751,8 @@ export const BookEditForm = ({
 
       {/* Progress Indicators */}
       {status === "uploading_pdf" ||
-        status === "uploading_cover" ||
-        uploadProgress.pdf > 0 ? (
+      status === "uploading_cover" ||
+      uploadProgress.pdf > 0 ? (
         <div className="space-y-3 rounded-2xl border-2 border-purple-200 bg-purple-50 p-4">
           <div>
             <div className="mb-1 flex items-center justify-between text-sm font-semibold text-purple-700">

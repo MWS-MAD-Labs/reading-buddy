@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   output: "standalone", // Required for Docker deployment
   images: {
+    unoptimized: true, // Disable Next.js Image Optimization (needed for self-hosted MinIO with private IP)
     remotePatterns: [
       {
         protocol: minioProtocol as "http" | "https",

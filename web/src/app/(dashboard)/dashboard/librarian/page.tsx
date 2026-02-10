@@ -35,7 +35,7 @@ export default async function LibrarianPage() {
       b.genre, b.language, b.description, b.page_count, b.pdf_url, b.cover_url,
       b.created_at, b.page_images_count, b.page_images_rendered_at,
       b.text_extracted_at, b.text_extraction_error, b.text_extraction_attempts,
-      b.last_extraction_attempt_at, b.file_format,
+      b.last_extraction_attempt_at, b.file_format, b.is_picture_book,
       COALESCE(
         ARRAY_AGG(DISTINCT ba.access_level::text)
         FILTER (WHERE ba.access_level IS NOT NULL),
@@ -67,7 +67,9 @@ export default async function LibrarianPage() {
       pdfUrl: book.pdf_url,
       coverUrl: book.cover_url,
       createdAt: book.created_at,
-      accessLevels: normalizeAccessLevels(book.access_levels) as AccessLevelValue[],
+      accessLevels: normalizeAccessLevels(
+        book.access_levels,
+      ) as AccessLevelValue[],
       pageImagesCount: book.page_images_count ?? null,
       pageImagesRenderedAt: book.page_images_rendered_at ?? null,
       textExtractedAt: book.text_extracted_at ?? null,
@@ -75,6 +77,7 @@ export default async function LibrarianPage() {
       textExtractionAttempts: book.text_extraction_attempts ?? 0,
       lastExtractionAttemptAt: book.last_extraction_attempt_at ?? null,
       fileFormat: book.file_format ?? "pdf",
+      isPictureBook: book.is_picture_book ?? false,
     }),
   );
 

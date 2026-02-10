@@ -15,12 +15,64 @@ type PdfBookReaderProps = {
   pdfUrl: string;
   initialPage?: number;
   expectedPages?: number | null;
+  useNativeViewer?: boolean;
 };
 
-const workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).toString();
+/**
+ * Convert a MinIO URL to use the PDF proxy API.
+ * This avoids CORS issues and private IP restrictions.
+ */
+function useProxyPdfUrl(originalUrl: string): string {
+  return useMemo(() => {
+    if (!originalUrl) return originalUrl;
+
+    console.log("[PdfBookReader] Original PDF URL:", originalUrl);
+
+    try {
+      const url = new URL(originalUrl);
+      const pathname = url.pathname;
+
+      // URLs are like: /reading-buddy/books/uuid-filename.pdf
+      // or: http://host:port/reading-buddy/books/uuid-filename.pdf
+      const pathParts = pathname.split("/").filter(Boolean);
+
+      console.log("[PdfBookReader] Path parts:", pathParts);
+
+      // Find the bucket name (usually starts after the first slash)
+      // Common bucket names: reading-buddy, books
+      let pdfPath = "";
+      for (let i = 0; i < pathParts.length; i++) {
+        if (pathParts[i] === "reading-buddy" && i + 1 < pathParts.length) {
+          // Everything after the bucket name
+          pdfPath = pathParts.slice(i + 1).join("/");
+          break;
+        }
+        // Also handle case where path starts directly with books/
+        if (pathParts[i] === "books" && i === 0) {
+          pdfPath = pathParts.join("/");
+          break;
+        }
+      }
+
+      if (!pdfPath) {
+        // Fallback: use everything after the first segment
+        pdfPath = pathParts.slice(1).join("/");
+      }
+
+      const proxyUrl = `/api/pdf/${pdfPath}`;
+      console.log("[PdfBookReader] Proxy URL:", proxyUrl);
+      return proxyUrl;
+    } catch (err) {
+      console.error("[PdfBookReader] URL parsing error:", err);
+      return originalUrl;
+    }
+  }, [originalUrl]);
+}
+
+// Use CDN worker that may have better decoder support
+// Note: JPEG2000 (JPX) support is limited due to licensing - many PDF workers exclude it
+const workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
 
 const DISPLAY_MODES = {
   SPREAD: "spread",
@@ -34,6 +86,7 @@ export const PdfBookReader = ({
   pdfUrl,
   initialPage = 1,
   expectedPages,
+  useNativeViewer = false,
 }: PdfBookReaderProps) => {
   const [reactPdf, setReactPdf] = useState<ReactPDFModule | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
@@ -51,8 +104,12 @@ export const PdfBookReader = ({
   );
   const [showSettings, setShowSettings] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [useNativeFallback, setUseNativeFallback] = useState(useNativeViewer);
   const achievementAwardedRef = useRef(false);
   const bookContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Use proxy URL to avoid CORS and private IP issues
+  const proxiedPdfUrl = useProxyPdfUrl(pdfUrl);
 
   const normalizedPage = useMemo(() => {
     if (!numPages) return Math.max(currentPage, 1);
@@ -250,6 +307,38 @@ export const PdfBookReader = ({
         : "book-spread--backward-b"
     : null;
 
+  // Native PDF viewer fallback (for PDFs with JPEG2000 images that react-pdf can't handle)
+  if (useNativeFallback) {
+    return (
+      <div className="space-y-4 rounded-3xl border-4 border-purple-300 bg-gradient-to-br from-purple-50 via-pink-50 to-yellow-50 p-4 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-bold text-purple-700">
+              📖 Native PDF Viewer
+            </span>
+            <span className="text-sm text-purple-600">
+              Use browser controls to navigate pages
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUseNativeFallback(false)}
+            className="btn-squish rounded-full border-2 border-purple-300 bg-purple-100 px-4 py-2 text-sm font-bold text-purple-700 hover:bg-purple-200"
+          >
+            Switch to Page Viewer
+          </button>
+        </div>
+        <div className="aspect-[8.5/11] w-full overflow-hidden rounded-2xl border-4 border-purple-400 bg-white shadow-lg">
+          <iframe
+            src={`${proxiedPdfUrl}#page=${initialPage}`}
+            className="h-full w-full"
+            title="PDF Viewer"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pop-in space-y-4 rounded-3xl border-4 border-purple-300 bg-gradient-to-br from-purple-50 via-pink-50 to-yellow-50 p-4 shadow-2xl md:space-y-5 md:p-8">
       {/* Mobile Controls */}
@@ -387,6 +476,20 @@ export const PdfBookReader = ({
                 </button>
               </div>
             </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <span className="text-base font-black text-yellow-700">
+                🔧 Viewer
+              </span>
+              <button
+                type="button"
+                onClick={() => setUseNativeFallback(true)}
+                className="btn-squish min-h-[44px] flex-1 rounded-xl px-4 py-2 text-sm font-black transition active:scale-95 bg-gradient-to-r from-indigo-400 to-purple-400 text-white shadow-md"
+                title="Use browser's native PDF viewer (better for complex PDFs)"
+              >
+                Native Viewer
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -415,7 +518,7 @@ export const PdfBookReader = ({
       >
         {DocumentComponent && PageComponent ? (
           <DocumentComponent
-            file={pdfUrl}
+            file={proxiedPdfUrl}
             className={clsx(
               "book-spread",
               spreadAnimationClass,

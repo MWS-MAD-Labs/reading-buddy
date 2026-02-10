@@ -13,7 +13,6 @@ import {
 import { createJournalEntry } from "@/app/(dashboard)/dashboard/journal/journal-actions";
 import type { Badge } from "@/types/database";
 
-
 // Track last page read to avoid duplicate XP awards
 const lastPageReadCache = new Map<string, number>();
 
@@ -236,23 +235,19 @@ export const getPendingCheckpointForPage = async (input: {
   }
 
   // Find the latest required checkpoint at or before the current page
-  // We join with class_quiz_assignments and class_students to ensure we only 
-  // get checkpoints that are actually assigned to this specific student's class.
+  // Note: Simplified query that doesn't depend on class_quiz_assignments table
+  // TODO: Add class-based filtering once that table is available
   const checkpointResult = await queryWithContext(
     user.userId,
-    `SELECT DISTINCT qc.id, qc.page_number, qc.quiz_id, qc.is_required
+    `SELECT qc.id, qc.page_number, qc.quiz_id, qc.is_required
      FROM quiz_checkpoints qc
-     JOIN class_quiz_assignments cqa ON qc.quiz_id = cqa.quiz_id
-     JOIN class_students cs ON cqa.class_id = cs.class_id
      WHERE qc.book_id = $1
-       AND cs.student_id = $2
        AND qc.is_required = true
        AND qc.quiz_id IS NOT NULL
-       AND qc.page_number <= $3
-       AND cqa.is_active = true
+       AND qc.page_number <= $2
      ORDER BY qc.page_number DESC
      LIMIT 1`,
-    [input.bookId, user.profileId, input.currentPage],
+    [input.bookId, input.currentPage],
   );
 
   if (checkpointResult.rows.length === 0) {
@@ -391,7 +386,10 @@ export const markBookAsCompleted = async (input: {
   };
 };
 
-export const updateBookTotalPages = async (bookId: number, totalPages: number) => {
+export const updateBookTotalPages = async (
+  bookId: number,
+  totalPages: number,
+) => {
   const user = await getCurrentUser();
 
   if (!user || !user.userId) {
@@ -415,12 +413,18 @@ export const updateBookTotalPages = async (bookId: number, totalPages: number) =
   // or if the current count is 1 or null.
   // This prevents minor fluctuations based on screen size/parsing variations if any.
   // For EPUBs, the reader calculates pages based on content, which is more accurate for the reader view.
-  if (!currentCount || currentCount <= 1 || Math.abs(currentCount - totalPages) > 5) {
-    console.log(`📚 Updating book ${bookId} page count: ${currentCount} -> ${totalPages}`);
+  if (
+    !currentCount ||
+    currentCount <= 1 ||
+    Math.abs(currentCount - totalPages) > 5
+  ) {
+    console.log(
+      `📚 Updating book ${bookId} page count: ${currentCount} -> ${totalPages}`,
+    );
     await queryWithContext(
       user.userId,
       `UPDATE books SET page_count = $1 WHERE id = $2`,
-      [totalPages, bookId]
+      [totalPages, bookId],
     );
   }
 

@@ -81,6 +81,7 @@ export const BookUploadForm = ({
   }>({ current: 0, total: 0 });
   const [uploadedBookId, setUploadedBookId] = useState<number | null>(null);
   const [generatingDescription, setGeneratingDescription] = useState(false);
+  const [isPictureBook, setIsPictureBook] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   const genreListId = useId();
@@ -436,6 +437,7 @@ export const BookUploadForm = ({
         coverUrl: uploadInfo.coverPublicUrl,
         fileFormat: detectedFormat || "pdf",
         fileSizeBytes: pdfFile.size,
+        isPictureBook,
       });
 
       setUploadedBookId(saveResult.bookId);
@@ -445,25 +447,24 @@ export const BookUploadForm = ({
         // EPUB files work natively - no processing needed!
         // EpubFlipReader handles text and images directly from the file
         setStatus("rendering");
-        setRenderingProgress("EPUB file ready! No additional processing needed.");
+        setRenderingProgress(
+          "EPUB file ready! No additional processing needed.",
+        );
 
         // Mark as ready in database
-        const { markBookAsReady } = await import(
-          "@/app/(dashboard)/dashboard/librarian/actions"
-        );
+        const { markBookAsReady } =
+          await import("@/app/(dashboard)/dashboard/librarian/actions");
         await markBookAsReady(saveResult.bookId, "epub");
 
         setSuccess("EPUB uploaded successfully! Ready for reading.");
-
       } else if (["mobi", "azw", "azw3"].includes(detectedFormat || "")) {
         // MOBI/AZW formats need conversion to images
         setStatus("rendering");
         const formatUpper = detectedFormat?.toUpperCase();
         setRenderingProgress(`Converting ${formatUpper} to readable format...`);
 
-        const { convertMobiToImages } = await import(
-          "@/app/(dashboard)/dashboard/librarian/actions"
-        );
+        const { convertMobiToImages } =
+          await import("@/app/(dashboard)/dashboard/librarian/actions");
         const renderResult = await convertMobiToImages(saveResult.bookId);
 
         if (!renderResult.success) {
@@ -483,7 +484,9 @@ export const BookUploadForm = ({
 
           if (renderStatus.completed) {
             renderComplete = true;
-            setRenderingProgress(`Conversion complete! ${renderStatus.pageCount} pages ready.`);
+            setRenderingProgress(
+              `Conversion complete! ${renderStatus.pageCount} pages ready.`,
+            );
           } else if (renderStatus.error) {
             throw new Error(`Conversion failed: ${renderStatus.error}`);
           } else if (renderStatus.processedPages && renderStatus.totalPages) {
@@ -504,7 +507,6 @@ export const BookUploadForm = ({
             ? `${formatUpper} converted successfully! Ready for reading.`
             : `${formatUpper} uploaded. Conversion continues in background.`,
         );
-
       } else {
         // PDF: Try text extraction first, only render images if it's a scanned PDF
         setStatus("extracting_text");
@@ -519,10 +521,11 @@ export const BookUploadForm = ({
               `✓ Text extracted: ${extractResult.totalWords?.toLocaleString()} words`,
             );
             setSuccess("PDF uploaded with text content! Ready for reading.");
-
           } else if (extractResult.errorType === "insufficient_text") {
             // Scanned PDF - need to render as images
-            setRenderingProgress("Scanned PDF detected. Rendering pages as images...");
+            setRenderingProgress(
+              "Scanned PDF detected. Rendering pages as images...",
+            );
             setStatus("rendering");
 
             const renderResult = await renderBookImages(saveResult.bookId);
@@ -549,7 +552,10 @@ export const BookUploadForm = ({
                 );
               } else if (renderStatus.error) {
                 throw new Error(`Rendering failed: ${renderStatus.error}`);
-              } else if (renderStatus.processedPages && renderStatus.totalPages) {
+              } else if (
+                renderStatus.processedPages &&
+                renderStatus.totalPages
+              ) {
                 setRenderingPageProgress({
                   current: renderStatus.processedPages,
                   total: renderStatus.totalPages,
@@ -567,12 +573,13 @@ export const BookUploadForm = ({
                 ? "Scanned PDF uploaded! Using image-based reader."
                 : "Scanned PDF uploaded. Image rendering continues in background.",
             );
-
           } else {
             // Other extraction error - log but don't fail
             console.warn("Text extraction issue:", extractResult.message);
             setRenderingProgress(`⚠️ ${extractResult.message}`);
-            setSuccess("PDF uploaded. You may need to retry text extraction manually.");
+            setSuccess(
+              "PDF uploaded. You may need to retry text extraction manually.",
+            );
           }
         } catch (extractErr) {
           console.warn("Text extraction error:", extractErr);
@@ -582,7 +589,9 @@ export const BookUploadForm = ({
               : "Unknown error occurred";
           setRenderingProgress(`⚠️ Processing issue: ${errorMessage}`);
           // Don't fail the upload - just warn
-          setSuccess("PDF uploaded. Processing encountered an issue - please check the book status.");
+          setSuccess(
+            "PDF uploaded. Processing encountered an issue - please check the book status.",
+          );
         }
       }
 
@@ -745,17 +754,18 @@ export const BookUploadForm = ({
               type="button"
               onClick={handleGenerateDescription}
               disabled={generatingDescription || status !== "idle"}
-              className={`rounded-lg border-2 px-4 py-2 text-sm font-bold text-white shadow transition disabled:opacity-50 ${generatingDescription
-                ? "animate-pulse border-purple-400 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 bg-[length:200%_100%] animate-[gradient_2s_ease-in-out_infinite]"
-                : "border-indigo-300 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
-                }`}
+              className={`rounded-lg border-2 px-4 py-2 text-sm font-bold text-white shadow transition disabled:opacity-50 ${
+                generatingDescription
+                  ? "animate-pulse border-purple-400 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 bg-[length:200%_100%] animate-[gradient_2s_ease-in-out_infinite]"
+                  : "border-indigo-300 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+              }`}
               style={
                 generatingDescription
                   ? {
-                    animation:
-                      "pulse 1.5s ease-in-out infinite, gradient 2s ease-in-out infinite",
-                    backgroundSize: "200% 100%",
-                  }
+                      animation:
+                        "pulse 1.5s ease-in-out infinite, gradient 2s ease-in-out infinite",
+                      backgroundSize: "200% 100%",
+                    }
                   : undefined
               }
             >
@@ -775,6 +785,26 @@ export const BookUploadForm = ({
             className="w-full rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 font-semibold text-purple-900 outline-none transition-all"
             placeholder="Quick summary for librarians and AI quiz prompts."
           />
+        </div>
+
+        <div className="space-y-2 md:col-span-2">
+          <label className="flex items-center gap-3 rounded-2xl border-4 border-purple-300 bg-purple-50 p-4">
+            <input
+              type="checkbox"
+              id="picture-book"
+              name="picture-book"
+              checked={isPictureBook}
+              onChange={(e) => setIsPictureBook(e.target.checked)}
+              className="h-6 w-6 rounded border-purple-400 text-purple-600 focus:ring-2 focus:ring-purple-300"
+            />
+            <div className="flex-1">
+              <p className="font-semibold text-purple-900">📖 Picture Book</p>
+              <p className="text-sm text-purple-700">
+                Check for books with illustrations. Each page will be rendered
+                as an image for optimal viewing.
+              </p>
+            </div>
+          </label>
         </div>
 
         <fieldset className="space-y-2 text-base font-bold text-purple-700 md:col-span-2">
@@ -858,8 +888,8 @@ export const BookUploadForm = ({
 
       {/* Progress Indicators */}
       {status === "uploading_pdf" ||
-        status === "uploading_cover" ||
-        uploadProgress.pdf > 0 ? (
+      status === "uploading_cover" ||
+      uploadProgress.pdf > 0 ? (
         <div className="space-y-3 rounded-2xl border-2 border-purple-200 bg-purple-50 p-4">
           <div>
             <div className="mb-1 flex items-center justify-between text-sm font-semibold text-purple-700">

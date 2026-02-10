@@ -28,13 +28,14 @@ export default async function StudentReadPage({
     notFound();
   }
 
-  // Get book details including new text-based reader columns
+  // Get book details including text extraction columns
   const bookResult = await queryWithContext(
     user.userId,
-    `SELECT 
+    `SELECT
       id, title, author, pdf_url, page_count,
       page_images_prefix, page_images_count,
-      file_format, original_file_url, text_json_url, text_extraction_status
+      file_format, original_file_url, text_json_url, text_extraction_status,
+      page_text_content, text_extracted_at, is_picture_book
      FROM books WHERE id = $1`,
     [bookId],
   );
@@ -47,16 +48,17 @@ export default async function StudentReadPage({
   const pageImages =
     book.page_images_prefix && book.page_images_count
       ? {
-        baseUrl: buildPublicPrefixUrl(book.page_images_prefix),
-        count: book.page_images_count,
-      }
+          baseUrl: buildPublicPrefixUrl(book.page_images_prefix),
+          count: book.page_images_count,
+        }
       : null;
 
   // Determine EPUB URL for native rendering (for epub files that haven't been converted)
   // Normalize the URL to use current MinIO endpoint configuration
-  const epubUrl = book.file_format === "epub" && book.original_file_url
-    ? normalizeMinioUrl(book.original_file_url)
-    : null;
+  const epubUrl =
+    book.file_format === "epub" && book.original_file_url
+      ? normalizeMinioUrl(book.original_file_url)
+      : null;
 
   // Get student's reading progress
   const progressResult = await queryWithContext(
@@ -94,7 +96,9 @@ export default async function StudentReadPage({
         pageImages={pageImages}
         textJsonUrl={book.text_json_url}
         textExtractionStatus={book.text_extraction_status}
+        pageTextContent={book.page_text_content}
         fileFormat={book.file_format || "pdf"}
+        isPictureBook={book.is_picture_book ?? false}
         totalPages={book.page_count}
       />
     </div>

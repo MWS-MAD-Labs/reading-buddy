@@ -169,6 +169,7 @@ export const saveBookMetadata = async (input: {
   coverUrl: string;
   fileFormat?: "pdf" | "epub" | "mobi" | "azw" | "azw3";
   fileSizeBytes?: number;
+  isPictureBook?: boolean;
 }) => {
   const user = await ensureLibrarianOrAdmin();
 
@@ -181,8 +182,8 @@ export const saveBookMetadata = async (input: {
       `INSERT INTO books (
         isbn, title, author, publisher, publication_year,
         genre, language, description, page_count, pdf_url, cover_url,
-        file_format, original_file_url, file_size_bytes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        file_format, original_file_url, file_size_bytes, is_picture_book
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING id`,
       [
         input.isbn,
@@ -199,6 +200,7 @@ export const saveBookMetadata = async (input: {
         input.fileFormat || "pdf",
         input.pdfUrl,
         input.fileSizeBytes ?? null,
+        input.isPictureBook ?? false,
       ],
     );
 
@@ -221,11 +223,14 @@ export const saveBookMetadata = async (input: {
       );
     }
 
+    // If marked as picture book, trigger image rendering
+    if (input.isPictureBook && insertedBook.id) {
+      await renderBookImages(insertedBook.id);
+    }
+
     // Note: Book is ready for text extraction. The librarian can trigger
     // text extraction from the book management interface when needed.
-    console.log(
-      `Book ${insertedBook.id} uploaded - ready for text extraction`,
-    );
+    console.log(`Book ${insertedBook.id} uploaded - ready for text extraction`);
 
     revalidatePath("/dashboard/library");
     revalidatePath("/dashboard/librarian");
@@ -251,6 +256,7 @@ export const updateBookMetadata = async (input: {
   pdfUrl?: string;
   coverUrl?: string;
   pageCount?: number | null;
+  isPictureBook?: boolean;
 }) => {
   const user = await ensureLibrarianOrAdmin();
 
@@ -297,6 +303,11 @@ export const updateBookMetadata = async (input: {
     params.push(input.pageCount);
     paramIndex++;
   }
+  if (input.isPictureBook !== undefined) {
+    setParts.push(`is_picture_book = $${paramIndex}`);
+    params.push(input.isPictureBook);
+    paramIndex++;
+  }
 
   try {
     // Update book metadata
@@ -324,6 +335,20 @@ export const updateBookMetadata = async (input: {
         `INSERT INTO book_access (book_id, access_level) VALUES ${accessValues}`,
         [input.id, ...input.accessLevels],
       );
+    }
+
+    // If marked as picture book, trigger image rendering (if not already rendered)
+    if (input.isPictureBook) {
+      const bookCheck = await queryWithContext(
+        user.userId,
+        `SELECT page_images_count FROM books WHERE id = $1`,
+        [input.id],
+      );
+      const book = bookCheck.rows[0];
+      // Only render if no images exist yet
+      if (!book?.page_images_count || book.page_images_count === 0) {
+        await renderBookImages(input.id);
+      }
     }
   } catch (error) {
     console.error("Book update error:", error);
@@ -410,13 +435,13 @@ export const generateQuizForBook = async (input: { bookId: number }) => {
   const textContent =
     book.text_extracted_at && book.page_text_content
       ? (book.page_text_content as {
-        pages: {
-          pageNumber: number;
-          text: string;
-          wordCount?: number;
-        }[];
-        totalWords: number;
-      })
+          pages: {
+            pageNumber: number;
+            text: string;
+            wordCount?: number;
+          }[];
+          totalWords: number;
+        })
       : null;
 
   const pages =
@@ -510,10 +535,10 @@ export const generateQuizForBookWithContent = async (input: {
   const textContent =
     book.text_extracted_at && book.page_text_content
       ? (book.page_text_content as {
-        pages: { pageNumber: number; text: string; wordCount?: number }[];
-        totalPages: number;
-        totalWords: number;
-      })
+          pages: { pageNumber: number; text: string; wordCount?: number }[];
+          totalPages: number;
+          totalWords: number;
+        })
       : null;
 
   const questionCount = input.questionCount ?? 5;
@@ -938,7 +963,26 @@ export const renderBookImages = async (bookId: number) => {
   const { spawn } = await import("child_process");
   const { existsSync } = await import("fs");
   const path = await import("path");
-  const scriptPath = `${process.cwd()}/scripts/render-book-images.ts`;
+
+  // Check if we're in standalone mode (scripts won't exist)
+  const scriptPath = path.join(
+    process.cwd(),
+    "scripts",
+    "render-book-images.ts",
+  );
+
+  if (!existsSync(scriptPath)) {
+    // In standalone Docker mode, scripts aren't available
+    // Return an error message directing to manual rendering
+    console.warn(
+      `[renderBookImages] Script not found at ${scriptPath} - standalone mode detected`,
+    );
+    return {
+      success: false,
+      error:
+        "Background rendering not available in this environment. Please use the API endpoint or run the script manually.",
+    };
+  }
 
   // Next.js standalone output may omit `node_modules/.bin`, so prefer a direct
   // local bin path when present, otherwise fall back to the global `tsx` CLI.
@@ -1072,9 +1116,9 @@ export const generateBookDescription = async (input: {
     const textContent =
       bookRecord?.text_extracted_at && bookRecord.page_text_content
         ? (bookRecord.page_text_content as {
-          pages: { pageNumber: number; text: string }[];
-          totalWords: number;
-        })
+            pages: { pageNumber: number; text: string }[];
+            totalWords: number;
+          })
         : null;
 
     const pagesFromText = textContent?.pages?.map((page: any) => ({
@@ -1088,12 +1132,12 @@ export const generateBookDescription = async (input: {
     const previewPage =
       !pagesFromText?.length && input.textPreview
         ? [
-          {
-            pageNumber: 0,
-            text: input.textPreview,
-            wordCount: input.textPreview.split(/\s+/).length,
-          },
-        ]
+            {
+              pageNumber: 0,
+              text: input.textPreview,
+              wordCount: input.textPreview.split(/\s+/).length,
+            },
+          ]
         : null;
 
     const pdfUrl =
@@ -1214,11 +1258,16 @@ export const extractBookText = async (bookId: number) => {
     // Check if meaningful text was extracted
     if (textContent.totalWords < 10) {
       const errorMsg =
-        "PDF appears to be image-based with no extractable text. OCR support coming soon.";
+        "PDF appears to be image-based with no extractable text. Using PDF reader mode.";
 
       await queryWithContext(
         user.userId,
-        `UPDATE books SET text_extraction_error = $1 WHERE id = $2`,
+        `UPDATE books SET
+          text_extraction_error = $1,
+          text_extraction_status = 'failed',
+          last_extraction_attempt_at = NOW(),
+          text_extraction_attempts = text_extraction_attempts + 1
+         WHERE id = $2`,
         [errorMsg, bookId],
       );
 
@@ -1230,15 +1279,35 @@ export const extractBookText = async (bookId: number) => {
       };
     }
 
-    // Save to database - clear any previous errors
+    // Save extracted text to MinIO storage
+    const { saveTextToStorage } = await import("@/lib/text-storage");
+    const textJsonUrl = await saveTextToStorage(bookId, {
+      bookId,
+      format: "pdf",
+      extractedAt: new Date().toISOString(),
+      totalPages: textContent.totalPages,
+      totalWords: textContent.totalWords,
+      pages: textContent.pages.map((p) => ({
+        pageNumber: p.pageNumber,
+        text: p.text,
+        wordCount: p.wordCount,
+      })),
+      metadata: {
+        extractionMethod: textContent.extractionMethod,
+      },
+    });
+
+    // Save to database - clear any previous errors and set completed status
     await queryWithContext(
       user.userId,
       `UPDATE books SET
         page_text_content = $1,
+        text_json_url = $2,
         text_extracted_at = NOW(),
-        text_extraction_method = $2,
+        text_extraction_method = $3,
+        text_extraction_status = 'completed',
         text_extraction_error = NULL
-       WHERE id = $3`,
+       WHERE id = $4`,
       [
         JSON.stringify({
           pages: textContent.pages,
@@ -1246,6 +1315,7 @@ export const extractBookText = async (bookId: number) => {
           totalWords: textContent.totalWords,
           extractionMethod: textContent.extractionMethod,
         }),
+        textJsonUrl,
         textContent.extractionMethod,
         bookId,
       ],
@@ -1262,10 +1332,15 @@ export const extractBookText = async (bookId: number) => {
     const message = error instanceof Error ? error.message : "Unknown error";
     const errorMsg = `Text extraction failed: ${message}`;
 
-    // Store error in database
+    // Store error in database and mark as failed
     await queryWithContext(
       user.userId,
-      `UPDATE books SET text_extraction_error = $1 WHERE id = $2`,
+      `UPDATE books SET
+        text_extraction_error = $1,
+        text_extraction_status = 'failed',
+        last_extraction_attempt_at = NOW(),
+        text_extraction_attempts = text_extraction_attempts + 1
+       WHERE id = $2`,
       [errorMsg, bookId],
     );
 
@@ -1462,7 +1537,7 @@ export const markBookAsReady = async (
       // EPUBs are ready immediately - mark text_extraction_status as 'completed'
       // since EpubFlipReader handles everything natively
       updateQuery = `
-        UPDATE books SET 
+        UPDATE books SET
           text_extraction_status = 'completed',
           text_extracted_at = NOW(),
           text_extraction_method = 'native_epub'
@@ -1474,7 +1549,7 @@ export const markBookAsReady = async (
     case "pdf_text":
       // PDF with extractable text - already handled by extractBookText
       updateQuery = `
-        UPDATE books SET 
+        UPDATE books SET
           text_extraction_status = 'completed'
         WHERE id = $1
       `;
@@ -1484,7 +1559,7 @@ export const markBookAsReady = async (
     case "pdf_images":
       // Scanned PDF using image fallback - set status to indicate image mode
       updateQuery = `
-        UPDATE books SET 
+        UPDATE books SET
           text_extraction_status = 'image_fallback',
           text_extraction_error = 'Scanned PDF - using image-based reader'
         WHERE id = $1
@@ -1500,6 +1575,51 @@ export const markBookAsReady = async (
 
   revalidatePath("/dashboard/librarian");
   revalidatePath("/dashboard/library");
+
+  return { success: true };
+};
+
+/**
+ * Set a book to use PDF viewer mode instead of text extraction.
+ * Use this for picture books, comics, and books where layout/images are important.
+ */
+export const setBookPdfViewerMode = async (bookId: number) => {
+  const user = await ensureLibrarianOrAdmin();
+
+  await queryWithContext(
+    user.userId,
+    `UPDATE books SET
+      text_extraction_status = 'pdf_viewer',
+      text_extraction_error = NULL
+     WHERE id = $1`,
+    [bookId],
+  );
+
+  revalidatePath("/dashboard/librarian");
+  revalidatePath("/dashboard/library");
+  revalidatePath(`/dashboard/student/read/${bookId}`);
+
+  return { success: true };
+};
+
+/**
+ * Reset a book from PDF viewer mode back to pending text extraction.
+ */
+export const resetBookTextExtraction = async (bookId: number) => {
+  const user = await ensureLibrarianOrAdmin();
+
+  await queryWithContext(
+    user.userId,
+    `UPDATE books SET
+      text_extraction_status = 'pending',
+      text_extraction_error = NULL
+     WHERE id = $1`,
+    [bookId],
+  );
+
+  revalidatePath("/dashboard/librarian");
+  revalidatePath("/dashboard/library");
+  revalidatePath(`/dashboard/student/read/${bookId}`);
 
   return { success: true };
 };

@@ -11,7 +11,11 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
-import { deleteBook } from "@/app/(dashboard)/dashboard/librarian/actions";
+import {
+  deleteBook,
+  setBookPdfViewerMode,
+  resetBookTextExtraction,
+} from "@/app/(dashboard)/dashboard/librarian/actions";
 import {
   ACCESS_LEVEL_OPTIONS,
   type AccessLevelValue,
@@ -53,6 +57,7 @@ export type ManagedBookRecord = {
   textExtractionAttempts?: number;
   lastExtractionAttemptAt?: string | null;
   fileFormat?: string;
+  isPictureBook?: boolean;
 };
 
 const ACCESS_BADGES: Record<
@@ -368,8 +373,6 @@ export const BookManager = ({
     });
   };
 
-
-
   return (
     <section className="space-y-5">
       <Card
@@ -592,7 +595,9 @@ export const BookManager = ({
                     </div>
 
                     {(() => {
-                      const accessLevels = normalizeAccessLevels(book.accessLevels);
+                      const accessLevels = normalizeAccessLevels(
+                        book.accessLevels,
+                      );
                       if (!accessLevels.length) return null;
 
                       return (
@@ -604,7 +609,7 @@ export const BookManager = ({
                             {accessLevels.map((level) => {
                               const badge =
                                 ACCESS_BADGES[
-                                level as keyof typeof ACCESS_BADGES
+                                  level as keyof typeof ACCESS_BADGES
                                 ];
                               return (
                                 <span
@@ -612,7 +617,7 @@ export const BookManager = ({
                                   className={clsx(
                                     "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
                                     badge?.color ??
-                                    "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                      "bg-indigo-100 text-indigo-600 border-indigo-300",
                                   )}
                                 >
                                   {badge?.label ?? level.slice(0, 2)}
@@ -718,7 +723,9 @@ export const BookManager = ({
                         </td>
                         <td className="px-4 py-3 text-xs">
                           {(() => {
-                            const accessLevels = normalizeAccessLevels(book.accessLevels);
+                            const accessLevels = normalizeAccessLevels(
+                              book.accessLevels,
+                            );
                             if (!accessLevels.length) {
                               return <span className="text-purple-300">—</span>;
                             }
@@ -728,7 +735,7 @@ export const BookManager = ({
                                 {accessLevels.map((level) => {
                                   const badge =
                                     ACCESS_BADGES[
-                                    level as keyof typeof ACCESS_BADGES
+                                      level as keyof typeof ACCESS_BADGES
                                     ];
                                   return (
                                     <span
@@ -736,7 +743,7 @@ export const BookManager = ({
                                       className={clsx(
                                         "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
                                         badge?.color ??
-                                        "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                          "bg-indigo-100 text-indigo-600 border-indigo-300",
                                       )}
                                     >
                                       {badge?.label ?? level.slice(0, 2)}
@@ -758,7 +765,10 @@ export const BookManager = ({
                                 if (actionMenu?.id === book.id) {
                                   setActionMenu(null);
                                 } else {
-                                  setActionMenu({ id: book.id, anchor: e.currentTarget });
+                                  setActionMenu({
+                                    id: book.id,
+                                    anchor: e.currentTarget,
+                                  });
                                 }
                               }}
                               className="h-10 w-10 rounded-full border border-indigo-200 bg-white/80 text-lg font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50"
@@ -821,6 +831,37 @@ export const BookManager = ({
                   <span aria-hidden>✏️</span>
                   <span>Edit</span>
                 </button>
+
+                <div className="mx-2 my-1 border-t border-indigo-100" />
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setActionMenu(null);
+                    await setBookPdfViewerMode(book.id);
+                    router.refresh();
+                  }}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-blue-600 transition hover:bg-blue-50"
+                  title="Use PDF viewer (for picture books, comics)"
+                >
+                  <span aria-hidden>📖</span>
+                  <span>PDF Viewer</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setActionMenu(null);
+                    await resetBookTextExtraction(book.id);
+                    router.refresh();
+                  }}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-amber-600 transition hover:bg-amber-50"
+                  title="Reset to text extraction mode"
+                >
+                  <span aria-hidden>🔄</span>
+                  <span>Reset Mode</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
