@@ -27,7 +27,7 @@ export interface BookTextContent {
   pages: PageText[];
   totalPages: number;
   totalWords: number;
-  extractionMethod: "pdf-text" | "ocr" | "hybrid";
+  extractionMethod: "pdf-text" | "ocr" | "epub-native";
 }
 
 /**
@@ -118,7 +118,7 @@ export async function extractTextFromPDF(
     }
 
     // 4. Determine extraction method
-    const extractionMethod: "pdf-text" | "ocr" | "hybrid" = hasText
+    const extractionMethod: "pdf-text" | "ocr" | "epub-native" = hasText
       ? "pdf-text"
       : "ocr";
 
