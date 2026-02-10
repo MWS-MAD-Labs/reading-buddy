@@ -74,9 +74,7 @@ export default defineConfig({
     url: "http://127.0.0.1:3000",
     reuseExistingServer: true, // Always reuse when available
     timeout: 120 * 1000,
-    stdout: "pipe",
+    stdout: "ignore",
     stderr: "pipe",
-    // Extra wait time on CI
-    reuseExistingPortTimeout: process.env.CI ? 30 * 1000 : 10 * 1000,
   },
 });
