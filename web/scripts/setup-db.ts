@@ -7,56 +7,73 @@ import dotenv from "dotenv";
 dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
 
 function readSqlMigrations(
-    migrationsDir: string,
-    opts?: { only?: (name: string) => boolean }
+  migrationsDir: string,
+  opts?: { only?: (name: string) => boolean },
 ): Array<{ name: string; sql: string }> {
-    if (!fs.existsSync(migrationsDir)) return [];
-    const files = fs
-        .readdirSync(migrationsDir)
-        .filter((file) => file.endsWith(".sql"))
-        .filter((file) => (opts?.only ? opts.only(file) : true))
-        .sort((a, b) => a.localeCompare(b));
+  if (!fs.existsSync(migrationsDir)) return [];
 
-    return files.map((file) => ({
-        name: file,
-        sql: fs.readFileSync(path.join(migrationsDir, file), "utf8"),
-    }));
+  // Helper to read SQL files from a directory
+  const readFromDir = (dir: string): Array<{ name: string; sql: string }> => {
+    if (!fs.existsSync(dir)) return [];
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const migrations: Array<{ name: string; sql: string }> = [];
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        // Recursively read from subdirectories
+        migrations.push(...readFromDir(fullPath));
+      } else if (entry.isFile() && entry.name.endsWith(".sql")) {
+        if (opts?.only ? opts.only(entry.name) : true) {
+          migrations.push({
+            name: entry.name,
+            sql: fs.readFileSync(fullPath, "utf8"),
+          });
+        }
+      }
+    }
+    return migrations;
+  };
+
+  const migrations = readFromDir(migrationsDir);
+  return migrations.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function setupDatabase() {
-    console.log("🚀 Starting database setup...");
+  console.log("🚀 Starting database setup...");
 
-    const pool = new Pool({
-        host: process.env.DB_HOST || "localhost",
-        port: parseInt(process.env.DB_PORT || "5434"),
-        database: process.env.DB_NAME || "reading_buddy",
-        user: process.env.DB_USER || "reading_buddy",
-        password: process.env.DB_PASSWORD,
-        ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined,
-    });
+  const pool = new Pool({
+    host: process.env.DB_HOST || "localhost",
+    port: parseInt(process.env.DB_PORT || "5434"),
+    database: process.env.DB_NAME || "reading_buddy",
+    user: process.env.DB_USER || "reading_buddy",
+    password: process.env.DB_PASSWORD,
+    ssl:
+      process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+  });
+
+  try {
+    // Read the SQL file
+    const sqlPath = path.resolve(__dirname, "../../database-setup.sql");
+    console.log(`📖 Reading SQL file from: ${sqlPath}`);
+
+    if (!fs.existsSync(sqlPath)) {
+      throw new Error("database-setup.sql not found!");
+    }
+
+    const sqlContent = fs.readFileSync(sqlPath, "utf8");
+
+    // Connect to database
+    console.log("🔌 Connecting to database...");
+    const client = await pool.connect();
 
     try {
-        // Read the SQL file
-        const sqlPath = path.resolve(__dirname, "../../database-setup.sql");
-        console.log(`📖 Reading SQL file from: ${sqlPath}`);
+      console.log("⚡ Executing database setup script...");
+      // Wrap in transaction
+      await client.query("BEGIN");
 
-        if (!fs.existsSync(sqlPath)) {
-            throw new Error("database-setup.sql not found!");
-        }
-
-        const sqlContent = fs.readFileSync(sqlPath, "utf8");
-
-        // Connect to database
-        console.log("🔌 Connecting to database...");
-        const client = await pool.connect();
-
-        try {
-            console.log("⚡ Executing database setup script...");
-            // Wrap in transaction
-            await client.query("BEGIN");
-
-            console.log("🧹 Wiping schemas for fresh install...");
-            await client.query(`
+      console.log("🧹 Wiping schemas for fresh install...");
+      await client.query(`
                 DROP SCHEMA IF EXISTS public CASCADE;
                 DROP SCHEMA IF EXISTS auth CASCADE;
                 CREATE SCHEMA public;
@@ -64,8 +81,8 @@ async function setupDatabase() {
                 GRANT ALL ON SCHEMA public TO public;
             `);
 
-            console.log("🛠️  Setting up auth schema mock...");
-            await client.query(`
+      console.log("🛠️  Setting up auth schema mock...");
+      await client.query(`
                 CREATE SCHEMA IF NOT EXISTS auth;
                 CREATE TABLE IF NOT EXISTS auth.users (
                     id UUID PRIMARY KEY,
@@ -78,24 +95,24 @@ async function setupDatabase() {
                 );
 
                 -- Mock auth functions
-                CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ 
+                CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
                     SELECT COALESCE(
                         current_setting('request.jwt.claim.sub', true),
                         (current_setting('request.jwt.claims', true)::jsonb ->> 'sub')
-                    )::uuid 
+                    )::uuid
                 $$;
 
-                CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ 
+                CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$
                     SELECT COALESCE(
                         current_setting('request.jwt.claim.role', true),
                         (current_setting('request.jwt.claims', true)::jsonb ->> 'role'),
                         'anon'
-                    )::text 
+                    )::text
                 $$;
             `);
 
-            console.log("🎭 Setting up usage roles...");
-            await client.query(`
+      console.log("🎭 Setting up usage roles...");
+      await client.query(`
                 DO $$
                 BEGIN
                     IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticated') THEN
@@ -109,7 +126,7 @@ async function setupDatabase() {
                     END IF;
                 END
                 $$;
-                
+
                 GRANT USAGE ON SCHEMA public TO authenticated;
                 GRANT USAGE ON SCHEMA public TO anon;
                 GRANT USAGE ON SCHEMA public TO service_role;
@@ -127,43 +144,49 @@ async function setupDatabase() {
                 );
 
                 -- Trigger to sync public.users to auth.users for FK consistency
-                CREATE OR REPLACE FUNCTION sync_user_to_auth() RETURNS TRIGGER AS $$ 
-                BEGIN 
-                    INSERT INTO auth.users (id, email) 
-                    VALUES (NEW.id, NEW.email) 
-                    ON CONFLICT (id) DO NOTHING; 
-                    RETURN NEW; 
-                END; 
+                CREATE OR REPLACE FUNCTION sync_user_to_auth() RETURNS TRIGGER AS $$
+                BEGIN
+                    INSERT INTO auth.users (id, email)
+                    VALUES (NEW.id, NEW.email)
+                    ON CONFLICT (id) DO NOTHING;
+                    RETURN NEW;
+                END;
                 $$ LANGUAGE plpgsql;
 
                 DROP TRIGGER IF EXISTS sync_users ON public.users;
-                CREATE TRIGGER sync_users 
-                AFTER INSERT ON public.users 
-                FOR EACH ROW 
+                CREATE TRIGGER sync_users
+                AFTER INSERT ON public.users
+                FOR EACH ROW
                 EXECUTE FUNCTION sync_user_to_auth();
             `);
 
-            // Execute the SQL
-            await client.query(sqlContent);
+      // Execute the SQL
+      await client.query(sqlContent);
 
-            // Apply required repo SQL migrations after the base schema, so CI has required tables.
-            const migrationsDir = path.resolve(__dirname, "../../sql/migrations");
-            const migrations = readSqlMigrations(migrationsDir, {
-                only: (name) => name.startsWith("20260112_"),
-            });
-            if (migrations.length > 0) {
-                console.log(`🧱 Applying ${migrations.length} migration(s) from: ${migrationsDir}`);
-                for (const migration of migrations) {
-                    console.log(`➡️  Running migration: ${migration.name}`);
-                    await client.query(migration.sql);
-                }
-            }
+      // Apply required repo SQL migrations after the base schema, so CI has required tables.
+      const migrationsDir = path.resolve(__dirname, "../../sql/migrations");
+      const migrations = readSqlMigrations(migrationsDir, {
+        only: (name) =>
+          name.startsWith("20260112_") ||
+          name === "add-picture-book-support.sql",
+      });
+      if (migrations.length > 0) {
+        console.log(
+          `🧱 Applying ${migrations.length} migration(s) from: ${migrationsDir}`,
+        );
+        for (const migration of migrations) {
+          console.log(`➡️  Running migration: ${migration.name}`);
+          await client.query(migration.sql);
+        }
+      }
 
-            // Remove interference from Supabase trigger
-            await client.query("DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;");
+      // Remove interference from Supabase trigger
+      await client.query(
+        "DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;",
+      );
 
-            // Function used by NextAuth to create/update profiles
-            await client.query(`
+      // Function used by NextAuth to create/update profiles
+      await client.query(`
                 CREATE OR REPLACE FUNCTION create_or_update_profile(
                     _user_id UUID,
                     _email TEXT,
@@ -178,9 +201,9 @@ async function setupDatabase() {
                     INSERT INTO public.profiles (id, user_id, full_name, role)
                     VALUES (_user_id, _user_id, _full_name, _role)
                     ON CONFLICT (user_id) DO UPDATE
-                    SET 
+                    SET
                         full_name = EXCLUDED.full_name,
-                        role = CASE 
+                        role = CASE
                             WHEN profiles.role = 'ADMIN' THEN profiles.role -- Don't downgrade admins
                             ELSE EXCLUDED.role
                         END,
@@ -189,22 +212,20 @@ async function setupDatabase() {
                 $$;
             `);
 
-            await client.query("COMMIT");
-            console.log("✅ Database setup completed successfully!");
-
-        } catch (error) {
-            await client.query("ROLLBACK");
-            throw error;
-        } finally {
-            client.release();
-        }
-
+      await client.query("COMMIT");
+      console.log("✅ Database setup completed successfully!");
     } catch (error) {
-        console.error("❌ Database setup failed:", error);
-        process.exit(1);
+      await client.query("ROLLBACK");
+      throw error;
     } finally {
-        await pool.end();
+      client.release();
     }
+  } catch (error) {
+    console.error("❌ Database setup failed:", error);
+    process.exit(1);
+  } finally {
+    await pool.end();
+  }
 }
 
 setupDatabase();
