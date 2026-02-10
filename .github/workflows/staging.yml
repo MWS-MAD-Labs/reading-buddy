@@ -78,8 +78,14 @@ jobs:
       - name: Run E2E tests
         working-directory: ./web
         run: |
+          # Start the Next.js dev server in background
+          npm run dev &
+          # Wait for server to start
+          sleep 30
+          # Run setup commands
           npm run db:setup
           npx tsx scripts/setup-test-data.ts
+          # Run tests
           npm run test:e2e
         env:
           NODE_ENV: test
