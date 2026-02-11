@@ -69,10 +69,10 @@ function useProxyPdfUrl(originalUrl: string): string {
   }, [originalUrl]);
 }
 
-// Use CDN worker that may have better decoder support
+// Use CDN worker that matches the installed pdfjs-dist version (5.4.296)
 // Note: JPEG2000 (JPX) support is limited due to licensing - many PDF workers exclude it
 const workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.296/pdf.worker.min.mjs";
 
 const DISPLAY_MODES = {
   SPREAD: "spread",
