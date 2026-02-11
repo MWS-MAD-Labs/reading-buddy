@@ -126,16 +126,16 @@ export function SkeletonAvatar({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 }
 
 export function SkeletonText({ lines = 3 }: { lines?: number }) {
+  // Generate random widths once using useMemo to avoid impure render
+  const widths = React.useMemo(
+    () => Array.from({ length: lines }, () => 70 + Math.random() * 30),
+    [lines],
+  );
+
   return (
     <div className="space-y-2">
-      {Array.from({ length: lines }).map((_, i) => (
-        <Skeleton
-          key={i}
-          className="h-4"
-          style={{
-            width: `${Math.random() * 30 + 70}%`,
-          }}
-        />
+      {widths.map((width, i) => (
+        <Skeleton key={i} className="h-4" style={{ width: `${width}%` }} />
       ))}
     </div>
   );
