@@ -2,7 +2,10 @@
 
 /**
  * Unified Book Reader
- * Routes to appropriate reader based on book format and text availability
+ * Routes to appropriate reader based on book format and availability
+ * - Picture books use image-based FlipBookReader
+ * - EPUB files use EpubFlipReader
+ * - Books with extracted text use TextFlipReader
  */
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -60,20 +63,6 @@ const EpubFlipReader = dynamic(
   },
 );
 
-const PdfBookReader = dynamic(
-  () => import("./PdfBookReader").then((mod) => mod.PdfBookReader),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-96 items-center justify-center">
-        <div className="text-lg font-semibold text-purple-600">
-          Loading PDF reader...
-        </div>
-      </div>
-    ),
-  },
-);
-
 type PageImageInfo = {
   baseUrl: string;
   count: number;
@@ -96,7 +85,7 @@ type UnifiedBookReaderProps = {
   showFinishButton?: boolean;
 };
 
-type ReaderMode = "text" | "epub" | "images" | "pdf" | "error" | "loading";
+type ReaderMode = "text" | "epub" | "images" | "error" | "loading";
 
 export function UnifiedBookReader({
   bookId,
@@ -127,8 +116,6 @@ export function UnifiedBookReader({
   const [isNotesPanelOpen, setIsNotesPanelOpen] = useState(false);
   const [totalPageCount, setTotalPageCount] = useState<number | null>(null);
 
-  // Show finish button based on prop from parent (which controls timing)
-
   // Determine reader mode based on available data
   useEffect(() => {
     const determineMode = async () => {
@@ -143,24 +130,14 @@ export function UnifiedBookReader({
         return;
       }
 
-      // Priority 1: Force PDF viewer mode (for picture books, comics, etc.)
-      // Librarian can set this status to preserve original layout/images
-      if (
-        textExtractionStatus === "pdf_viewer" ||
-        textExtractionStatus === "image_fallback"
-      ) {
-        setReaderMode("pdf");
-        return;
-      }
-
-      // Priority 2: Native EPUB file available - use EpubReader
+      // Priority 1: Native EPUB file available - use EpubReader
       // EPUB files have rich formatting, so prefer native rendering
       if (epubUrl) {
         setReaderMode("epub");
         return;
       }
 
-      // Priority 3: Page text content from database (most recent extraction)
+      // Priority 2: Page text content from database (most recent extraction)
       if (
         pageTextContent &&
         pageTextContent.pages &&
@@ -174,7 +151,7 @@ export function UnifiedBookReader({
         return;
       }
 
-      // Priority 4: Text JSON URL available - fetch from MinIO
+      // Priority 3: Text JSON URL available - fetch from MinIO
       if (textJsonUrl && textExtractionStatus === "completed") {
         try {
           const response = await fetch(textJsonUrl);
@@ -198,7 +175,7 @@ export function UnifiedBookReader({
         }
       }
 
-      // Priority 5: Extraction in progress
+      // Priority 4: Extraction in progress
       if (textExtractionStatus === "processing") {
         setError(
           "Text extraction is in progress. Please try again in a few minutes.",
@@ -207,14 +184,7 @@ export function UnifiedBookReader({
         return;
       }
 
-      // Priority 6: Extraction failed - use PdfBookReader for scanned PDFs
-      // This handles scanned/image-based PDFs that couldn't have text extracted
-      if (textExtractionStatus === "failed") {
-        setReaderMode("pdf");
-        return;
-      }
-
-      // Priority 7: No text yet, but has images - use legacy FlipBookReader
+      // Priority 5: Legacy books with rendered images
       // This handles existing books during migration
       if (pageImages && pageImages.count > 0) {
         setTotalPageCount(pageImages.count);
@@ -222,7 +192,7 @@ export function UnifiedBookReader({
         return;
       }
 
-      // Priority 8: Nothing available - show error
+      // Priority 6: Nothing available - show error
       setError(
         "This book is not yet available for reading. Please contact your librarian.",
       );
@@ -255,14 +225,11 @@ export function UnifiedBookReader({
 
       saveTimeoutRef.current = setTimeout(
         async () => {
-          // Check if page has changed or if it's the very first load (where lastSavedPageRef might match page but we need a check)
+          // Check if page has changed or if it's the very first load
           const isSignificantChange =
             page > lastSavedPageRef.current ||
             Math.abs(page - lastSavedPageRef.current) >= 2;
-          const isInitialCheck =
-            lastSavedPageRef.current === initialPage && !saveTimeoutRef.current; // This logic is tricky with debounce
 
-          // Simplified: Always check if it's the first time we're successfully recording or if page progressed
           if (isSignificantChange || page === initialPage) {
             try {
               await recordReadingProgress({ bookId, currentPage: page });
@@ -452,63 +419,10 @@ export function UnifiedBookReader({
     );
   }
 
-  // PDF mode - use PdfBookReader for scanned PDFs or direct PDF viewing
-  // This handles books where text extraction failed (likely scanned documents)
-  if (readerMode === "pdf") {
-    return (
-      <div className="space-y-4">
-        <PdfBookReader
-          bookId={bookId}
-          pdfUrl={pdfUrl}
-          initialPage={initialPage}
-          expectedPages={totalPageCount ?? undefined}
-        />
-
-        {/* Reader Actions Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-white/80 p-3">
-          <div className="flex items-center gap-2 text-sm text-indigo-600">
-            <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-              📄 PDF Mode (Scanned)
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/dashboard/journal/${bookId}`}
-              className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
-            >
-              📓 Book Journal
-            </Link>
-            <button
-              onClick={() => setIsNotesPanelOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
-            >
-              📝 Notes
-            </button>
-            {showFinishButton && onComplete && (
-              <button
-                onClick={onComplete}
-                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105 animate-pulse"
-              >
-                ✅ Finish Reading
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Notes Panel */}
-        <ReaderNotesPanel
-          bookId={bookId}
-          currentPage={currentPage}
-          isOpen={isNotesPanelOpen}
-          onClose={() => setIsNotesPanelOpen(false)}
-          onPageJump={(page) => handlePageChange(page)}
-        />
-      </div>
-    );
-  }
-
-  // Image mode - use legacy FlipBookReader (for migration period)
+  // Image mode - use FlipBookReader for picture books
   if (readerMode === "images" && pageImages) {
+    const modeLabel = isPictureBook ? "📖 Picture Book" : "🖼️ Image Mode";
+
     return (
       <div className="space-y-4">
         <FlipBookReader
@@ -523,6 +437,9 @@ export function UnifiedBookReader({
           <div className="flex items-center gap-2 text-sm text-indigo-600">
             <span className="font-medium">📍 Page {currentPage}</span>
             <span className="text-indigo-400">of {pageImages.count}</span>
+            <span className="ml-2 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+              {modeLabel}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <Link
