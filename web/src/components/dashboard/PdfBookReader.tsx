@@ -71,7 +71,7 @@ function useProxyPdfUrl(originalUrl: string): string {
 
 // Use CDN worker compatible with react-pdf 10.x (which uses pdfjs-dist 3.x)
 // Note: JPEG2000 (JPX) support is limited due to licensing - many PDF workers exclude it
-const workerSrc = `https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.mjs`;
+const workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.mjs`;
 
 const DISPLAY_MODES = {
   SPREAD: "spread",
