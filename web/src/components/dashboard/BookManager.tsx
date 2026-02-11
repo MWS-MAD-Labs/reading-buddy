@@ -11,11 +11,7 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
-import {
-  deleteBook,
-  checkRenderStatus,
-  renderBookImages,
-} from "@/app/(dashboard)/dashboard/librarian/actions";
+import { deleteBook } from "@/app/(dashboard)/dashboard/librarian/actions";
 import {
   ACCESS_LEVEL_OPTIONS,
   type AccessLevelValue,
@@ -374,7 +370,18 @@ export const BookManager = ({
     }
 
     try {
-      const status = await checkRenderStatus(bookId);
+      const response = await fetch(
+        `/api/render-book-images?bookId=${encodeURIComponent(bookId)}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        },
+      );
+      const status = await response.json();
+
+      if (!response.ok) {
+        throw new Error(status?.error || "Unable to check render progress.");
+      }
 
       if (activeRenderBookIdRef.current !== bookId) {
         return;
@@ -434,9 +441,15 @@ export const BookManager = ({
       message: `Starting render for "${book.title}"...`,
     });
 
-    const result = await renderBookImages(book.id);
+    const response = await fetch(
+      `/api/render-book-images?bookId=${encodeURIComponent(book.id)}`,
+      {
+        method: "POST",
+      },
+    );
+    const result = await response.json();
 
-    if (!("success" in result) || !result.success) {
+    if (!response.ok || !("success" in result) || !result.success) {
       setFeedback({
         type: "error",
         message:
