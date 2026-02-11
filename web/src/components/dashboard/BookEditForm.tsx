@@ -60,9 +60,6 @@ export const BookEditForm = ({
   const [selectedAccessLevels, setSelectedAccessLevels] = useState<
     Set<AccessLevelValue>
   >(new Set(normalizeAccessLevels(book.accessLevels)));
-  const [isPictureBook, setIsPictureBook] = useState<boolean>(
-    book.isPictureBook ?? false,
-  );
   const [pageCount, setPageCount] = useState<number | null>(book.pageCount);
   const [pdfDetectionState, setPdfDetectionState] =
     useState<PdfDetectionState>("idle");
@@ -385,7 +382,6 @@ export const BookEditForm = ({
         pdfUrl,
         coverUrl,
         pageCount: resolvedPageCount,
-        isPictureBook,
       });
 
       // If new PDF was uploaded, trigger re-rendering
@@ -471,7 +467,6 @@ export const BookEditForm = ({
     setError(null);
     setSuccess(null);
     setSelectedAccessLevels(new Set(normalizeAccessLevels(book.accessLevels)));
-    setIsPictureBook(book.isPictureBook ?? false);
     setPageCount(book.pageCount);
     setPdfDetectionState("idle");
     setPdfDetectionMessage(null);
@@ -649,25 +644,6 @@ export const BookEditForm = ({
             placeholder="Quick summary for librarians and AI quiz prompts."
           />
         </fieldset>
-
-        <div className="space-y-2 md:col-span-2">
-          <label className="flex items-center gap-3 rounded-2xl border-4 border-purple-300 bg-purple-50 p-4">
-            <input
-              type="checkbox"
-              name="picture-book"
-              checked={isPictureBook}
-              onChange={(e) => setIsPictureBook(e.target.checked)}
-              className="h-6 w-6 rounded border-purple-400 text-purple-600 focus:ring-2 focus:ring-purple-300"
-            />
-            <div className="flex-1">
-              <p className="font-semibold text-purple-900">📖 Picture Book</p>
-              <p className="text-sm text-purple-700">
-                Check for books with illustrations. Each page will be rendered
-                as an image for optimal viewing.
-              </p>
-            </div>
-          </label>
-        </div>
 
         <fieldset className="space-y-2 text-base font-bold text-purple-700 md:col-span-2">
           <legend>Access</legend>

@@ -223,8 +223,9 @@ export const saveBookMetadata = async (input: {
       );
     }
 
-    // If marked as picture book, trigger image rendering
-    if (input.isPictureBook && insertedBook.id) {
+    // Auto-trigger image rendering for all PDF books
+    // This ensures the book is ready for image-based reading
+    if (insertedBook.id) {
       await renderBookImages(insertedBook.id);
     }
 
@@ -337,18 +338,16 @@ export const updateBookMetadata = async (input: {
       );
     }
 
-    // If marked as picture book, trigger image rendering (if not already rendered)
-    if (input.isPictureBook) {
-      const bookCheck = await queryWithContext(
-        user.userId,
-        `SELECT page_images_count FROM books WHERE id = $1`,
-        [input.id],
-      );
-      const book = bookCheck.rows[0];
-      // Only render if no images exist yet
-      if (!book?.page_images_count || book.page_images_count === 0) {
-        await renderBookImages(input.id);
-      }
+    // Auto-trigger image rendering if not already rendered
+    const bookCheck = await queryWithContext(
+      user.userId,
+      `SELECT page_images_count FROM books WHERE id = $1`,
+      [input.id],
+    );
+    const book = bookCheck.rows[0];
+    // Only render if no images exist yet
+    if (!book?.page_images_count || book.page_images_count === 0) {
+      await renderBookImages(input.id);
     }
   } catch (error) {
     console.error("Book update error:", error);

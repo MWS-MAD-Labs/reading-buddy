@@ -81,7 +81,6 @@ export const BookUploadForm = ({
   }>({ current: 0, total: 0 });
   const [uploadedBookId, setUploadedBookId] = useState<number | null>(null);
   const [generatingDescription, setGeneratingDescription] = useState(false);
-  const [isPictureBook, setIsPictureBook] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   const genreListId = useId();
@@ -437,7 +436,6 @@ export const BookUploadForm = ({
         coverUrl: uploadInfo.coverPublicUrl,
         fileFormat: detectedFormat || "pdf",
         fileSizeBytes: pdfFile.size,
-        isPictureBook,
       });
 
       setUploadedBookId(saveResult.bookId);
@@ -785,26 +783,6 @@ export const BookUploadForm = ({
             className="w-full rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 font-semibold text-purple-900 outline-none transition-all"
             placeholder="Quick summary for librarians and AI quiz prompts."
           />
-        </div>
-
-        <div className="space-y-2 md:col-span-2">
-          <label className="flex items-center gap-3 rounded-2xl border-4 border-purple-300 bg-purple-50 p-4">
-            <input
-              type="checkbox"
-              id="picture-book"
-              name="picture-book"
-              checked={isPictureBook}
-              onChange={(e) => setIsPictureBook(e.target.checked)}
-              className="h-6 w-6 rounded border-purple-400 text-purple-600 focus:ring-2 focus:ring-purple-300"
-            />
-            <div className="flex-1">
-              <p className="font-semibold text-purple-900">📖 Picture Book</p>
-              <p className="text-sm text-purple-700">
-                Check for books with illustrations. Each page will be rendered
-                as an image for optimal viewing.
-              </p>
-            </div>
-          </label>
         </div>
 
         <fieldset className="space-y-2 text-base font-bold text-purple-700 md:col-span-2">
