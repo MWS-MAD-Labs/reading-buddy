@@ -1028,16 +1028,41 @@ export const renderBookImages = async (bookId: number) => {
     args = [tsxCliPath, scriptPath, `--bookId=${bookId}`];
   }
 
+  const webCwdCandidate = path.join(process.cwd(), "web");
+  const scriptDir = path.dirname(scriptPath);
+  const workerCwd = existsSync(path.join(scriptDir, "..", "tsconfig.json"))
+    ? path.resolve(scriptDir, "..")
+    : existsSync(path.join(webCwdCandidate, "tsconfig.json"))
+      ? webCwdCandidate
+      : process.cwd();
+
   console.info(
-    `[renderBookImages] Starting render worker for book ${bookId} using command: ${command}`,
+    `[renderBookImages] Starting render worker for book ${bookId} using command: ${command} (cwd: ${workerCwd})`,
   );
   const child = spawn(command, args, {
-    detached: true,
-    stdio: "ignore",
+    detached: false,
+    stdio: ["ignore", "pipe", "pipe"],
+    cwd: workerCwd,
     env: {
       ...process.env,
     },
   });
+
+  if (child.stdout) {
+    child.stdout.on("data", (chunk) => {
+      console.info(
+        `[renderBookImages:book:${bookId}:stdout] ${String(chunk).trim()}`,
+      );
+    });
+  }
+
+  if (child.stderr) {
+    child.stderr.on("data", (chunk) => {
+      console.error(
+        `[renderBookImages:book:${bookId}:stderr] ${String(chunk).trim()}`,
+      );
+    });
+  }
 
   child.on("error", async (error) => {
     const message =
@@ -1061,7 +1086,27 @@ export const renderBookImages = async (bookId: number) => {
     }
   });
 
-  child.unref();
+  child.on("exit", async (code, signal) => {
+    if (code === 0) {
+      return;
+    }
+    const message = `Render worker exited unexpectedly (code=${code ?? "null"}, signal=${signal ?? "null"})`;
+    console.error(`[renderBookImages] ${message}`);
+    try {
+      await queryWithContext(
+        actorUserId,
+        `UPDATE book_render_jobs
+         SET status = $1, error_message = $2
+         WHERE id = $3 AND status IN ($4, $5)`,
+        ["failed", message, jobId, "pending", "processing"],
+      );
+    } catch (updateError) {
+      console.error(
+        "[renderBookImages] Failed to update job status:",
+        updateError,
+      );
+    }
+  });
 
   return {
     success: true,

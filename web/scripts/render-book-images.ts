@@ -369,7 +369,19 @@ const main = async () => {
 
     const job = jobResult.rows[0];
     if (job) {
-      await processJob(job as JobRecord);
+      try {
+        await processJob(job as JobRecord);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        await pool.query(
+          `UPDATE book_render_jobs
+           SET status = $1, error_message = $2, finished_at = $3
+           WHERE id = $4`,
+          ["failed", message, new Date().toISOString(), job.id],
+        );
+        console.error(`Job ${job.id} failed:`, message);
+        throw err;
+      }
       return;
     }
     throw new Error("Unable to load job that was just created.");
