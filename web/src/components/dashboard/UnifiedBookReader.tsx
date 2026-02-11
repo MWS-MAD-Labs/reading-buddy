@@ -183,7 +183,7 @@ export function UnifiedBookReader({
         process.env.NODE_ENV === "test" ? 500 : 3000,
       );
     },
-    [bookId, onPageChange, router],
+    [bookId, initialPage, onPageChange, router],
   );
 
   // Cleanup timeout on unmount
