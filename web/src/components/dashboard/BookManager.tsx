@@ -13,8 +13,7 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import {
   deleteBook,
-  setBookPdfViewerMode,
-  resetBookTextExtraction,
+  renderBookImages,
 } from "@/app/(dashboard)/dashboard/librarian/actions";
 import {
   ACCESS_LEVEL_OPTIONS,
@@ -92,7 +91,7 @@ const ACCESS_BADGES: Record<
 };
 
 const getContentStatusBadge = (book: ManagedBookRecord) => {
-  // EPUBs work natively without text extraction
+  // EPUBs work natively
   if (book.fileFormat === "epub") {
     return (
       <Badge
@@ -106,47 +105,30 @@ const getContentStatusBadge = (book: ManagedBookRecord) => {
     );
   }
 
-  // For PDFs, check text extraction status
-  if (book.textExtractedAt) {
-    return (
-      <Badge
-        variant="lime"
-        size="sm"
-        title="Text extracted successfully"
-        className="rounded-full"
-      >
-        ✓ Extracted
-      </Badge>
-    );
-  }
-
-  // Legacy PDFs with page images are still readable
+  // PDFs with rendered images are ready
   if (book.pageImagesCount && book.pageImagesCount > 0) {
     return (
       <Badge
         variant="sky"
         size="sm"
-        title={
-          book.textExtractionError
-            ? `Using page images (text extraction issue: ${book.textExtractionError})`
-            : "Using page images"
-        }
+        title={`Ready to read (${book.pageImagesCount} pages rendered)`}
         className="rounded-full"
       >
-        📷 Images
+        📷 Ready
       </Badge>
     );
   }
 
-  if (book.textExtractionError) {
+  // PDFs without images need rendering
+  if (book.fileFormat === "pdf") {
     return (
       <Badge
         variant="amber"
         size="sm"
-        title={book.textExtractionError}
-        className="cursor-help rounded-full"
+        title="Click menu (⋮) → Render Images to make this book available"
+        className="rounded-full"
       >
-        ✗ Failed
+        ⚠ Needs Render
       </Badge>
     );
   }
@@ -798,6 +780,10 @@ export const BookManager = ({
           const book = books.find((b) => b.id === actionMenu.id);
           if (!book) return null;
 
+          const needsRenderImages =
+            book.fileFormat === "pdf" &&
+            (!book.pageImagesCount || book.pageImagesCount === 0);
+
           return createPortal(
             <div
               ref={menuRef}
@@ -820,6 +806,30 @@ export const BookManager = ({
                   <span>Quizzes</span>
                 </button>
 
+                {needsRenderImages && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setActionMenu(null);
+                      const result = await renderBookImages(book.id);
+                      if ("success" in result && result.success) {
+                        router.refresh();
+                      } else {
+                        alert(
+                          "error" in result
+                            ? result.error
+                            : "Failed to render images",
+                        );
+                      }
+                    }}
+                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-purple-600 transition hover:bg-purple-50"
+                    title="Render PDF pages as images for reading"
+                  >
+                    <span aria-hidden>🖼️</span>
+                    <span>Render Images</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => {
@@ -833,34 +843,6 @@ export const BookManager = ({
                 </button>
 
                 <div className="mx-2 my-1 border-t border-indigo-100" />
-
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setActionMenu(null);
-                    await setBookPdfViewerMode(book.id);
-                    router.refresh();
-                  }}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-blue-600 transition hover:bg-blue-50"
-                  title="Use PDF viewer (for picture books, comics)"
-                >
-                  <span aria-hidden>📖</span>
-                  <span>PDF Viewer</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setActionMenu(null);
-                    await resetBookTextExtraction(book.id);
-                    router.refresh();
-                  }}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-amber-600 transition hover:bg-amber-50"
-                  title="Reset to text extraction mode"
-                >
-                  <span aria-hidden>🔄</span>
-                  <span>Reset Mode</span>
-                </button>
 
                 <button
                   type="button"
