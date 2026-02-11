@@ -965,8 +965,8 @@ export const renderBookImages = async (bookId: number) => {
   const path = await import("path");
 
   const scriptCandidates = [
-    path.join(process.cwd(), "scripts", "render-book-images.ts"),
     path.join(process.cwd(), "web", "scripts", "render-book-images.ts"),
+    path.join(process.cwd(), "scripts", "render-book-images.ts"),
   ];
   const scriptPath = scriptCandidates.find((candidate) =>
     existsSync(candidate),

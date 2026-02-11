@@ -93,6 +93,10 @@ RUN groupadd --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./.next/static
 
+# Include full runtime node_modules for background TS worker dependencies
+# (e.g. tsx/esbuild/minio/pg) which may not be fully traced by standalone output.
+COPY --from=deps --chown=nextjs:nodejs /app/web/node_modules ./node_modules
+
 # Copy the public folder
 COPY --from=builder --chown=nextjs:nodejs /app/web/public ./public
 
