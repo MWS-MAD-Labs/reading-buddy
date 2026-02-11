@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import {
   deleteBook,
+  checkRenderStatus,
   renderBookImages,
 } from "@/app/(dashboard)/dashboard/librarian/actions";
 import {
@@ -159,7 +160,7 @@ export const BookManager = ({
 }: BookManagerProps) => {
   const router = useRouter();
   const [feedback, setFeedback] = useState<{
-    type: "success" | "error";
+    type: "success" | "error" | "info";
     message: string;
   } | null>(null);
   const [deletePendingId, setDeletePendingId] = useState<number | null>(null);
@@ -185,6 +186,18 @@ export const BookManager = ({
     left: number;
   } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const renderPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const activeRenderBookIdRef = useRef<number | null>(null);
+
+  const clearRenderPolling = () => {
+    if (renderPollTimeoutRef.current) {
+      clearTimeout(renderPollTimeoutRef.current);
+      renderPollTimeoutRef.current = null;
+    }
+    activeRenderBookIdRef.current = null;
+  };
 
   // Calculate menu position when actionMenu changes
   useEffect(() => {
@@ -355,6 +368,103 @@ export const BookManager = ({
     });
   };
 
+  const pollRenderStatus = async (bookId: number, bookTitle: string) => {
+    if (activeRenderBookIdRef.current !== bookId) {
+      return;
+    }
+
+    try {
+      const status = await checkRenderStatus(bookId);
+
+      if (activeRenderBookIdRef.current !== bookId) {
+        return;
+      }
+
+      if (status.completed) {
+        clearRenderPolling();
+        setFeedback({
+          type: "success",
+          message: `Rendering complete for "${bookTitle}" (${status.pageCount ?? 0} pages).`,
+        });
+        router.refresh();
+        return;
+      }
+
+      if (status.error) {
+        clearRenderPolling();
+        setFeedback({
+          type: "error",
+          message: `Rendering failed for "${bookTitle}": ${status.error}`,
+        });
+        return;
+      }
+
+      const processedPages = status.processedPages ?? 0;
+      const totalPages = status.totalPages ?? 0;
+      const statusLabel = status.status === "pending" ? "Queued" : "Rendering";
+
+      setFeedback({
+        type: "info",
+        message:
+          totalPages > 0
+            ? `${statusLabel} "${bookTitle}": ${processedPages} / ${totalPages} pages`
+            : `${statusLabel} "${bookTitle}"...`,
+      });
+
+      renderPollTimeoutRef.current = setTimeout(() => {
+        void pollRenderStatus(bookId, bookTitle);
+      }, 2000);
+    } catch (error) {
+      clearRenderPolling();
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to check render progress.";
+      setFeedback({
+        type: "error",
+        message: `Render status check failed for "${bookTitle}": ${message}`,
+      });
+    }
+  };
+
+  const handleRenderImages = async (book: ManagedBookRecord) => {
+    clearRenderPolling();
+    setFeedback({
+      type: "info",
+      message: `Starting render for "${book.title}"...`,
+    });
+
+    const result = await renderBookImages(book.id);
+
+    if (!("success" in result) || !result.success) {
+      setFeedback({
+        type: "error",
+        message:
+          "error" in result && result.error
+            ? result.error
+            : "Failed to render images.",
+      });
+      return;
+    }
+
+    activeRenderBookIdRef.current = book.id;
+    setFeedback({
+      type: "info",
+      message: `Render started for "${book.title}". Checking progress...`,
+    });
+    void pollRenderStatus(book.id, book.title);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (renderPollTimeoutRef.current) {
+        clearTimeout(renderPollTimeoutRef.current);
+        renderPollTimeoutRef.current = null;
+      }
+      activeRenderBookIdRef.current = null;
+    };
+  }, []);
+
   return (
     <section className="space-y-5">
       <Card
@@ -388,11 +498,7 @@ export const BookManager = ({
         </CardHeader>
 
         {feedback ? (
-          <Alert
-            variant={feedback.type === "success" ? "success" : "error"}
-            className="w-full"
-          >
-            {feedback.type === "success" ? "✅ " : "⚠️ "}
+          <Alert variant={feedback.type} className="w-full">
             {feedback.message}
           </Alert>
         ) : null}
@@ -811,16 +917,7 @@ export const BookManager = ({
                     type="button"
                     onClick={async () => {
                       setActionMenu(null);
-                      const result = await renderBookImages(book.id);
-                      if ("success" in result && result.success) {
-                        router.refresh();
-                      } else {
-                        alert(
-                          "error" in result
-                            ? result.error
-                            : "Failed to render images",
-                        );
-                      }
+                      await handleRenderImages(book);
                     }}
                     className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-purple-600 transition hover:bg-purple-50"
                     title="Render PDF pages as images for reading"
