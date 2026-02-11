@@ -96,6 +96,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./.next/static
 # Copy the public folder
 COPY --from=builder --chown=nextjs:nodejs /app/web/public ./public
 
+# Copy worker scripts and source files required by background render worker.
+# The standalone Next.js output does not include TypeScript source/scripts.
+COPY --from=builder --chown=nextjs:nodejs /app/web/scripts ./web/scripts
+COPY --from=builder --chown=nextjs:nodejs /app/web/src ./web/src
+COPY --from=builder --chown=nextjs:nodejs /app/web/tsconfig.json ./web/tsconfig.json
+
 # Set the correct permission for prerender cache
 RUN mkdir -p ./.next && chown -R nextjs:nodejs ./.next
 
