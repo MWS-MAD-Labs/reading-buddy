@@ -910,10 +910,11 @@ export const renderBookImages = async (bookId: number) => {
   if (!user || !user.userId) {
     return { error: "Not authenticated" };
   }
+  const actorUserId = user.userId;
 
   // Check if book exists
   const bookResult = await queryWithContext(
-    user.userId,
+    actorUserId,
     `SELECT id, title FROM books WHERE id = $1`,
     [bookId],
   );
@@ -926,7 +927,7 @@ export const renderBookImages = async (bookId: number) => {
 
   // Create or update render job
   const existingJobResult = await queryWithContext(
-    user.userId,
+    actorUserId,
     `SELECT id, status FROM book_render_jobs
      WHERE book_id = $1
      ORDER BY created_at DESC
@@ -943,7 +944,7 @@ export const renderBookImages = async (bookId: number) => {
     jobId = existingJobResult.rows[0].id;
   } else {
     const newJobResult = await queryWithContext(
-      user.userId,
+      actorUserId,
       `INSERT INTO book_render_jobs (book_id, status)
        VALUES ($1, $2)
        RETURNING id`,
@@ -963,43 +964,104 @@ export const renderBookImages = async (bookId: number) => {
   const { existsSync } = await import("fs");
   const path = await import("path");
 
-  // Check if we're in standalone mode (scripts won't exist)
-  const scriptPath = path.join(
-    process.cwd(),
-    "scripts",
-    "render-book-images.ts",
+  const scriptCandidates = [
+    path.join(process.cwd(), "scripts", "render-book-images.ts"),
+    path.join(process.cwd(), "web", "scripts", "render-book-images.ts"),
+  ];
+  const scriptPath = scriptCandidates.find((candidate) =>
+    existsSync(candidate),
   );
 
-  if (!existsSync(scriptPath)) {
-    // In standalone Docker mode, scripts aren't available
-    // Return an error message directing to manual rendering
-    console.warn(
-      `[renderBookImages] Script not found at ${scriptPath} - standalone mode detected`,
+  if (!scriptPath) {
+    const message =
+      "Background rendering worker script not found. Please contact administrator to verify deployment artifacts.";
+    await queryWithContext(
+      actorUserId,
+      `UPDATE book_render_jobs
+       SET status = $1, error_message = $2
+       WHERE id = $3`,
+      ["failed", message, jobId],
+    );
+    console.error(
+      `[renderBookImages] Script not found. Checked: ${scriptCandidates.join(", ")}`,
     );
     return {
       success: false,
-      error:
-        "Background rendering not available in this environment. Please use the API endpoint or run the script manually.",
+      error: message,
     };
   }
 
-  // Next.js standalone output may omit `node_modules/.bin`, so prefer a direct
-  // local bin path when present, otherwise fall back to the global `tsx` CLI.
-  const localTsxBin = path.join(
-    process.cwd(),
-    "node_modules",
-    ".bin",
-    process.platform === "win32" ? "tsx.cmd" : "tsx",
+  const localTsxBinCandidates = [
+    path.join(
+      process.cwd(),
+      "node_modules",
+      ".bin",
+      process.platform === "win32" ? "tsx.cmd" : "tsx",
+    ),
+    path.join(
+      process.cwd(),
+      "web",
+      "node_modules",
+      ".bin",
+      process.platform === "win32" ? "tsx.cmd" : "tsx",
+    ),
+  ];
+  const localTsxBin = localTsxBinCandidates.find((candidate) =>
+    existsSync(candidate),
   );
-  const tsxCommand = existsSync(localTsxBin) ? localTsxBin : "tsx";
 
-  spawn(tsxCommand, [scriptPath, `--bookId=${bookId}`], {
+  const tsxCliCandidates = [
+    path.join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs"),
+    path.join(process.cwd(), "web", "node_modules", "tsx", "dist", "cli.mjs"),
+  ];
+  const tsxCliPath = tsxCliCandidates.find((candidate) =>
+    existsSync(candidate),
+  );
+
+  let command = "tsx";
+  let args = [scriptPath, `--bookId=${bookId}`];
+
+  if (localTsxBin) {
+    command = localTsxBin;
+  } else if (tsxCliPath) {
+    command = process.execPath;
+    args = [tsxCliPath, scriptPath, `--bookId=${bookId}`];
+  }
+
+  console.info(
+    `[renderBookImages] Starting render worker for book ${bookId} using command: ${command}`,
+  );
+  const child = spawn(command, args, {
     detached: true,
     stdio: "ignore",
     env: {
       ...process.env,
     },
-  }).unref();
+  });
+
+  child.on("error", async (error) => {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to start render worker process.";
+    console.error(`[renderBookImages] Failed to spawn worker: ${message}`);
+    try {
+      await queryWithContext(
+        actorUserId,
+        `UPDATE book_render_jobs
+         SET status = $1, error_message = $2
+         WHERE id = $3`,
+        ["failed", message, jobId],
+      );
+    } catch (updateError) {
+      console.error(
+        "[renderBookImages] Failed to update job status:",
+        updateError,
+      );
+    }
+  });
+
+  child.unref();
 
   return {
     success: true,
