@@ -44,13 +44,6 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
     const bookRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Expose methods to parent
-    useImperativeHandle(ref, () => ({
-      goToPage: (page: number) => {
-        goToPage(page);
-      },
-    }));
-
     // Update currentPage when initialPage changes (e.g., when returning to a book with saved progress)
     useEffect(() => {
       setCurrentPage(Math.max(initialPage, 1));
@@ -137,6 +130,13 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
         bookRef.current.pageFlip().flip(targetPage - 1);
       }
     };
+
+    // Expose methods to parent
+    useImperativeHandle(ref, () => ({
+      goToPage: (page: number) => {
+        goToPage(page);
+      },
+    }));
 
     const handleJumpSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -486,21 +486,21 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
           style={
             isFullscreen
               ? {
-                // Clean white background for fullscreen
-                background: "white",
-              }
+                  // Clean white background for fullscreen
+                  background: "white",
+                }
               : isMobile && isPortrait
                 ? {
-                  // Simple background for mobile portrait
-                  background: "transparent",
-                }
+                    // Simple background for mobile portrait
+                    background: "transparent",
+                  }
                 : {
-                  // Book-like background for desktop/landscape
-                  background:
-                    "linear-gradient(to right, #8B4513 0%, #A0522D 2%, transparent 2%, transparent 98%, #A0522D 98%, #8B4513 100%)",
-                  boxShadow:
-                    "0 10px 40px rgba(0,0,0,0.3), inset 0 0 20px rgba(139,69,19,0.2)",
-                }
+                    // Book-like background for desktop/landscape
+                    background:
+                      "linear-gradient(to right, #8B4513 0%, #A0522D 2%, transparent 2%, transparent 98%, #A0522D 98%, #8B4513 100%)",
+                    boxShadow:
+                      "0 10px 40px rgba(0,0,0,0.3), inset 0 0 20px rgba(139,69,19,0.2)",
+                  }
           }
         >
           {/* Book spine effect - only show on desktop/landscape, not in fullscreen */}
@@ -599,11 +599,11 @@ export const FlipBookReader = forwardRef<FlipBookRef, FlipBookProps>(
                     isFullscreen
                       ? {} // No shadows in fullscreen
                       : {
-                        boxShadow:
-                          pageNumber % 2 === 0
-                            ? "inset 4px 0 8px rgba(0,0,0,0.05)" // Right page shadow
-                            : "inset -4px 0 8px rgba(0,0,0,0.05)", // Left page shadow
-                      }
+                          boxShadow:
+                            pageNumber % 2 === 0
+                              ? "inset 4px 0 8px rgba(0,0,0,0.05)" // Right page shadow
+                              : "inset -4px 0 8px rgba(0,0,0,0.05)", // Left page shadow
+                        }
                   }
                 >
                   {/* Book page content */}
