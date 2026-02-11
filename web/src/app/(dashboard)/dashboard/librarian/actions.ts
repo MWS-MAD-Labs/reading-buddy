@@ -1010,6 +1010,11 @@ export const renderBookImages = async (bookId: number) => {
     existsSync(candidate),
   );
 
+  const globalTsxBinCandidates = ["/usr/local/bin/tsx", "/usr/bin/tsx"];
+  const globalTsxBin = globalTsxBinCandidates.find((candidate) =>
+    existsSync(candidate),
+  );
+
   const tsxCliCandidates = [
     path.join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs"),
     path.join(process.cwd(), "web", "node_modules", "tsx", "dist", "cli.mjs"),
@@ -1023,6 +1028,8 @@ export const renderBookImages = async (bookId: number) => {
 
   if (localTsxBin) {
     command = localTsxBin;
+  } else if (globalTsxBin) {
+    command = globalTsxBin;
   } else if (tsxCliPath) {
     command = process.execPath;
     args = [tsxCliPath, scriptPath, `--bookId=${bookId}`];
