@@ -1,0 +1,8 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="128" fill="#FDF2F8"/> <!-- pink-50 -->
+  <path d="M256 128C192 128 144 160 128 192V384C144 352 192 320 256 320C320 320 368 352 384 384V192C368 160 320 128 256 128Z" fill="#C084FC"/> <!-- purple-400 -->
+  <path d="M256 128V320" stroke="#9333EA" stroke-width="16" stroke-linecap="round"/> <!-- purple-600 -->
+  <circle cx="200" cy="240" r="16" fill="#7E22CE"/> <!-- purple-700 -->
+  <circle cx="312" cy="240" r="16" fill="#7E22CE"/> <!-- purple-700 -->
+  <path d="M230 280C230 280 240 290 256 290C272 290 282 280 282 280" stroke="#7E22CE" stroke-width="8" stroke-linecap="round"/>
+</svg>
