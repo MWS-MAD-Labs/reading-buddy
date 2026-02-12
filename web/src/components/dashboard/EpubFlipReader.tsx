@@ -71,12 +71,6 @@ export const EpubFlipReader = forwardRef<
       : initialPage || 0;
   const [currentPage, setCurrentPage] = useState(basePage);
 
-  console.log("📖 EpubFlipReader mount:", {
-    basePage,
-    initialPage,
-    epubUrl,
-    storageKey,
-  });
   const [jumpToPage, setJumpToPage] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
@@ -101,11 +95,6 @@ export const EpubFlipReader = forwardRef<
           ? parseInt(initialPage, 10)
           : initialPage;
       savedPageRef.current = dbValue > 0 ? dbValue : localSaved;
-      console.log("💾 Loaded saved page:", {
-        dbValue,
-        localSaved,
-        final: savedPageRef.current,
-      });
     } catch {
       savedPageRef.current =
         typeof initialPage === "string"
@@ -468,22 +457,10 @@ export const EpubFlipReader = forwardRef<
         lastPageRef.current || savedPageRef.current || initialPage;
       const targetIndex = Math.round(targetPage);
 
-      console.log("🎯 Attempting navigation to:", {
-        targetPage,
-        targetIndex,
-        pagesCount: pages.length,
-      });
-
-      if (targetIndex >= 0) {
-        const timer = setTimeout(() => {
-          if (bookRef.current) {
-            console.log("🚀 Flipping to:", targetIndex);
-            bookRef.current.pageFlip().flip(targetIndex);
-            lastPageRef.current = targetIndex;
-            setCurrentPage(targetIndex);
-          }
-        }, 500); // Slightly longer timeout
-        return () => clearTimeout(timer);
+      if (targetIndex >= 0 && bookRef.current) {
+        bookRef.current.pageFlip().flip(targetIndex);
+        lastPageRef.current = targetIndex;
+        setCurrentPage(targetIndex);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -592,7 +569,7 @@ export const EpubFlipReader = forwardRef<
         )}
       >
         <HTMLFlipBook
-          key={`epub-${isFullscreen ? "fs" : "normal"}-${width}x${height}-${preferences.fontSize}-${preferences.theme}`}
+          key={`epub-${isFullscreen ? "fs" : "normal"}-${isMobile && isPortrait ? "p" : "l"}`}
           ref={bookRef}
           width={width}
           height={height}
@@ -602,7 +579,7 @@ export const EpubFlipReader = forwardRef<
           minHeight={Math.round(baseHeight * 0.6)}
           maxHeight={Math.round(baseHeight * 2)}
           drawShadow={true}
-          flippingTime={800}
+          flippingTime={400}
           usePortrait={
             isFullscreen
               ? typeof window !== "undefined"
@@ -622,7 +599,6 @@ export const EpubFlipReader = forwardRef<
           disableFlipByClick={false}
           startPage={currentPage}
           onFlip={(event: { data: number }) => {
-            console.log("📖 Page flipped to:", event.data);
             handleFlip(event.data);
           }}
           className={clsx("mx-auto", !isFullscreen && "shadow-2xl")}

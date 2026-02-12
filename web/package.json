@@ -34,6 +34,9 @@
   },
   "dependencies": {
     "@auth/pg-adapter": "^1.11.1",
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/cli": "^7.5.0",
+    "@capacitor/core": "^8.1.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/lora": "^5.2.8",
     "@fontsource/open-sans": "^5.2.7",
@@ -102,8 +105,8 @@
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.34.8",
-    "lightningcss-linux-x64-gnu": "^1.29.1",
-    "@tailwindcss/oxide-linux-x64-gnu": "^4.0.0"
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.0.0",
+    "lightningcss-linux-x64-gnu": "^1.29.1"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
