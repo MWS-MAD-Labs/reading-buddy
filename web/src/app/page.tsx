@@ -51,34 +51,73 @@ export default function Home() {
         </header>
 
         {/* Features Grids */}
-        <section className="width-full grid w-full grid-cols-1 gap-6 md:grid-cols-3">
-          {/* Card 1 */}
+        <section className="width-full grid w-full grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {/* Card 1: Books */}
           <div className="group flex flex-col gap-4 rounded-[40px] border border-white/50 bg-white/60 p-8 shadow-xl backdrop-blur-sm transition-transform hover:scale-[1.02]">
             <div className="relative h-40 w-full overflow-hidden rounded-3xl bg-pink-50">
               <Image src="/feature-books.svg" alt="Books Illustration" fill className="object-contain p-4 transition-transform duration-500 group-hover:scale-110" />
             </div>
             <div className="text-left">
-              <h3 className="mb-2 text-2xl font-black text-slate-800">Your Books, Your Rules</h3>
+              <h3 className="mb-2 text-2xl font-black text-slate-800">Immersive Reading</h3>
               <p className="font-medium text-slate-500">
-                Self-host your entire collection with MinIO. You own the data, cover art, and files.
+                Read EPUBs and PDFs seamlessly. Progress is saved automatically across devices.
               </p>
             </div>
           </div>
 
-          {/* Card 2 */}
+          {/* Card 2: Gamification */}
+          <div className="group flex flex-col gap-4 rounded-[40px] border border-white/50 bg-white/60 p-8 shadow-xl backdrop-blur-sm transition-transform hover:scale-[1.02]">
+            <div className="relative h-40 w-full overflow-hidden rounded-3xl bg-orange-50">
+              <Image src="/feature-gamification.svg" alt="Gamification Illustration" fill className="object-contain p-4 transition-transform duration-500 group-hover:scale-110" />
+            </div>
+            <div className="text-left">
+              <h3 className="mb-2 text-2xl font-black text-slate-800">Fun & Rewards</h3>
+              <p className="font-medium text-slate-500">
+                Earn XP, collect badges, and maintain streaks. Reading has never been this rewarding.
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3: Analytics */}
+          <div className="group flex flex-col gap-4 rounded-[40px] border border-white/50 bg-white/60 p-8 shadow-xl backdrop-blur-sm transition-transform hover:scale-[1.02]">
+            <div className="relative h-40 w-full overflow-hidden rounded-3xl bg-emerald-50">
+              <Image src="/feature-analytics.svg" alt="Analytics Illustration" fill className="object-contain p-4 transition-transform duration-500 group-hover:scale-110" />
+            </div>
+            <div className="text-left">
+              <h3 className="mb-2 text-2xl font-black text-slate-800">Classroom Tools</h3>
+              <p className="font-medium text-slate-500">
+                Teachers get detailed analytics on student progress, engagement, and quiz performance.
+              </p>
+            </div>
+          </div>
+
+          {/* Card 4: Management */}
+          <div className="group flex flex-col gap-4 rounded-[40px] border border-white/50 bg-white/60 p-8 shadow-xl backdrop-blur-sm transition-transform hover:scale-[1.02]">
+            <div className="relative h-40 w-full overflow-hidden rounded-3xl bg-sky-50">
+              <Image src="/feature-management.svg" alt="Management Illustration" fill className="object-contain p-4 transition-transform duration-500 group-hover:scale-110" />
+            </div>
+            <div className="text-left">
+              <h3 className="mb-2 text-2xl font-black text-slate-800">Smart Library</h3>
+              <p className="font-medium text-slate-500">
+                Librarians can manage metadata, set access levels by grade, and curate collections easily.
+              </p>
+            </div>
+          </div>
+
+          {/* Card 5: AI */}
           <div className="group flex flex-col gap-4 rounded-[40px] border border-white/50 bg-white/60 p-8 shadow-xl backdrop-blur-sm transition-transform hover:scale-[1.02]">
             <div className="relative h-40 w-full overflow-hidden rounded-3xl bg-purple-50">
               <Image src="/feature-ai.svg" alt="AI Illustration" fill className="object-contain p-4 transition-transform duration-500 group-hover:scale-110" />
             </div>
             <div className="text-left">
-              <h3 className="mb-2 text-2xl font-black text-slate-800">Smart Quiz Helper</h3>
+              <h3 className="mb-2 text-2xl font-black text-slate-800">AI Companion</h3>
               <p className="font-medium text-slate-500">
-                Powered by Google Gemini to automatically generate fun quizzes from your books.
+                Automatically generate quizzes from your school books using Gemini or a Local Model.
               </p>
             </div>
           </div>
 
-          {/* Card 3 */}
+          {/* Card 6: Users */}
           <div className="group flex flex-col gap-4 rounded-[40px] border border-white/50 bg-white/60 p-8 shadow-xl backdrop-blur-sm transition-transform hover:scale-[1.02]">
             <div className="relative h-40 w-full overflow-hidden rounded-3xl bg-indigo-50">
               <Image src="/feature-users.svg" alt="Users Illustration" fill className="object-contain p-4 transition-transform duration-500 group-hover:scale-110" />
@@ -86,18 +125,17 @@ export default function Home() {
             <div className="text-left">
               <h3 className="mb-2 text-2xl font-black text-slate-800">For Everyone</h3>
               <p className="font-medium text-slate-500">
-                A perfect companion for students, teachers, librarians, and admins alike.
+                A unified platform for students, teachers, and admins with role-based dashboards.
               </p>
             </div>
           </div>
         </section>
 
-        {/* Simple Footer */}
+        {/* Footer */}
         <footer className="mt-12 text-slate-400 font-bold">
-          <p>© {new Date().getFullYear()} Reading Buddy. Built for education.</p>
+          <p>© {new Date().getFullYear()} MAD Labs by Millennia World School</p>
         </footer>
       </main>
     </div>
   );
 }
-
