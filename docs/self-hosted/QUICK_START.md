@@ -29,7 +29,7 @@
 ### 1. Clone or Download
 
 ```bash
-git clone https://github.com/<your-org>/<your-repo>.git
+git clone https://github.com/MWS-MAD-Labs/reading-buddy.git
 cd reading-buddy
 ```
 

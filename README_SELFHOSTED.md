@@ -49,7 +49,7 @@ A modern K-12 e-library platform with gamification, AI-powered quizzes, and role
 ### One-Command Setup
 
 ```bash
-git clone https://github.com/<your-org>/<your-repo>.git
+git clone https://github.com/MWS-MAD-Labs/reading-buddy.git
 cd reading-buddy
 ./scripts/quick-start.sh
 ```
@@ -338,7 +338,7 @@ See [Contributing Guide](CONTRIBUTING.md) for details.
 
 ```bash
 # Clone repository
-git clone https://github.com/<your-org>/<your-repo>.git
+git clone https://github.com/MWS-MAD-Labs/reading-buddy.git
 cd reading-buddy
 
 # Start development environment

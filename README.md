@@ -60,8 +60,8 @@ Reading Buddy transforms traditional school libraries into interactive digital l
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/<your-org>/<your-repo>.git
-cd <your-repo>
+git clone https://github.com/MWS-MAD-Labs/reading-buddy.git
+cd reading-buddy
 
 # 2. Configure environment
 cp .env.example .env
