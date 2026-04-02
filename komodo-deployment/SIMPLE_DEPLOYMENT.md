@@ -213,7 +213,7 @@ Replace with:
 ```yaml
 services:
   reading-buddy-staging:
-    image: ghcr.io/faisalnh/reading-companion-staging:latest
+    image: ghcr.io/mws-mad-labs/reading-companion-staging:latest
     container_name: reading-buddy-staging
     restart: unless-stopped
     pull_policy: always

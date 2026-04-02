@@ -60,8 +60,8 @@ Reading Buddy transforms traditional school libraries into interactive digital l
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/faisalnh/reading-companion.git
-cd reading-companion
+git clone https://github.com/<your-org>/<your-repo>.git
+cd <your-repo>
 
 # 2. Configure environment
 cp .env.example .env
@@ -435,7 +435,7 @@ With requirements:
 
 **Developed by:** Faisal Nur Hidayat  
 **AI Assistance:** Claude (Anthropic)  
-**Contributors:** See [GitHub Contributors](https://github.com/faisalnh/reading-companion/graphs/contributors)
+**Contributors:** See [GitHub Contributors](../../graphs/contributors)
 
 ### Acknowledgments
 
@@ -451,8 +451,8 @@ With requirements:
 
 **Need Help?**
 - 📖 **Documentation:** See `notes/` directory
-- 🐛 **Bug Reports:** [GitHub Issues](https://github.com/faisalnh/reading-companion/issues)
-- 💬 **Discussions:** [GitHub Discussions](https://github.com/faisalnh/reading-companion/discussions)
+- 🐛 **Bug Reports:** [GitHub Issues](../../issues)
+- 💬 **Discussions:** [GitHub Discussions](../../discussions)
 - 📧 **Email:** support@example.com
 
 **Quick Links:**

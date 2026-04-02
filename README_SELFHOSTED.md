@@ -49,7 +49,7 @@ A modern K-12 e-library platform with gamification, AI-powered quizzes, and role
 ### One-Command Setup
 
 ```bash
-git clone https://github.com/yourusername/reading-buddy.git
+git clone https://github.com/<your-org>/<your-repo>.git
 cd reading-buddy
 ./scripts/quick-start.sh
 ```
@@ -189,7 +189,7 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 # AI Provider
 AI_PROVIDER=cloud
 GOOGLE_GEMINI_API_KEY=your-api-key
-
+cek
 # Email
 EMAIL_SERVER=smtp://user:pass@smtp.gmail.com:587
 EMAIL_FROM=noreply@yourdomain.com
@@ -338,7 +338,7 @@ See [Contributing Guide](CONTRIBUTING.md) for details.
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/reading-buddy.git
+git clone https://github.com/<your-org>/<your-repo>.git
 cd reading-buddy
 
 # Start development environment
@@ -381,8 +381,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ### Community Support
 
-- **GitHub Issues:** [Report bugs](https://github.com/yourusername/reading-buddy/issues)
-- **Discussions:** [Ask questions](https://github.com/yourusername/reading-buddy/discussions)
+- **GitHub Issues:** [Report bugs](../../issues)
+- **Discussions:** [Ask questions](../../discussions)
 - **Discord:** [Join community](https://discord.gg/reading-buddy) _(coming soon)_
 
 ### Documentation
@@ -448,4 +448,4 @@ If you find Reading Buddy useful, please star the repository!
 - [🚀 Deployment Guide](docs/self-hosted/DEPLOYMENT.md)
 - [🔧 Configuration](docs/self-hosted/CONFIGURATION.md)
 - [❓ FAQ](docs/self-hosted/FAQ.md)
-- [🐛 Report Issue](https://github.com/yourusername/reading-buddy/issues)
+- [🐛 Report Issue](../../issues)

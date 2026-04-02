@@ -158,7 +158,7 @@ Go to Komodo → `reading-companion-staging` stack → Edit
 ```yaml
 services:
   reading-buddy-staging:
-    image: ghcr.io/faisalnh/reading-companion-staging:latest
+    image: ghcr.io/mws-mad-labs/reading-companion-staging:latest
     container_name: reading-buddy-staging
     restart: unless-stopped
     pull_policy: always
@@ -237,7 +237,7 @@ Click "Redeploy" in Komodo. The application will:
 
 Go to GitHub:
 ```
-https://github.com/faisalnh/reading-companion/compare/staging...local-db
+https://github.com/MWS-MAD-Labs/reading-buddy/compare/staging...local-db
 ```
 
 1. Click "Create Pull Request"
@@ -272,7 +272,7 @@ git push origin staging
 
 ### 6.2 Verify Komodo Deployment
 
-1. Komodo will pull new image: `ghcr.io/faisalnh/reading-companion-staging:latest`
+1. Komodo will pull new image: `ghcr.io/mws-mad-labs/reading-companion-staging:latest`
 2. Container restarts with new code
 3. Health check passes
 4. Application accessible at: https://staging-reads.mws.web.id

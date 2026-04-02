@@ -10,10 +10,10 @@ Every push to `staging` branch creates:
 
 | Tag Pattern | Example | Purpose | Mutable |
 |------------|---------|---------|---------|
-| `latest` | `ghcr.io/faisalnh/reading-companion-staging:latest` | Always latest staging | ✅ Yes |
-| `build-{n}` | `ghcr.io/faisalnh/reading-companion-staging:build-123` | Build number | ❌ No |
-| `staging-{sha}` | `ghcr.io/faisalnh/reading-companion-staging:staging-abc1234` | Git commit | ❌ No |
-| `staging-{date}` | `ghcr.io/faisalnh/reading-companion-staging:staging-2025-12-13-0930` | Timestamp | ❌ No |
+| `latest` | `ghcr.io/mws-mad-labs/reading-companion-staging:latest` | Always latest staging | ✅ Yes |
+| `build-{n}` | `ghcr.io/mws-mad-labs/reading-companion-staging:build-123` | Build number | ❌ No |
+| `staging-{sha}` | `ghcr.io/mws-mad-labs/reading-companion-staging:staging-abc1234` | Git commit | ❌ No |
+| `staging-{date}` | `ghcr.io/mws-mad-labs/reading-companion-staging:staging-2025-12-13-0930` | Timestamp | ❌ No |
 
 ## Production Tags
 
@@ -23,10 +23,10 @@ Every push to `main` branch creates:
 
 | Tag Pattern | Example | Purpose | Mutable |
 |------------|---------|---------|---------|
-| `latest` | `ghcr.io/faisalnh/reading-companion:latest` | Latest production | ✅ Yes |
-| `build-{n}` | `ghcr.io/faisalnh/reading-companion:build-456` | Build number | ❌ No |
-| `main-{sha}` | `ghcr.io/faisalnh/reading-companion:main-abc1234` | Git commit | ❌ No |
-| `prod-{date}` | `ghcr.io/faisalnh/reading-companion:prod-2025-12-13-1030` | Timestamp | ❌ No |
+| `latest` | `ghcr.io/mws-mad-labs/reading-companion:latest` | Latest production | ✅ Yes |
+| `build-{n}` | `ghcr.io/mws-mad-labs/reading-companion:build-456` | Build number | ❌ No |
+| `main-{sha}` | `ghcr.io/mws-mad-labs/reading-companion:main-abc1234` | Git commit | ❌ No |
+| `prod-{date}` | `ghcr.io/mws-mad-labs/reading-companion:prod-2025-12-13-1030` | Timestamp | ❌ No |
 
 ### From Git Tags (Semantic Versioning)
 
@@ -34,16 +34,16 @@ When you create a git tag like `v1.2.3`, it creates:
 
 | Tag Pattern | Example | Purpose | Mutable |
 |------------|---------|---------|---------|
-| `v1.2.3` | `ghcr.io/faisalnh/reading-companion:v1.2.3` | Exact version | ❌ No |
-| `v1.2` | `ghcr.io/faisalnh/reading-companion:v1.2` | Minor version | ✅ Yes |
-| `v1` | `ghcr.io/faisalnh/reading-companion:v1` | Major version | ✅ Yes |
+| `v1.2.3` | `ghcr.io/mws-mad-labs/reading-companion:v1.2.3` | Exact version | ❌ No |
+| `v1.2` | `ghcr.io/mws-mad-labs/reading-companion:v1.2` | Minor version | ✅ Yes |
+| `v1` | `ghcr.io/mws-mad-labs/reading-companion:v1` | Major version | ✅ Yes |
 
 ## Usage in Komodo
 
 ### Staging (Current Deployment)
 
 ```yaml
-image: ghcr.io/faisalnh/reading-companion-staging:latest
+image: ghcr.io/mws-mad-labs/reading-companion-staging:latest
 ```
 
 **Deployment:** Manual redeploy after each build
@@ -51,7 +51,7 @@ image: ghcr.io/faisalnh/reading-companion-staging:latest
 ### Staging (Pin to Specific Build)
 
 ```yaml
-image: ghcr.io/faisalnh/reading-companion-staging:build-123
+image: ghcr.io/mws-mad-labs/reading-companion-staging:build-123
 ```
 
 **Use case:** Testing a specific build, preventing auto-updates
@@ -59,7 +59,7 @@ image: ghcr.io/faisalnh/reading-companion-staging:build-123
 ### Production (Latest)
 
 ```yaml
-image: ghcr.io/faisalnh/reading-companion:latest
+image: ghcr.io/mws-mad-labs/reading-companion:latest
 ```
 
 **Deployment:** Manual redeploy
@@ -67,7 +67,7 @@ image: ghcr.io/faisalnh/reading-companion:latest
 ### Production (Semantic Version)
 
 ```yaml
-image: ghcr.io/faisalnh/reading-companion:v1.2
+image: ghcr.io/mws-mad-labs/reading-companion:v1.2
 ```
 
 **Deployment:** Auto-updates to latest patch within v1.2.x  
@@ -79,10 +79,10 @@ image: ghcr.io/faisalnh/reading-companion:v1.2
 
 ```bash
 # Check available builds
-docker pull ghcr.io/faisalnh/reading-companion-staging:build-122
+docker pull ghcr.io/mws-mad-labs/reading-companion-staging:build-122
 
 # Update Komodo stack
-image: ghcr.io/faisalnh/reading-companion-staging:build-122
+image: ghcr.io/mws-mad-labs/reading-companion-staging:build-122
 
 # Redeploy
 ```
@@ -91,14 +91,14 @@ image: ghcr.io/faisalnh/reading-companion-staging:build-122
 
 ```bash
 # Use commit SHA tag
-image: ghcr.io/faisalnh/reading-companion-staging:staging-abc1234
+image: ghcr.io/mws-mad-labs/reading-companion-staging:staging-abc1234
 ```
 
 ### Scenario 3: Rollback Production to Previous Version
 
 ```bash
 # Use semantic version
-image: ghcr.io/faisalnh/reading-companion:v1.1.0
+image: ghcr.io/mws-mad-labs/reading-companion:v1.1.0
 ```
 
 ## Creating Semantic Versions
@@ -121,7 +121,7 @@ git push origin v1.2.0
 #    - :latest (updated)
 
 # 4. Deploy in Komodo
-image: ghcr.io/faisalnh/reading-companion:v1.2.0
+image: ghcr.io/mws-mad-labs/reading-companion:v1.2.0
 ```
 
 ## Tag Naming Convention
@@ -152,16 +152,16 @@ Format: `YYYY-MM-DD-HHmm` (UTC)
 
 ### Via GitHub Container Registry
 
-https://github.com/faisalnh/reading-companion/pkgs/container/reading-companion-staging
+https://github.com/orgs/MWS-MAD-Labs/packages/container/package/reading-companion-staging
 
 ### Via Docker CLI
 
 ```bash
 # Staging
-docker pull ghcr.io/faisalnh/reading-companion-staging --all-tags
+docker pull ghcr.io/mws-mad-labs/reading-companion-staging --all-tags
 
 # Production  
-docker pull ghcr.io/faisalnh/reading-companion --all-tags
+docker pull ghcr.io/mws-mad-labs/reading-companion --all-tags
 ```
 
 ## Best Practices
@@ -188,6 +188,6 @@ To see what's currently deployed:
 docker inspect reading-buddy-staging | grep Image
 
 # Check for updates
-docker pull ghcr.io/faisalnh/reading-companion-staging:latest
+docker pull ghcr.io/mws-mad-labs/reading-companion-staging:latest
 docker images | grep reading-companion
 ```

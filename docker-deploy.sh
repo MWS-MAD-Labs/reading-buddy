@@ -13,7 +13,7 @@ if [ ! -f .env ]; then
     echo "Please create .env file with your environment variables."
     echo "You can use .env.example as a template:"
     echo ""
-    echo "  curl -O https://raw.githubusercontent.com/faisalnh/reading-companion/main/.env.example"
+    echo "  curl -O https://raw.githubusercontent.com/MWS-MAD-Labs/reading-buddy/main/.env.example"
     echo "  cp .env.example .env"
     echo "  nano .env  # Edit with your credentials"
     echo ""
