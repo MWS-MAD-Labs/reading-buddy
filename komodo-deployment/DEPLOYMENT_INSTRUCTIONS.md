@@ -154,6 +154,8 @@ docker exec reading-buddy-postgres-staging psql -U reading_buddy -d reading_budd
 
 Go to Komodo → `reading-companion-staging` stack → Edit
 
+If Komodo warns about orphan containers such as `reading-companion-staging-app-1`, it means an older service definition from the same compose project still exists. After confirming the new `reading-buddy-staging` service is healthy, redeploy once with `--remove-orphans` or remove the old container manually.
+
 **Replace the docker-compose.yml with:**
 ```yaml
 services:

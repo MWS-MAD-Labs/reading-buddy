@@ -238,6 +238,8 @@ services:
       - MINIO_ENDPOINT=minioapi.mws.web.id
       - MINIO_PORT=443
       - MINIO_USE_SSL=true
+
+If Komodo later reports an orphan container like `reading-companion-staging-app-1`, that container came from an older compose service name in the same project. Once `reading-buddy-staging` is confirmed healthy, clean it up with `docker compose ... up -d --remove-orphans` or remove the old container explicitly.
       - MINIO_ACCESS_KEY=mwsaccesskey
       - MINIO_SECRET_KEY=mwssecretkey
       - MINIO_BUCKET_NAME=reading-buddy
