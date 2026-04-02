@@ -258,13 +258,13 @@ Required secrets in GitHub repository settings:
 
 | Secret Name | Purpose | Used In |
 |-------------|---------|---------|
-| `GHCR_PAT` | GitHub Personal Access Token for GHCR push | Both workflows |
+| `GITHUB_TOKEN` | Built-in GitHub Actions token used for GHCR push | Both workflows |
 | `KOMODO_PROCEDURE_WEBHOOK_URL` | Staging procedure webhook URL | Staging workflow |
 | `KOMODO_WEBHOOK_SECRET` | Staging webhook signature secret | Staging workflow |
 | `KOMODO_PROD_PROCEDURE_WEBHOOK_URL` | Production procedure webhook URL | Production workflow |
 | `KOMODO_PROD_WEBHOOK_SECRET` | Production webhook signature secret | Production workflow |
-| `CODECOV_TOKEN` | Codecov upload token (optional for public repos) | Both workflows |
-| `LHCI_GITHUB_APP_TOKEN` | Lighthouse CI GitHub integration (optional) | Both workflows |
+| `CODECOV_TOKEN` | Codecov upload token, only needed if you want coverage upload from production CI | Production workflow |
+| `LHCI_GITHUB_APP_TOKEN` | Lighthouse CI GitHub integration (optional) | Optional workflows only |
 
 ## Workflow Process
 
