@@ -29,7 +29,7 @@
 ### 1. Clone or Download
 
 ```bash
-git clone https://github.com/yourusername/reading-buddy.git
+git clone https://github.com/<your-org>/<your-repo>.git
 cd reading-buddy
 ```
 
@@ -452,8 +452,8 @@ services:
 
 ### Community
 
-- GitHub Issues: [Report bugs](https://github.com/yourusername/reading-buddy/issues)
-- Discussions: [Ask questions](https://github.com/yourusername/reading-buddy/discussions)
+- GitHub Issues: [Report bugs](../../issues)
+- Discussions: [Ask questions](../../discussions)
 
 ### Logs
 

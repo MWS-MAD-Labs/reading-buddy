@@ -6,7 +6,7 @@ This guide explains how to deploy Reading Buddy using Docker, with the source co
 
 - Docker installed (version 20.10 or higher)
 - Docker Compose installed (version 2.0 or higher)
-- Git repository: https://github.com/faisalnh/reading-companion
+- Git repository: https://github.com/MWS-MAD-Labs/reading-buddy
 
 ## Quick Start
 
@@ -15,7 +15,7 @@ This guide explains how to deploy Reading Buddy using Docker, with the source co
 Download the environment template and configure your credentials:
 
 ```bash
-curl -O https://raw.githubusercontent.com/faisalnh/reading-companion/main/.env.example
+curl -O https://raw.githubusercontent.com/MWS-MAD-Labs/reading-buddy/main/.env.example
 cp .env.example .env
 nano .env  # Edit with your actual values
 ```
@@ -23,7 +23,7 @@ nano .env  # Edit with your actual values
 ### 2. Download Docker Compose File
 
 ```bash
-curl -O https://raw.githubusercontent.com/faisalnh/reading-companion/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/MWS-MAD-Labs/reading-buddy/main/docker-compose.yml
 ```
 
 ### 3. Deploy
@@ -46,7 +46,7 @@ The Docker setup is configured to:
 
 ### Build Process
 
-1. Docker pulls latest code from `https://github.com/faisalnh/reading-companion.git#main`
+1. Docker pulls latest code from `https://github.com/MWS-MAD-Labs/reading-buddy.git#main`
 2. Builds Next.js application with placeholder environment variables
 3. Creates standalone production build
 4. Runs container with your actual credentials from `.env` file
@@ -114,7 +114,7 @@ This is the default configuration in `docker-compose.yml`:
 services:
   reading-buddy:
     build:
-      context: https://github.com/faisalnh/reading-companion.git#main
+      context: https://github.com/MWS-MAD-Labs/reading-buddy.git#main
       dockerfile: Dockerfile
       no_cache: true
       pull: true
@@ -131,7 +131,7 @@ If you want to test local changes before pushing to GitHub:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/faisalnh/reading-companion.git
+   git clone https://github.com/MWS-MAD-Labs/reading-buddy.git
    cd reading-companion
    ```
 
@@ -377,7 +377,7 @@ If deploying with a custom domain, update your Supabase redirect URLs:
 
 ## Support and Documentation
 
-- **GitHub Repository**: https://github.com/faisalnh/reading-companion
+- **GitHub Repository**: https://github.com/MWS-MAD-Labs/reading-buddy
 - **Issues**: Report problems via GitHub Issues
 - **Next.js Docs**: https://nextjs.org/docs
 - **Docker Docs**: https://docs.docker.com

@@ -49,14 +49,14 @@ Live Application 🚀
 - **Branch:** `staging`
 - **URL:** https://staging-reads.mws.web.id
 - **Port:** 3001
-- **Image:** `ghcr.io/faisalnh/reading-companion-staging:latest`
+- **Image:** `ghcr.io/mws-mad-labs/reading-companion-staging:latest`
 - **Auto-deploy:** ✅ On every push to staging
 
 ### Production Environment
 - **Branch:** `main`
 - **URL:** https://reads.mws.web.id
 - **Port:** 3000
-- **Image:** `ghcr.io/faisalnh/reading-companion:latest`
+- **Image:** `ghcr.io/mws-mad-labs/reading-companion:latest`
 - **Auto-deploy:** ✅ On every push/merge to main
 - **Protection:** Branch protection rules enabled
 
@@ -126,10 +126,10 @@ git commit -m "feat: new feature"
 
 **Image Tags Created:**
 ```
-ghcr.io/faisalnh/reading-companion-staging:latest
-ghcr.io/faisalnh/reading-companion-staging:build-<run_number>
-ghcr.io/faisalnh/reading-companion-staging:staging-<sha>
-ghcr.io/faisalnh/reading-companion-staging:staging-<timestamp>
+ghcr.io/mws-mad-labs/reading-companion-staging:latest
+ghcr.io/mws-mad-labs/reading-companion-staging:build-<run_number>
+ghcr.io/mws-mad-labs/reading-companion-staging:staging-<sha>
+ghcr.io/mws-mad-labs/reading-companion-staging:staging-<timestamp>
 ```
 
 #### Production Workflow
@@ -142,13 +142,13 @@ ghcr.io/faisalnh/reading-companion-staging:staging-<timestamp>
 
 **Image Tags Created:**
 ```
-ghcr.io/faisalnh/reading-companion:latest
-ghcr.io/faisalnh/reading-companion:build-<run_number>
-ghcr.io/faisalnh/reading-companion:v1.0.0 (if tagged)
-ghcr.io/faisalnh/reading-companion:1.0
-ghcr.io/faisalnh/reading-companion:1
-ghcr.io/faisalnh/reading-companion:main-<sha>
-ghcr.io/faisalnh/reading-companion:prod-<timestamp>
+ghcr.io/mws-mad-labs/reading-companion:latest
+ghcr.io/mws-mad-labs/reading-companion:build-<run_number>
+ghcr.io/mws-mad-labs/reading-companion:v1.0.0 (if tagged)
+ghcr.io/mws-mad-labs/reading-companion:1.0
+ghcr.io/mws-mad-labs/reading-companion:1
+ghcr.io/mws-mad-labs/reading-companion:main-<sha>
+ghcr.io/mws-mad-labs/reading-companion:prod-<timestamp>
 ```
 
 ### 3. Komodo Procedures (Webhook Automation)
@@ -193,7 +193,7 @@ ghcr.io/faisalnh/reading-companion:prod-<timestamp>
 ```yaml
 services:
   reading-buddy-staging:
-    image: ghcr.io/faisalnh/reading-companion-staging:latest
+    image: ghcr.io/mws-mad-labs/reading-companion-staging:latest
     container_name: reading-buddy-staging
     restart: unless-stopped
     pull_policy: always
@@ -246,7 +246,7 @@ networks:
 **Name:** `reading-companion-prod`
 
 **Docker Compose:** Same as staging with these changes:
-- Image: `ghcr.io/faisalnh/reading-companion:latest`
+- Image: `ghcr.io/mws-mad-labs/reading-companion:latest`
 - Container: `reading-buddy-prod`
 - Port: `3000:3000`
 - App URL: `https://reads.mws.web.id`
@@ -476,13 +476,13 @@ See [VERSIONING.md](./VERSIONING.md) for complete versioning documentation.
 
 ```yaml
 # Use latest (auto-updates)
-image: ghcr.io/faisalnh/reading-companion:latest
+image: ghcr.io/mws-mad-labs/reading-companion:latest
 
 # Pin to specific build (manual updates)
-image: ghcr.io/faisalnh/reading-companion:build-123
+image: ghcr.io/mws-mad-labs/reading-companion:build-123
 
 # Pin to release version
-image: ghcr.io/faisalnh/reading-companion:v1.2.3
+image: ghcr.io/mws-mad-labs/reading-companion:v1.2.3
 ```
 
 ## Monitoring and Troubleshooting
@@ -490,7 +490,7 @@ image: ghcr.io/faisalnh/reading-companion:v1.2.3
 ### Check CI/CD Status
 
 **GitHub Actions:**
-- View all workflows: https://github.com/faisalnh/reading-companion/actions
+- View all workflows: https://github.com/MWS-MAD-Labs/reading-buddy/actions
 - Check specific run for errors
 - View build logs
 
@@ -548,7 +548,7 @@ npm run lint
 
 ```yaml
 # In Komodo Stack, change image tag
-image: ghcr.io/faisalnh/reading-companion:build-122  # previous build
+image: ghcr.io/mws-mad-labs/reading-companion:build-122  # previous build
 
 # Then redeploy
 ```
@@ -643,7 +643,7 @@ Current setup uses informational tracking (no hard failures).
 
 **View Coverage:**
 - Reports uploaded as GitHub Actions artifacts
-- Codecov dashboard: https://codecov.io/gh/faisalnh/reading-companion
+- Codecov dashboard: https://codecov.io/gh/MWS-MAD-Labs/reading-buddy
 - Trends and historical data available
 
 **Setup Required:**
