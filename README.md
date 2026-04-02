@@ -82,7 +82,7 @@ docker exec -i reading-buddy-postgres psql -U reading_buddy -d reading_buddy < s
 open http://localhost:3000
 ```
 
-**📖 Detailed Setup:** See `notes/2024-12-14/deployment/DATABASE_SETUP.md`
+**📖 Detailed Setup:** See `notes/2024-12-14/deployment/DATABASE_SETUP.md` for self-hosted database provisioning details.
 
 ---
 
