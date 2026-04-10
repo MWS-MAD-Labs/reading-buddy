@@ -47,6 +47,20 @@ const EpubFlipReader = dynamic(
   },
 );
 
+const TextFlipReader = dynamic(
+  () => import("./TextFlipReader").then((mod) => mod.TextFlipReader),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-96 items-center justify-center">
+        <div className="text-lg font-semibold text-purple-600">
+          Loading text reader...
+        </div>
+      </div>
+    ),
+  },
+);
+
 type PageImageInfo = {
   baseUrl: string;
   count: number;
@@ -69,7 +83,7 @@ type UnifiedBookReaderProps = {
   showFinishButton?: boolean;
 };
 
-type ReaderMode = "epub" | "images" | "error" | "loading";
+type ReaderMode = "epub" | "images" | "text" | "error" | "loading";
 
 export function UnifiedBookReader({
   bookId,
@@ -101,6 +115,12 @@ export function UnifiedBookReader({
   );
   const [isNotesPanelOpen, setIsNotesPanelOpen] = useState(false);
   const [totalPageCount, setTotalPageCount] = useState<number | null>(null);
+  const hasRenderedImages = Boolean(pageImages && pageImages.count > 0);
+  const hasExtractedText = Boolean(
+    pageTextContent &&
+      Array.isArray(pageTextContent.pages) &&
+      pageTextContent.pages.length > 0,
+  );
 
   // Determine reader mode based on book format
   useEffect(() => {
@@ -114,10 +134,24 @@ export function UnifiedBookReader({
         return;
       }
 
-      // All PDF books use image-based rendering (FlipBookReader)
-      // If images exist, use them; otherwise show error
+      // PDFs can use either extracted text or image rendering.
       if (fileFormat === "pdf" || pdfUrl) {
-        if (pageImages && pageImages.count > 0) {
+        const prefersImageReader =
+          isPictureBook ||
+          textExtractionStatus === "image_fallback" ||
+          textExtractionStatus === "pdf_viewer";
+
+        if (prefersImageReader && hasRenderedImages && pageImages) {
+          setTotalPageCount(pageImages.count);
+          setReaderMode("images");
+        } else if (!prefersImageReader && hasExtractedText) {
+          const extractedPageCount =
+            typeof pageTextContent.totalPages === "number"
+              ? pageTextContent.totalPages
+              : pageTextContent.pages.length;
+          setTotalPageCount(extractedPageCount);
+          setReaderMode("text");
+        } else if (hasRenderedImages && pageImages) {
           setTotalPageCount(pageImages.count);
           setReaderMode("images");
         } else {
@@ -137,7 +171,17 @@ export function UnifiedBookReader({
     };
 
     determineMode();
-  }, [fileFormat, epubUrl, pdfUrl, pageImages]);
+  }, [
+    epubUrl,
+    fileFormat,
+    hasExtractedText,
+    hasRenderedImages,
+    isPictureBook,
+    pageImages,
+    pageTextContent,
+    pdfUrl,
+    textExtractionStatus,
+  ]);
 
   // Debounced save to database
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -283,6 +327,61 @@ export function UnifiedBookReader({
         </div>
 
         {/* Notes Panel */}
+        <ReaderNotesPanel
+          bookId={bookId}
+          currentPage={currentPage}
+          isOpen={isNotesPanelOpen}
+          onClose={() => setIsNotesPanelOpen(false)}
+          onPageJump={(page) => handlePageChange(page)}
+        />
+      </div>
+    );
+  }
+
+  if (readerMode === "text" && hasExtractedText) {
+    return (
+      <div className="space-y-4">
+        <TextFlipReader
+          textContent={pageTextContent}
+          initialPage={initialPage}
+          onPageChange={handlePageChange}
+          bookTitle={bookTitle}
+        />
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-white/80 p-3">
+          <div className="flex items-center gap-2 text-sm text-indigo-600">
+            <span className="font-medium">📍 Page {currentPage}</span>
+            {totalPageCount && (
+              <span className="text-indigo-400">of {totalPageCount}</span>
+            )}
+            <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
+              📄 PDF Text Mode
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/dashboard/journal/${bookId}`}
+              className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+            >
+              📓 Book Journal
+            </Link>
+            <button
+              onClick={() => setIsNotesPanelOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
+            >
+              📝 Notes
+            </button>
+            {showFinishButton && onComplete && (
+              <button
+                onClick={onComplete}
+                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105 animate-pulse"
+              >
+                ✅ Finish Reading
+              </button>
+            )}
+          </div>
+        </div>
+
         <ReaderNotesPanel
           bookId={bookId}
           currentPage={currentPage}
