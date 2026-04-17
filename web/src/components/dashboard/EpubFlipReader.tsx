@@ -21,6 +21,7 @@ import {
   getReaderThemeConfig,
   normalizeTocItems,
   parseStoredLocations,
+  rewriteArchivedSectionAssetUrls,
   resolveInitialEpubTarget,
   type NormalizedTocItem,
 } from "@/lib/epub";
@@ -290,6 +291,15 @@ export const EpubFlipReader = forwardRef<
               }
             ).packaging;
           }
+
+          book.spine.hooks.content.register(
+            async (document: Document, section: { url?: string; document?: Document }) => {
+              await rewriteArchivedSectionAssetUrls(book, {
+                url: section.url,
+                document,
+              });
+            },
+          );
 
           if (cancelled) {
             return;
