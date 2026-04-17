@@ -1,730 +1,851 @@
 "use client";
 
-/**
- * EPUB Flip Reader Component
- * Parses EPUB files and renders with 3D flip animation using react-pageflip
- * Features premium visual styling: realistic paper, spine, shadows, and covers.
- */
-
 import {
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
+  useMemo,
   useRef,
   useState,
-  forwardRef,
-  useImperativeHandle,
 } from "react";
-import dynamic from "next/dynamic";
 import clsx from "clsx";
 import ePub, { Book } from "epubjs";
 import {
+  applyReaderTheme,
+  EPUB_LOCATION_BREAK_CHARS,
+  getCanonicalPageFromCfi,
+  getCfiFromCanonicalPage,
+  getEpubLocationsCacheKey,
+  getProgressPercentFromCfi,
+  getReaderThemeConfig,
+  normalizeTocItems,
+  parseStoredLocations,
+  resolveInitialEpubTarget,
+  type NormalizedTocItem,
+} from "@/lib/epub";
+import {
+  ReadingSettings,
   useReadingPreferences,
   getPreferenceClasses,
-  getPreferenceStyles,
-  ReadingSettings,
 } from "./reader/ReadingSettings";
 import { FullscreenReaderOverlay } from "./reader/FullscreenReaderOverlay";
 
-// Import reader fonts and theme CSS
 import "@/styles/reader-fonts.css";
 import "@/styles/reader-theme.css";
+
+type RenditionLike = Book["rendition"];
 
 export type EpubFlipReaderRef = {
   goToPage: (page: number) => void;
 };
 
+type EpubRelocationPayload = {
+  pageNumber: number;
+  totalPages: number;
+  cfi: string | null;
+  progressPercent: number | null;
+};
+
 type EpubFlipReaderProps = {
+  bookId: number;
   epubUrl: string;
   initialPage?: number;
+  initialCfi?: string | null;
   onPageChange?: (pageNumber: number) => void;
+  onRelocation?: (payload: EpubRelocationPayload) => void;
   onTotalPages?: (totalPages: number) => void;
   bookTitle?: string;
 };
 
-type ParsedPage = {
-  type: "cover" | "content" | "back-cover";
-  pageNumber: number;
-  content?: string;
-  chapterTitle?: string;
-  isChapterStart?: boolean;
+type TouchPoint = {
+  x: number;
+  y: number;
 };
-
-const HTMLFlipBook = dynamic(() => import("react-pageflip"), { ssr: false });
-
-// Approximate characters per page (reduced for better margins/readability)
-const CHARS_PER_PAGE = 1500;
 
 export const EpubFlipReader = forwardRef<
   EpubFlipReaderRef,
   EpubFlipReaderProps
->(({ epubUrl, initialPage = 1, onPageChange, onTotalPages, bookTitle }, ref) => {
-  // Generate storage key from epub URL
-  const storageKey = `epub-page-${epubUrl.replace(/[^a-zA-Z0-9]/g, "_").slice(-50)}`;
+>(
+  (
+    {
+      bookId,
+      epubUrl,
+      initialPage = 1,
+      initialCfi = null,
+      onPageChange,
+      onRelocation,
+      onTotalPages,
+      bookTitle,
+    },
+    ref,
+  ) => {
+    const viewerRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const bookRef = useRef<Book | null>(null);
+    const renditionRef = useRef<RenditionLike | null>(null);
+    const currentCfiRef = useRef<string | null>(null);
+    const totalPagesRef = useRef(0);
+    const touchStartRef = useRef<TouchPoint | null>(null);
+    const readerLifecycleRef = useRef<{
+      key: string;
+      initializing: boolean;
+    } | null>(null);
+    const pendingCleanupRef = useRef<{
+      key: string;
+      timerId: number;
+    } | null>(null);
+    const initialTargetRef = useRef<{ cfi: string | null; page: number | null }>({
+      cfi: initialCfi,
+      page: initialPage,
+    });
 
-  const [pages, setPages] = useState<ParsedPage[]>([]);
-  const [totalPages, setTotalPages] = useState(0);
-  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
-  // Ensure initialPage is treated as a number
-  const basePage =
-    typeof initialPage === "string"
-      ? parseInt(initialPage, 10)
-      : initialPage || 0;
-  const [currentPage, setCurrentPage] = useState(basePage);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [showSettings, setShowSettings] = useState(false);
+    const [showToc, setShowToc] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(
+      typeof initialPage === "number" ? initialPage : 1,
+    );
+    const [totalPages, setTotalPages] = useState(0);
+    const [title, setTitle] = useState(bookTitle || "Unknown Title");
+    const [author, setAuthor] = useState("Unknown Author");
+    const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+    const [tocItems, setTocItems] = useState<NormalizedTocItem[]>([]);
 
-  const [jumpToPage, setJumpToPage] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
-  const [isPortrait, setIsPortrait] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const bookRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const epubBookRef = useRef<Book | null>(null);
+    const { preferences, updatePreferences, resetPreferences, isLoaded } =
+      useReadingPreferences();
 
-  // Load saved page from localStorage on mount
-  const savedPageRef = useRef<number | null>(null);
-  if (savedPageRef.current === null && typeof window !== "undefined") {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      const localSaved = saved ? parseInt(saved, 10) : 0;
-      // Only fallback to localStorage if DB value is 0 (first page/new book)
-      const dbValue =
-        typeof initialPage === "string"
-          ? parseInt(initialPage, 10)
-          : initialPage;
-      savedPageRef.current = dbValue > 0 ? dbValue : localSaved;
-    } catch {
-      savedPageRef.current =
-        typeof initialPage === "string"
-          ? parseInt(initialPage, 10)
-          : initialPage;
-    }
-  }
-  // Track last page to restore after settings-triggered re-render
-  const lastPageRef = useRef<number>(savedPageRef.current ?? initialPage);
+    const themeClasses = getPreferenceClasses(preferences);
+    const readerTheme = useMemo(
+      () => getReaderThemeConfig(preferences),
+      [preferences],
+    );
+    const locationsCacheKey = useMemo(
+      () => getEpubLocationsCacheKey(bookId),
+      [bookId],
+    );
 
-  const { preferences, updatePreferences, resetPreferences, isLoaded } =
-    useReadingPreferences();
-
-  // Parse EPUB and extract text content
-  useEffect(() => {
-    const parseEpub = async () => {
-      setIsLoading(true);
-      setError(null);
+    const displayTarget = useCallback(async (target?: string | number | null) => {
+      if (!renditionRef.current) {
+        return;
+      }
 
       try {
-        const book = ePub(epubUrl);
-        epubBookRef.current = book;
+        if (typeof target === "number") {
+          await renditionRef.current.display(target);
+        } else {
+          await renditionRef.current.display(target ?? undefined);
+        }
+      } catch (displayError) {
+        console.error("Failed to navigate EPUB", displayError);
+      }
+    }, []);
 
-        await book.ready;
+    const goToPage = useCallback(
+      async (page: number) => {
+        const book = bookRef.current;
+        if (!book) {
+          return;
+        }
 
-        // Get metadata
-        const metadata = await book.loaded.metadata;
-        const title = metadata.title || bookTitle || "Unknown Title";
-        const author = metadata.creator || "Unknown Author";
+        const targetCfi = getCfiFromCanonicalPage(book, page);
+        if (targetCfi) {
+          await displayTarget(targetCfi);
+        }
+      },
+      [displayTarget],
+    );
 
-        // Try to extract cover image
-        let coverUrl: string | null = null;
+    useImperativeHandle(ref, () => ({
+      goToPage,
+    }));
+
+    const handleRelocated = useCallback(
+      (location: {
+        start?: { cfi?: string };
+      }) => {
+        const book = bookRef.current;
+        const cfi = location?.start?.cfi ?? null;
+
+        if (!book || !cfi) {
+          return;
+        }
+
+        currentCfiRef.current = cfi;
+
+        const canonicalPage = getCanonicalPageFromCfi(book, cfi) ?? 1;
+        const progressPercent = getProgressPercentFromCfi(book, cfi);
+
+        setCurrentPage(canonicalPage);
+        onPageChange?.(canonicalPage);
+        onRelocation?.({
+          pageNumber: canonicalPage,
+          totalPages: totalPagesRef.current,
+          cfi,
+          progressPercent,
+        });
+      },
+      [onPageChange, onRelocation],
+    );
+
+    const handlePrev = useCallback(async () => {
+      try {
+        await renditionRef.current?.prev();
+      } catch (navigationError) {
+        console.error("Failed to navigate to previous EPUB page", navigationError);
+      }
+    }, []);
+
+    const handleNext = useCallback(async () => {
+      try {
+        await renditionRef.current?.next();
+      } catch (navigationError) {
+        console.error("Failed to navigate to next EPUB page", navigationError);
+      }
+    }, []);
+
+    useEffect(() => {
+      const viewer = viewerRef.current;
+      if (!viewer || !epubUrl) {
+        return;
+      }
+
+      const readerKey = `${bookId}:${epubUrl}`;
+      let cancelled = false;
+      let localBook: Book | null = null;
+      let localRendition: RenditionLike | null = null;
+
+      if (pendingCleanupRef.current?.key === readerKey) {
+        window.clearTimeout(pendingCleanupRef.current.timerId);
+        pendingCleanupRef.current = null;
+      }
+
+      if (
+        readerLifecycleRef.current?.key === readerKey &&
+        (readerLifecycleRef.current.initializing ||
+          bookRef.current ||
+          renditionRef.current)
+      ) {
+        return () => {
+          pendingCleanupRef.current = {
+            key: readerKey,
+            timerId: window.setTimeout(() => {
+              cancelled = true;
+              if (renditionRef.current) {
+                renditionRef.current.destroy();
+                renditionRef.current = null;
+              }
+              if (bookRef.current) {
+                bookRef.current.destroy();
+                bookRef.current = null;
+              }
+              if (readerLifecycleRef.current?.key === readerKey) {
+                readerLifecycleRef.current = null;
+              }
+              pendingCleanupRef.current = null;
+            }, 0),
+          };
+        };
+      }
+
+      readerLifecycleRef.current = {
+        key: readerKey,
+        initializing: true,
+      };
+
+      const loadBook = async () => {
+        setIsLoading(true);
+        setError(null);
+
+        const response = await fetch(epubUrl, {
+          credentials: "same-origin",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch EPUB (${response.status})`);
+        }
+
+        const epubBuffer = await response.arrayBuffer();
+        const book = ePub(epubBuffer, {
+          replacements: "none",
+        });
+        localBook = book;
+        bookRef.current = book;
+
         try {
-          const coverHref = await book.coverUrl();
-          if (coverHref) {
-            coverUrl = coverHref;
-            setCoverImageUrl(coverHref);
-            console.log("📚 Cover image found:", coverHref);
+          await book.ready;
+          await book.opened;
+
+          if (!(book as Book & { package?: unknown }).package) {
+            (
+              book as Book & {
+                package?: unknown;
+                packaging?: unknown;
+              }
+            ).package = (
+              book as Book & {
+                packaging?: unknown;
+              }
+            ).packaging;
           }
-        } catch (coverErr) {
-          console.warn("Could not extract cover image:", coverErr);
-        }
 
-        // Get spine items (chapters)
-        const spine = book.spine;
-        const allText: { text: string; title?: string }[] = [];
+          if (cancelled) {
+            return;
+          }
 
-        // Iterate through spine items
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const item of (spine as any).items) {
+          const metadata = await book.loaded.metadata;
+
+          if (cancelled) {
+            return;
+          }
+
+          setTitle(metadata.title || bookTitle || "Unknown Title");
+          setAuthor(metadata.creator || "Unknown Author");
+
           try {
-            const doc = await book.load(item.href);
-            if (doc && typeof doc === "object" && "body" in doc) {
-              const body = (doc as Document).body;
-              const text = body?.textContent?.trim() || "";
-              if (text) {
-                // Try to get chapter title from TOC
-                const toc = await book.loaded.navigation;
-                const tocItem = toc.toc.find((t) => t.href.includes(item.href));
-                allText.push({
-                  text,
-                  title: tocItem?.label,
-                });
-              }
+            const coverUrl = await book.coverUrl();
+            if (!cancelled) {
+              setCoverImageUrl(coverUrl || null);
             }
-          } catch (e) {
-            console.warn(`Failed to load chapter: ${item.href}`, e);
+          } catch (coverError) {
+            console.warn("Failed to load EPUB cover", coverError);
           }
-        }
 
-        // Build pages array
-        const finalPages: ParsedPage[] = [];
-        let pageCounter = 0; // 0-indexed internally
-
-        // 1. Cover Page (Page 0)
-        finalPages.push({
-          type: "cover",
-          pageNumber: 0,
-          content: JSON.stringify({ title, author }),
-        });
-        pageCounter++;
-
-        // 2. Content Pages
-        for (const chapter of allText) {
-          let remainingText = chapter.text;
-          let isFirstPageOfChapter = true;
-
-          while (remainingText.length > 0) {
-            // Find a good break point
-            let breakPoint = CHARS_PER_PAGE;
-
-            if (remainingText.length > CHARS_PER_PAGE) {
-              // Try paragraph break
-              const paragraphBreak = remainingText.lastIndexOf(
-                "\n\n",
-                CHARS_PER_PAGE,
-              );
-              if (paragraphBreak > CHARS_PER_PAGE * 0.5) {
-                breakPoint = paragraphBreak + 2;
-              } else {
-                // Try sentence break
-                const sentenceBreak = remainingText.lastIndexOf(
-                  ". ",
-                  CHARS_PER_PAGE,
-                );
-                if (sentenceBreak > CHARS_PER_PAGE * 0.5) {
-                  breakPoint = sentenceBreak + 2;
-                } else {
-                  // Try word break
-                  const wordBreak = remainingText.lastIndexOf(
-                    " ",
-                    CHARS_PER_PAGE,
-                  );
-                  if (wordBreak > CHARS_PER_PAGE * 0.5) {
-                    breakPoint = wordBreak + 1;
-                  }
-                }
-              }
-            } else {
-              breakPoint = remainingText.length;
+          try {
+            const navigation = await book.loaded.navigation;
+            if (!cancelled) {
+              setTocItems(normalizeTocItems(navigation?.toc || []));
             }
-
-            const pageText = remainingText.slice(0, breakPoint).trim();
-            remainingText = remainingText.slice(breakPoint).trim();
-
-            if (pageText) {
-              finalPages.push({
-                type: "content",
-                pageNumber: pageCounter,
-                content: pageText,
-                chapterTitle: isFirstPageOfChapter ? chapter.title : undefined,
-                isChapterStart: isFirstPageOfChapter,
-              });
-              pageCounter++;
-              isFirstPageOfChapter = false;
+          } catch (navigationError) {
+            console.warn("Failed to load EPUB navigation", navigationError);
+            if (!cancelled) {
+              setTocItems([]);
             }
           }
+
+          const cachedLocations =
+            typeof window === "undefined"
+              ? null
+              : parseStoredLocations(localStorage.getItem(locationsCacheKey));
+
+          const resolvedLocations =
+            cachedLocations && cachedLocations.length > 0
+              ? book.locations.load(cachedLocations as unknown as string)
+              : await book.locations.generate(EPUB_LOCATION_BREAK_CHARS);
+
+          if (!cachedLocations && typeof window !== "undefined") {
+            localStorage.setItem(
+              locationsCacheKey,
+              JSON.stringify(resolvedLocations),
+            );
+          }
+
+          if (cancelled) {
+            return;
+          }
+
+          totalPagesRef.current = resolvedLocations.length;
+          setTotalPages(resolvedLocations.length);
+          onTotalPages?.(resolvedLocations.length);
+
+          const rendition = book.renderTo(viewer, {
+            width: "100%",
+            height: "100%",
+            flow: "paginated",
+            spread: "auto",
+            minSpreadWidth: 960,
+            manager: "default",
+            allowScriptedContent: false,
+          });
+
+          localRendition = rendition;
+          renditionRef.current = rendition;
+          rendition.on("relocated", handleRelocated);
+
+          applyReaderTheme(rendition, preferences);
+
+          await rendition.started;
+
+          const initialTarget = resolveInitialEpubTarget({
+            initialCfi: initialTargetRef.current.cfi,
+            initialPage: initialTargetRef.current.page,
+            book,
+          });
+
+          await rendition.display(initialTarget || undefined);
+
+          if (!cancelled) {
+            setIsLoading(false);
+          }
+        } catch (loadError) {
+          console.error("Failed to load EPUB", loadError);
+          if (!cancelled) {
+            setError(
+              loadError instanceof Error
+                ? loadError.message
+                : "Failed to load EPUB",
+            );
+            setIsLoading(false);
+          }
+        } finally {
+          if (readerLifecycleRef.current?.key === readerKey) {
+            readerLifecycleRef.current = {
+              key: readerKey,
+              initializing: false,
+            };
+          }
+        }
+      };
+
+      void loadBook();
+
+      return () => {
+        pendingCleanupRef.current = {
+          key: readerKey,
+          timerId: window.setTimeout(() => {
+            cancelled = true;
+
+            if (localRendition) {
+              localRendition.destroy();
+              if (renditionRef.current === localRendition) {
+                renditionRef.current = null;
+              }
+              localRendition = null;
+            }
+
+            if (localBook) {
+              localBook.destroy();
+              if (bookRef.current === localBook) {
+                bookRef.current = null;
+              }
+              localBook = null;
+            }
+
+            if (readerLifecycleRef.current?.key === readerKey) {
+              readerLifecycleRef.current = null;
+            }
+
+            pendingCleanupRef.current = null;
+          }, 0),
+        };
+      };
+    }, [
+      bookId,
+      bookTitle,
+      epubUrl,
+      handleRelocated,
+      locationsCacheKey,
+      onTotalPages,
+    ]);
+
+    useEffect(() => {
+      if (!renditionRef.current) {
+        return;
+      }
+
+      applyReaderTheme(renditionRef.current, preferences);
+    }, [preferences]);
+
+    useEffect(() => {
+      const viewer = viewerRef.current;
+      if (!viewer || typeof ResizeObserver === "undefined") {
+        return;
+      }
+
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry || !renditionRef.current) {
+          return;
         }
 
-        // 3. Back Cover
-        finalPages.push({
-          type: "back-cover",
-          pageNumber: pageCounter,
-        });
+        const rendition = renditionRef.current as RenditionLike & {
+          manager?: {
+            resize: (width?: number, height?: number, epubcfi?: string) => void;
+          };
+        };
 
-        if (finalPages.length <= 2) {
-          // Only covers
-          throw new Error("No readable content found in EPUB");
+        if (!rendition.manager) {
+          return;
         }
 
-        setPages(finalPages);
-        setTotalPages(finalPages.length);
-        setIsLoading(false);
-        onTotalPages?.(finalPages.length);
-      } catch (err) {
-        console.error("Error parsing EPUB:", err);
-        setError(err instanceof Error ? err.message : "Failed to parse EPUB");
-        setIsLoading(false);
-      }
-    };
+        try {
+          rendition.resize(
+            Math.floor(entry.contentRect.width),
+            Math.floor(entry.contentRect.height),
+          );
+        } catch (resizeError) {
+          console.warn("Failed to resize EPUB rendition", resizeError);
+        }
+      });
 
-    if (epubUrl) {
-      parseEpub();
-    }
+      observer.observe(viewer);
+      return () => observer.disconnect();
+    }, []);
 
-    return () => {
-      if (epubBookRef.current) {
-        epubBookRef.current.destroy();
-      }
-    };
-  }, [epubUrl, bookTitle]);
+    useEffect(() => {
+      const handleFullscreenChange = () => {
+        const fullscreenElement =
+          document.fullscreenElement ||
+          (document as Document & { webkitFullscreenElement?: Element | null })
+            .webkitFullscreenElement;
+        setIsFullscreen(Boolean(fullscreenElement));
+      };
 
-  // Define goToPage first
-  const goToPageHandler = useCallback(
-    (page: number) => {
-      // Adjust for 0-indexed pages (cover is 0)
-      // User input '1' should map to first content page (index 1) if possible
-      // Detailed logic:
-      // Internal pages: 0 (Cover), 1 (Content 1), 2 (Content 2)...
-      // We want user-facing "Page 1" to be Content 1 (Index 1)
-
-      let targetIndex = page;
-      if (page === 1) targetIndex = 1; // Go to first content page
-
-      targetIndex = Math.min(totalPages - 1, Math.max(0, targetIndex));
-
-      if (bookRef.current) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (bookRef.current as any).pageFlip().flip(targetIndex);
-      }
-    },
-    [totalPages],
-  );
-
-  // Expose methods to parent
-  useImperativeHandle(ref, () => ({
-    goToPage: goToPageHandler,
-  }));
-
-  // Detect screen orientation and size
-  useEffect(() => {
-    const checkOrientation = () => {
-      const portrait = window.innerHeight > window.innerWidth;
-      const mobile = window.innerWidth < 768;
-      setIsPortrait(portrait);
-      setIsMobile(mobile);
-    };
-
-    checkOrientation();
-    window.addEventListener("resize", checkOrientation);
-    window.addEventListener("orientationchange", checkOrientation);
-
-    return () => {
-      window.removeEventListener("resize", checkOrientation);
-      window.removeEventListener("orientationchange", checkOrientation);
-    };
-  }, []);
-
-  // Handle fullscreen changes
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isCurrentlyFullscreen = Boolean(
-        document.fullscreenElement ||
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (document as any).webkitFullscreenElement,
-      );
-      setIsFullscreen(isCurrentlyFullscreen);
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener(
+      document.addEventListener("fullscreenchange", handleFullscreenChange);
+      document.addEventListener(
         "webkitfullscreenchange",
         handleFullscreenChange,
       );
-    };
-  }, []);
 
-  const handleFlip = useCallback(
-    (pageIndex: number) => {
-      setCurrentPage(pageIndex);
-      lastPageRef.current = pageIndex; // Track for settings reload
-      // Save to localStorage for persistence across reloads
-      try {
-        localStorage.setItem(storageKey, String(pageIndex));
-      } catch {
-        /* ignore storage errors */
-      }
-      onPageChange?.(pageIndex);
-    },
-    [onPageChange, storageKey],
-  );
+      return () => {
+        document.removeEventListener("fullscreenchange", handleFullscreenChange);
+        document.removeEventListener(
+          "webkitfullscreenchange",
+          handleFullscreenChange,
+        );
+      };
+    }, []);
 
-  const handleJumpSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const pageNum = parseInt(jumpToPage, 10);
-    if (!isNaN(pageNum)) {
-      goToPageHandler(pageNum);
-      setJumpToPage("");
-    }
-  };
-
-  const toggleFullscreen = async () => {
-    if (!containerRef.current) return;
-    try {
-      if (!isFullscreen) {
-        if (containerRef.current.requestFullscreen) {
-          await containerRef.current.requestFullscreen();
-        } else if ((containerRef.current as any).webkitRequestFullscreen) {
-          await (containerRef.current as any).webkitRequestFullscreen();
+    useEffect(() => {
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (showSettings) {
+          return;
         }
-      } else {
+
+        const activeTag = (document.activeElement?.tagName || "").toLowerCase();
+        if (activeTag === "input" || activeTag === "textarea") {
+          return;
+        }
+
+        if (event.key === "ArrowLeft" || event.key === "PageUp") {
+          event.preventDefault();
+          void handlePrev();
+        }
+
+        if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
+          event.preventDefault();
+          void handleNext();
+        }
+
+        if (event.key === "Escape" && isFullscreen) {
+          void (async () => {
+            if (document.exitFullscreen) {
+              await document.exitFullscreen();
+            }
+          })();
+        }
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [handleNext, handlePrev, isFullscreen, showSettings]);
+
+    const toggleFullscreen = useCallback(async () => {
+      const container = containerRef.current;
+      if (!container) {
+        return;
+      }
+
+      try {
+        if (!isFullscreen) {
+          if (container.requestFullscreen) {
+            await container.requestFullscreen();
+          } else if (
+            "webkitRequestFullscreen" in container &&
+            typeof (
+              container as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }
+            ).webkitRequestFullscreen === "function"
+          ) {
+            await (
+              container as HTMLElement & {
+                webkitRequestFullscreen: () => Promise<void>;
+              }
+            ).webkitRequestFullscreen();
+          }
+        } else if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      } catch (fullscreenError) {
+        console.error("Failed to toggle fullscreen", fullscreenError);
+      }
+    }, [isFullscreen]);
+
+    const exitFullscreen = useCallback(async () => {
+      try {
         if (document.exitFullscreen) {
           await document.exitFullscreen();
-        } else if ((document as any).webkitExitFullscreen) {
-          await (document as any).webkitExitFullscreen();
         }
+      } catch (fullscreenError) {
+        console.error("Failed to exit fullscreen", fullscreenError);
       }
-    } catch (error) {
-      console.error("Error toggling fullscreen:", error);
-    }
-  };
+    }, []);
 
-  const exitFullscreen = useCallback(async () => {
-    try {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen();
-      } else if ((document as any).webkitExitFullscreen) {
-        await (document as any).webkitExitFullscreen();
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
+    const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+      const touch = event.touches[0];
+      touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    }, []);
 
-  useEffect(() => {
-    if (!isFullscreen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        void exitFullscreen();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isFullscreen, exitFullscreen]);
+    const handleTouchEnd = useCallback(
+      (event: React.TouchEvent<HTMLDivElement>) => {
+        const start = touchStartRef.current;
+        if (!start) {
+          return;
+        }
 
-  const adjustFontSize = useCallback(
-    (delta: number) => {
-      const next = Math.min(200, Math.max(80, preferences.fontSize + delta));
-      updatePreferences({ fontSize: next });
-    },
-    [preferences.fontSize, updatePreferences],
-  );
+        const touch = event.changedTouches[0];
+        const deltaX = touch.clientX - start.x;
+        const deltaY = Math.abs(touch.clientY - start.y);
+        touchStartRef.current = null;
 
-  // Calculate dimensions - Larger and more book-like
-  const getResponsiveDimensions = () => {
-    const viewportWidth =
-      typeof window !== "undefined" ? window.innerWidth : 1024;
-    const viewportHeight =
-      typeof window !== "undefined" ? window.innerHeight : 768;
-
-    if (isFullscreen) {
-      const padding = 0; // fullscreen should be edge-to-edge
-      const availableWidth = Math.max(320, viewportWidth - padding);
-      const availableHeight = Math.max(320, viewportHeight - padding);
-      const usePortraitLayout = viewportHeight > viewportWidth;
-
-      return usePortraitLayout
-        ? { baseWidth: availableWidth, baseHeight: availableHeight }
-        : { baseWidth: availableWidth / 2, baseHeight: availableHeight };
-    }
-
-    if (isMobile && isPortrait) {
-      const availableWidth = viewportWidth - 30;
-      return {
-        baseWidth: availableWidth,
-        baseHeight: availableWidth * 1.5,
-      };
-    }
-
-    // Desktop default size - Make it look like a substantial book
-    return { baseWidth: 500, baseHeight: 720 };
-  };
-
-  const { baseWidth, baseHeight } = getResponsiveDimensions();
-  const width = Math.round(baseWidth);
-  const height = Math.round(baseHeight);
-
-  // Prefer explicit font size controls over auto-scaling in fullscreen.
-  const scaleFactor = 1;
-
-  // Navigate to saved page on initial load or after settings change
-  useEffect(() => {
-    if (bookRef.current && pages.length > 0) {
-      // Priority: lastPageRef (session) > savedPageRef (mount) > initialPage (DB)
-      const targetPage =
-        lastPageRef.current || savedPageRef.current || initialPage;
-      const targetIndex = Math.round(targetPage);
-
-      if (targetIndex >= 0 && bookRef.current) {
-        bookRef.current.pageFlip().flip(targetIndex);
-        lastPageRef.current = targetIndex;
-        setCurrentPage(targetIndex);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pages.length, preferences.fontSize, preferences.theme]);
-
-  const themeClasses = getPreferenceClasses(preferences);
-  const themeStyles = getPreferenceStyles(preferences, scaleFactor);
-
-  // Loading state
-  if (isLoading || !isLoaded) {
-    return (
-      <div className="flex h-96 flex-col items-center justify-center gap-4">
-        <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-purple-500 border-t-transparent"></div>
-        <p className="text-lg font-semibold text-purple-600">Binding book...</p>
-        <p className="text-sm text-purple-400">Preparing pages & cover...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex h-96 flex-col items-center justify-center gap-4 rounded-3xl border-4 border-red-200 bg-red-50 p-8 text-center">
-        <div className="text-4xl">⚠️</div>
-        <h3 className="text-xl font-bold text-red-800">Error Loading Book</h3>
-        <p className="max-w-md text-red-600">{error}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={containerRef}
-      className={clsx(
-        isFullscreen
-          ? "fixed inset-0 z-[9999] overflow-hidden flex flex-col"
-          : "book-container space-y-4 py-8", // 3D perspective in non-fullscreen
-        themeClasses,
-      )}
-      style={isFullscreen ? { backgroundColor: "var(--reader-bg)" } : undefined}
-    >
-      <FullscreenReaderOverlay
-        isOpen={isFullscreen}
-        fontSizePercent={preferences.fontSize}
-        onDecreaseFontSize={() => adjustFontSize(-10)}
-        onIncreaseFontSize={() => adjustFontSize(10)}
-        onOpenSettings={() => setShowSettings(true)}
-        onExitFullscreen={() => void exitFullscreen()}
-      />
-
-      {/* Navigation Controls */}
-      {!isFullscreen && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50 p-2 shadow-sm">
-          <div className="flex items-center gap-1">
-            {/* Navigation Buttons... (Same as before but cleaner) */}
-            <button
-              onClick={() => goToPageHandler(0)}
-              className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-600"
-            >
-              Cover
-            </button>
-            <button
-              onClick={() => goToPageHandler(currentPage - 2)}
-              disabled={currentPage <= 0}
-              className="rounded-lg bg-white border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              ◀ Prev
-            </button>
-            <button
-              onClick={() => goToPageHandler(currentPage + 2)}
-              disabled={currentPage >= totalPages - 1}
-              className="rounded-lg bg-white border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              Next ▶
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="text-xs font-medium text-gray-500 mr-2">
-              {currentPage === 0
-                ? "Cover"
-                : `Pages ${currentPage}-${currentPage + 1}`}
-            </div>
-            <button
-              onClick={toggleFullscreen}
-              className="rounded-lg border border-indigo-300 bg-indigo-100 px-2 py-1.5 text-xs font-bold text-indigo-600 hover:bg-indigo-200"
-            >
-              ⛶ Full
-            </button>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="rounded-lg border border-violet-300 bg-violet-100 px-2 py-1.5 text-xs font-bold text-violet-600 hover:bg-violet-200"
-            >
-              ⚙️ Aa
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Flip Book Wrapper */}
-      <div
-        className={clsx(
-          "relative mx-auto transition-all duration-500",
-          isFullscreen
-            ? "flex-1 min-h-0 flex items-center justify-center"
-            : "p-4",
-        )}
-      >
-        <HTMLFlipBook
-          key={`epub-${isFullscreen ? "fs" : "normal"}-${isMobile && isPortrait ? "p" : "l"}`}
-          ref={bookRef}
-          width={width}
-          height={height}
-          size={isFullscreen || (isMobile && isPortrait) ? "fixed" : "stretch"}
-          minWidth={Math.round(baseWidth * 0.6)}
-          maxWidth={Math.round(baseWidth * 2)}
-          minHeight={Math.round(baseHeight * 0.6)}
-          maxHeight={Math.round(baseHeight * 2)}
-          drawShadow={true}
-          flippingTime={400}
-          usePortrait={
-            isFullscreen
-              ? typeof window !== "undefined"
-                ? window.innerHeight > window.innerWidth
-                : false
-              : isMobile && isPortrait
+        if (Math.abs(deltaX) > 48 && Math.abs(deltaX) > deltaY) {
+          if (deltaX < 0) {
+            void handleNext();
+          } else {
+            void handlePrev();
           }
-          startZIndex={0}
-          autoSize={isFullscreen || (isMobile && isPortrait) ? false : true}
-          maxShadowOpacity={0.4}
-          showCover={true}
-          mobileScrollSupport={true}
-          clickEventForward={false}
-          useMouseEvents={true}
-          swipeDistance={30}
-          showPageCorners={true}
-          disableFlipByClick={false}
-          startPage={currentPage}
-          onFlip={(event: { data: number }) => {
-            handleFlip(event.data);
-          }}
-          className={clsx("mx-auto", !isFullscreen && "shadow-2xl")}
-          style={{}}
-        >
-          {pages.map((page, index) => {
-            if (index === 0 && page.type === "cover") {
-              const meta = JSON.parse(page.content || "{}");
-              return (
-                <div key={`cover-${index}`} className="book-cover relative overflow-hidden">
-                  {/* Show cover image if available */}
-                  {coverImageUrl ? (
-                    <img
-                      src={coverImageUrl}
-                      alt={`Cover of ${meta.title}`}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      onError={(e) => {
-                        // If image fails to load, hide it and show text fallback
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    /* Text fallback - only shown when no cover image */
-                    <div className="relative z-10 flex flex-col items-center justify-center h-full p-8">
-                      <div className="cover-title text-center">{meta.title}</div>
-                      <div className="cover-author text-center">{meta.author}</div>
-                    </div>
-                  )}
-                </div>
-              );
-            }
+        }
+      },
+      [handleNext, handlePrev],
+    );
 
-            if (page.type === "back-cover") {
-              return (
-                <div key={`back-${index}`} className="book-cover">
-                  <div className="text-white/50 text-sm mt-auto mb-8">
-                    End of Book
-                  </div>
-                </div>
-              );
-            }
+    const handleTocSelect = useCallback(
+      async (href: string) => {
+        await displayTarget(href);
+        setShowToc(false);
+      },
+      [displayTarget],
+    );
 
-            return (
-              <article
-                key={`page-${page.pageNumber}`}
-                className={clsx(
-                  "reader-page-card reader-content",
-                  index % 2 === 0 ? "reader-page-card--left" : "",
-                  page.isChapterStart ? "chapter-start" : "",
-                  themeClasses,
-                )}
+    const adjustFontSize = useCallback(
+      (delta: number) => {
+        const nextSize = Math.min(200, Math.max(80, preferences.fontSize + delta));
+        updatePreferences({ fontSize: nextSize });
+      },
+      [preferences.fontSize, updatePreferences],
+    );
+
+    const renderTocItems = useCallback(
+      (items: NormalizedTocItem[]) =>
+        items.map((item) => (
+          <div key={item.id} className="space-y-2">
+            <button
+              type="button"
+              onClick={() => void handleTocSelect(item.href)}
+              className="w-full rounded-xl border border-transparent bg-white/70 px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50"
+              style={{ paddingLeft: `${12 + item.depth * 16}px` }}
+            >
+              {item.label}
+            </button>
+            {item.children.length > 0 ? renderTocItems(item.children) : null}
+          </div>
+        )),
+      [handleTocSelect],
+    );
+
+    if (error) {
+      return (
+        <div className="flex h-96 flex-col items-center justify-center gap-4 rounded-3xl border-4 border-red-200 bg-red-50 p-8 text-center">
+          <div className="text-4xl">⚠️</div>
+          <h3 className="text-xl font-bold text-red-800">Error Loading Book</h3>
+          <p className="max-w-md text-red-600">{error}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        ref={containerRef}
+        className={clsx(
+          isFullscreen
+            ? "fixed inset-0 z-[9999] flex flex-col overflow-hidden"
+            : "space-y-4 py-6",
+          themeClasses,
+        )}
+        style={{ backgroundColor: readerTheme.background, color: readerTheme.foreground }}
+      >
+        <FullscreenReaderOverlay
+          isOpen={isFullscreen}
+          fontSizePercent={preferences.fontSize}
+          onDecreaseFontSize={() => adjustFontSize(-10)}
+          onIncreaseFontSize={() => adjustFontSize(10)}
+          onOpenSettings={() => setShowSettings(true)}
+          onExitFullscreen={() => void exitFullscreen()}
+        />
+
+        {!isFullscreen && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-indigo-100 bg-white/80 p-3 shadow-sm">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-indigo-900">{title}</p>
+              <p className="truncate text-xs text-indigo-500">{author}</p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handlePrev()}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50"
               >
-                <div
-                  className="reader-page-content overflow-y-auto px-4 py-2"
-                  style={themeStyles}
-                >
-                  {/* Chapter Title (if start) */}
-                  {page.chapterTitle && page.isChapterStart && (
-                    <div className="mb-4 text-center">
-                      <h2 className="font-serif font-bold text-lg mb-1">
-                        {page.chapterTitle}
-                      </h2>
-                      <div className="w-12 h-0.5 bg-current opacity-30 mx-auto"></div>
-                    </div>
-                  )}
-
-                  {/* Text Content */}
-                  <div className="leading-relaxed">
-                    {page.content?.split("\n\n").map((paragraph, pIdx) => (
-                      <p key={pIdx} className="mb-4 text-justify">
-                        {paragraph.split("\n").map((line, lIdx) => (
-                          <span key={lIdx}>
-                            {line}
-                            {lIdx < paragraph.split("\n").length - 1 && <br />}
-                          </span>
-                        ))}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-                <div className="reader-page-number">{page.pageNumber}</div>
-              </article>
-            );
-          })}
-        </HTMLFlipBook>
-      </div>
-
-      {/* Reading Settings Modal */}
-      <ReadingSettings
-        preferences={preferences}
-        onUpdate={updatePreferences}
-        onReset={resetPreferences}
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-      />
-
-      {/* Progress Bar - Hidden in fullscreen */}
-      {!isFullscreen && totalPages > 0 && (
-        <div className="rounded-2xl border-2 border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-indigo-600">
-              Page{" "}
-              <span className="font-semibold text-indigo-900">
-                {currentPage}
-              </span>{" "}
-              of {totalPages - 2} {/* Subtract cover and back cover */}
-            </p>
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              <p className="text-xs font-semibold text-emerald-700">
-                EPUB Mode
-              </p>
+                ◀ Prev
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleNext()}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50"
+              >
+                Next ▶
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowToc((open) => !open)}
+                className="rounded-lg border border-emerald-300 bg-emerald-100 px-2 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200"
+              >
+                ☰ TOC
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSettings(true)}
+                className="rounded-lg border border-violet-300 bg-violet-100 px-2 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-200"
+              >
+                ⚙️ Aa
+              </button>
+              <button
+                type="button"
+                onClick={() => void toggleFullscreen()}
+                className="rounded-lg border border-indigo-300 bg-indigo-100 px-2 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-200"
+              >
+                ⛶ Full
+              </button>
             </div>
           </div>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-indigo-100">
-            <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-300"
-              style={{
-                width: `${Math.max(0, currentPage / Math.max(1, totalPages - 2)) * 100}%`,
-              }}
-            ></div>
+        )}
+
+        <div
+          className={clsx(
+            "relative mx-auto flex w-full gap-4",
+            isFullscreen ? "min-h-0 flex-1 px-3 pb-3 pt-14 sm:px-4 sm:pb-4" : "",
+          )}
+        >
+          {showToc && (
+            <aside
+              className={clsx(
+                "w-full max-w-xs shrink-0 overflow-y-auto rounded-3xl border border-indigo-100 bg-white/90 p-4 shadow-xl",
+                isFullscreen ? "max-h-full" : "max-h-[720px]",
+              )}
+            >
+              <div className="mb-4 flex items-start gap-3">
+                {coverImageUrl ? (
+                  <img
+                    src={coverImageUrl}
+                    alt={`Cover of ${title}`}
+                    className="h-20 w-14 rounded-xl object-cover shadow-md"
+                  />
+                ) : null}
+                <div className="min-w-0">
+                  <p className="line-clamp-2 text-sm font-bold text-slate-900">{title}</p>
+                  <p className="mt-1 text-xs text-slate-500">{author}</p>
+                  <p className="mt-2 text-xs font-semibold text-emerald-700">
+                    Page {currentPage} of {Math.max(totalPages, 1)}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {tocItems.length > 0 ? (
+                  renderTocItems(tocItems)
+                ) : (
+                  <p className="text-sm text-slate-500">No table of contents found.</p>
+                )}
+              </div>
+            </aside>
+          )}
+
+          <div
+            className={clsx(
+              "relative flex-1 overflow-hidden rounded-[2rem] border shadow-2xl",
+              isFullscreen ? "min-h-0" : "min-h-[720px]",
+            )}
+            style={{
+              background:
+                preferences.theme === "dark"
+                  ? "linear-gradient(180deg, #202024 0%, #16161a 100%)"
+                  : "linear-gradient(180deg, #fffdf8 0%, #f7f1e5 100%)",
+              borderColor:
+                preferences.theme === "dark" ? "rgba(255,255,255,0.08)" : "#e6dcc7",
+            }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            {(isLoading || !isLoaded) && (
+              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-white/70 backdrop-blur-sm">
+                <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-purple-500 border-t-transparent"></div>
+                <p className="text-lg font-semibold text-purple-600">Opening EPUB...</p>
+                <p className="text-sm text-purple-400">
+                  Building stable reading locations and loading chapters.
+                </p>
+              </div>
+            )}
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-black/10 to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-black/10 to-transparent" />
+            <button
+              type="button"
+              onClick={() => void handlePrev()}
+              className="absolute inset-y-0 left-0 z-20 w-1/6 min-w-12"
+              aria-label="Previous page"
+            />
+            <button
+              type="button"
+              onClick={() => void handleNext()}
+              className="absolute inset-y-0 right-0 z-20 w-1/6 min-w-12"
+              aria-label="Next page"
+            />
+            <div className="absolute inset-0 px-6 py-8 sm:px-10 sm:py-10">
+              <div
+                ref={viewerRef}
+                className="h-full w-full overflow-hidden rounded-[1.5rem] bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)]"
+              />
+            </div>
           </div>
         </div>
-      )}
-    </div>
-  );
-});
+
+        <ReadingSettings
+          preferences={preferences}
+          onUpdate={updatePreferences}
+          onReset={resetPreferences}
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+        />
+
+        {!isFullscreen && totalPages > 0 && (
+          <div className="rounded-2xl border-2 border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-indigo-600">
+                Page{" "}
+                <span className="font-semibold text-indigo-900">
+                  {currentPage}
+                </span>{" "}
+                of {totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
+                <p className="text-xs font-semibold text-emerald-700">
+                  EPUB Paginated Mode
+                </p>
+              </div>
+            </div>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-indigo-100">
+              <div
+                className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-300"
+                style={{
+                  width: `${Math.max(0, currentPage / Math.max(totalPages, 1)) * 100}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  },
+);
 
 EpubFlipReader.displayName = "EpubFlipReader";

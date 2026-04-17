@@ -18,7 +18,9 @@ const lastPageReadCache = new Map<string, number>();
 
 export const recordReadingProgress = async (input: {
   bookId: number;
-  currentPage: number;
+  currentPage?: number;
+  epubCfi?: string | null;
+  progressPercent?: number | null;
 }): Promise<{
   success: boolean;
   streakUpdated?: boolean;
@@ -38,17 +40,40 @@ export const recordReadingProgress = async (input: {
     student_id: user.profileId,
     book_id: input.bookId,
     current_page: input.currentPage,
+    epub_cfi: input.epubCfi,
+    progress_percent: input.progressPercent,
   });
 
   try {
+    const resolvedPage =
+      typeof input.currentPage === "number" && input.currentPage > 0
+        ? input.currentPage
+        : 1;
+
     const result = await queryWithContext(
       user.userId,
-      `INSERT INTO student_books (student_id, book_id, current_page)
-       VALUES ($1, $2, $3)
+      `INSERT INTO student_books (
+         student_id,
+         book_id,
+         current_page,
+         epub_cfi,
+         progress_percent
+       )
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (student_id, book_id)
-       DO UPDATE SET current_page = $3, updated_at = NOW()
+       DO UPDATE SET
+         current_page = COALESCE($3, student_books.current_page),
+         epub_cfi = COALESCE($4, student_books.epub_cfi),
+         progress_percent = COALESCE($5, student_books.progress_percent),
+         updated_at = NOW()
        RETURNING *, (xmax = 0) AS is_new`,
-      [user.profileId, input.bookId, input.currentPage],
+      [
+        user.profileId,
+        input.bookId,
+        resolvedPage,
+        input.epubCfi ?? null,
+        input.progressPercent ?? null,
+      ],
     );
 
     const isNew = result.rows[0]?.is_new;
@@ -74,18 +99,18 @@ export const recordReadingProgress = async (input: {
   let streakResult = { currentStreak: 0, isNewStreak: false };
 
   // Award XP for new pages read (avoid duplicates)
-  if (input.currentPage > lastPage) {
-    const newPagesRead = input.currentPage - lastPage;
+  if ((input.currentPage ?? 0) > lastPage) {
+    const newPagesRead = (input.currentPage ?? 0) - lastPage;
 
     // Log reading session periodically (every 5 pages or first page read)
-    if (lastPage === 0 || input.currentPage % 5 === 0) {
+    if (lastPage === 0 || (input.currentPage ?? 0) % 5 === 0) {
       try {
         await createJournalEntry({
           entryType: "reading_session",
           bookId: input.bookId,
           pageRangeStart: lastPage === 0 ? 1 : lastPage,
-          pageRangeEnd: input.currentPage,
-          content: `Read up to page ${input.currentPage} 📖`,
+          pageRangeEnd: input.currentPage ?? 0,
+          content: `Read up to page ${input.currentPage ?? 0} 📖`,
         });
       } catch (err) {
         console.error("Failed to log reading_session:", err);
@@ -107,7 +132,7 @@ export const recordReadingProgress = async (input: {
         user.profileId,
         pageXp,
         "page_read",
-        `${input.bookId}-${input.currentPage}`,
+        `${input.bookId}-${input.currentPage ?? 0}`,
         `Read ${newPagesRead} page(s)`,
       );
       xpAwarded += pageXp;
@@ -138,7 +163,7 @@ export const recordReadingProgress = async (input: {
       console.error("Failed to evaluate badges:", err);
     }
 
-    lastPageReadCache.set(cacheKey, input.currentPage);
+    lastPageReadCache.set(cacheKey, input.currentPage ?? 0);
   }
 
   console.log("✅ Progress saved successfully");
@@ -399,7 +424,7 @@ export const updateBookTotalPages = async (
   // Verify the book exists and check current page count
   const bookResult = await queryWithContext(
     user.userId,
-    `SELECT page_count FROM books WHERE id = $1`,
+    `SELECT page_count, file_format FROM books WHERE id = $1`,
     [bookId],
   );
 
@@ -407,7 +432,22 @@ export const updateBookTotalPages = async (
     throw new Error("Book not found.");
   }
 
-  const currentCount = bookResult.rows[0].page_count;
+  const { page_count: currentCount, file_format: fileFormat } =
+    bookResult.rows[0];
+
+  if (fileFormat === "epub") {
+    if (!currentCount || currentCount <= 1) {
+      console.log(
+        `📚 Saving canonical EPUB page count for book ${bookId}: ${totalPages}`,
+      );
+      await queryWithContext(
+        user.userId,
+        `UPDATE books SET page_count = $1 WHERE id = $2`,
+        [totalPages, bookId],
+      );
+    }
+    return;
+  }
 
   // Only update if the new count is significantly different (e.g., > 10% difference)
   // or if the current count is 1 or null.

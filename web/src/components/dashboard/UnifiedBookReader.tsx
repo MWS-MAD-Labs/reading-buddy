@@ -72,6 +72,7 @@ type UnifiedBookReaderProps = {
   pdfUrl: string;
   epubUrl?: string | null;
   initialPage?: number;
+  initialCfi?: string | null;
   pageImages?: PageImageInfo | null;
   textJsonUrl?: string | null;
   textExtractionStatus?: string | null;
@@ -79,6 +80,7 @@ type UnifiedBookReaderProps = {
   fileFormat?: "pdf" | "epub";
   isPictureBook?: boolean;
   onPageChange?: (pageNumber: number) => void;
+  onTotalPagesChange?: (totalPages: number | null) => void;
   onComplete?: () => void;
   showFinishButton?: boolean;
 };
@@ -91,6 +93,7 @@ export function UnifiedBookReader({
   pdfUrl,
   epubUrl,
   initialPage = 1,
+  initialCfi = null,
   pageImages,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   textJsonUrl,
@@ -102,6 +105,7 @@ export function UnifiedBookReader({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isPictureBook = false,
   onPageChange,
+  onTotalPagesChange,
   onComplete,
   showFinishButton = false,
 }: UnifiedBookReaderProps) {
@@ -187,10 +191,14 @@ export function UnifiedBookReader({
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedPageRef = useRef<number>(initialPage);
 
-  const handlePageChange = useCallback(
-    (page: number) => {
-      setCurrentPage(page);
-      onPageChange?.(page);
+  const scheduleProgressSave = useCallback(
+    (payload: {
+      page: number;
+      epubCfi?: string | null;
+      progressPercent?: number | null;
+    }) => {
+      setCurrentPage(payload.page);
+      onPageChange?.(payload.page);
 
       // Debounce database save
       if (saveTimeoutRef.current) {
@@ -200,34 +208,61 @@ export function UnifiedBookReader({
       saveTimeoutRef.current = setTimeout(
         async () => {
           const isSignificantChange =
-            page > lastSavedPageRef.current ||
-            Math.abs(page - lastSavedPageRef.current) >= 2;
+            payload.page > lastSavedPageRef.current ||
+            Math.abs(payload.page - lastSavedPageRef.current) >= 2;
 
-          if (isSignificantChange || page === initialPage) {
+          if (isSignificantChange || payload.page === initialPage) {
             try {
-              await recordReadingProgress({ bookId, currentPage: page });
-              lastSavedPageRef.current = page;
+              await recordReadingProgress({
+                bookId,
+                currentPage: payload.page,
+                epubCfi: payload.epubCfi,
+                progressPercent: payload.progressPercent,
+              });
+              lastSavedPageRef.current = payload.page;
 
               // Check for required checkpoint quiz
               const checkpoint = await getPendingCheckpointForPage({
                 bookId,
-                currentPage: page,
+                currentPage: payload.page,
               });
 
               if (checkpoint.checkpointRequired && checkpoint.quizId) {
                 router.push(
-                  `/dashboard/student/quiz/${checkpoint.quizId}?bookId=${bookId}&page=${page}`,
+                  `/dashboard/student/quiz/${checkpoint.quizId}?bookId=${bookId}&page=${payload.page}`,
                 );
               }
             } catch (err) {
               console.error("Failed to save reading progress:", err);
             }
           }
-        },
-        process.env.NODE_ENV === "test" ? 500 : 3000,
+      },
+      process.env.NODE_ENV === "test" ? 500 : 3000,
       );
     },
     [bookId, initialPage, onPageChange, router],
+  );
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      scheduleProgressSave({ page });
+    },
+    [scheduleProgressSave],
+  );
+
+  const handleEpubRelocation = useCallback(
+    (payload: {
+      pageNumber: number;
+      cfi: string | null;
+      progressPercent: number | null;
+    }) => {
+      scheduleProgressSave({
+        page: payload.pageNumber,
+        epubCfi: payload.cfi,
+        progressPercent: payload.progressPercent,
+      });
+    },
+    [scheduleProgressSave],
   );
 
   // Cleanup timeout on unmount
@@ -238,6 +273,10 @@ export function UnifiedBookReader({
       }
     };
   }, []);
+
+  useEffect(() => {
+    onTotalPagesChange?.(totalPageCount);
+  }, [onTotalPagesChange, totalPageCount]);
 
   // Error state
   if (readerMode === "error") {
@@ -281,10 +320,12 @@ export function UnifiedBookReader({
     return (
       <div className="space-y-4">
         <EpubFlipReader
+          bookId={bookId}
           epubUrl={epubUrl}
           bookTitle={bookTitle}
           initialPage={initialPage}
-          onPageChange={handlePageChange}
+          initialCfi={initialCfi}
+          onRelocation={handleEpubRelocation}
           onTotalPages={(count) => {
             setTotalPageCount(count);
             updateBookTotalPages(bookId, count).catch(console.error);
