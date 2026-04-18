@@ -27,6 +27,7 @@ vi.mock("epubjs", () => {
       locations: {
         generate: mockGenerate,
         load: mockLoad,
+        save: vi.fn(() => '["cfi-0","cfi-1","cfi-2"]'),
         locationFromCfi: vi.fn((cfi: string) => (cfi === "saved-cfi" ? 5 : 0)),
         cfiFromLocation: vi.fn((location: number) => `page-cfi-${location}`),
         percentageFromCfi: vi.fn(() => 0.5),
@@ -135,6 +136,25 @@ describe("EpubFlipReader resume behavior", () => {
 
     await waitFor(() => {
       expect(mockDisplay).toHaveBeenCalledWith("page-cfi-1");
+    });
+  });
+
+  it("renders immediately from saved cfi even when location generation is still pending", async () => {
+    const { EpubFlipReader } = await import("@/components/dashboard/EpubFlipReader");
+
+    mockGenerate.mockReturnValue(new Promise<string[]>(() => {}));
+
+    render(
+      <EpubFlipReader
+        bookId={1}
+        epubUrl="/api/epub/1/file"
+        initialPage={2}
+        initialCfi="saved-cfi"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mockDisplay).toHaveBeenCalledWith("saved-cfi");
     });
   });
 });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getMinioPublicConfig } from "@/lib/minio";
 
 /**
  * Proxy API for PDF files.
@@ -14,11 +15,11 @@ export async function GET(
   console.log(`[PDF Proxy] Requested path: ${path}`);
 
   // Get MinIO configuration
-  const minioEndpoint =
-    process.env.MINIO_ENDPOINT?.replace(/^https?:\/\//, "") || "localhost:9000";
-  const minioPort = process.env.MINIO_PORT || "9000";
-  const minioUseSsl = process.env.MINIO_USE_SSL === "true";
-  const bucketName = process.env.MINIO_BUCKET_NAME || "reading-buddy";
+  const publicConfig = getMinioPublicConfig();
+  const minioEndpoint = publicConfig.endPoint.replace(/^https?:\/\//, "");
+  const minioPort = String(publicConfig.port);
+  const minioUseSsl = publicConfig.useSSL;
+  const bucketName = publicConfig.bucketName;
 
   // Construct the MinIO URL
   const protocol = minioUseSsl ? "https" : "http";

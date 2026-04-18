@@ -30,7 +30,7 @@ const book = {
 
 describe("parseStoredLocations", () => {
   it("parses serialized location arrays", () => {
-    expect(parseStoredLocations('["a","b"]')).toEqual(["a", "b"]);
+    expect(parseStoredLocations('["a","b"]')).toBe('["a","b"]');
   });
 
   it("returns null for invalid payloads", () => {

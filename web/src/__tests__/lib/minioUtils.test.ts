@@ -74,6 +74,26 @@ describe("getObjectKeyFromPublicUrl", () => {
     const key = getObjectKeyFromPublicUrl("");
     expect(key).toBeNull();
   });
+
+  it("should extract object key from internal URLs when public and internal endpoints differ", () => {
+    const previousInternalEndpoint = process.env.MINIO_INTERNAL_ENDPOINT;
+    const previousInternalPort = process.env.MINIO_INTERNAL_PORT;
+    const previousInternalSsl = process.env.MINIO_INTERNAL_USE_SSL;
+
+    process.env.MINIO_INTERNAL_ENDPOINT = "172.16.1.194";
+    process.env.MINIO_INTERNAL_PORT = "9000";
+    process.env.MINIO_INTERNAL_USE_SSL = "false";
+
+    const key = getObjectKeyFromPublicUrl(
+      "http://172.16.1.194:9000/test-bucket/books/internal.epub",
+    );
+
+    process.env.MINIO_INTERNAL_ENDPOINT = previousInternalEndpoint;
+    process.env.MINIO_INTERNAL_PORT = previousInternalPort;
+    process.env.MINIO_INTERNAL_USE_SSL = previousInternalSsl;
+
+    expect(key).toBe("books/internal.epub");
+  });
 });
 
 describe("buildBookAssetsPrefix", () => {

@@ -31,7 +31,7 @@ export function getEpubLocationsCacheKey(bookId: number | string) {
 
 export function parseStoredLocations(
   value: string | null | undefined,
-): string[] | null {
+): string | null {
   if (!value) {
     return null;
   }
@@ -42,7 +42,7 @@ export function parseStoredLocations(
       return null;
     }
 
-    return parsed;
+    return value;
   } catch {
     return null;
   }

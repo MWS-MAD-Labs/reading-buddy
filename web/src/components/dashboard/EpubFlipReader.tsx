@@ -86,6 +86,8 @@ export const EpubFlipReader = forwardRef<
     const bookRef = useRef<Book | null>(null);
     const renditionRef = useRef<RenditionLike | null>(null);
     const currentCfiRef = useRef<string | null>(null);
+    const currentPageRef = useRef(typeof initialPage === "number" ? initialPage : 1);
+    const locationsReadyRef = useRef(false);
     const totalPagesRef = useRef(0);
     const touchStartRef = useRef<TouchPoint | null>(null);
     const readerLifecycleRef = useRef<{
@@ -163,22 +165,22 @@ export const EpubFlipReader = forwardRef<
       goToPage,
     }));
 
-    const handleRelocated = useCallback(
-      (location: {
-        start?: { cfi?: string };
-      }) => {
+    const syncRelocationState = useCallback(
+      (cfi: string) => {
         const book = bookRef.current;
-        const cfi = location?.start?.cfi ?? null;
-
-        if (!book || !cfi) {
-          return;
-        }
+        let canonicalPage = currentPageRef.current;
+        let progressPercent: number | null = null;
 
         currentCfiRef.current = cfi;
 
-        const canonicalPage = getCanonicalPageFromCfi(book, cfi) ?? 1;
-        const progressPercent = getProgressPercentFromCfi(book, cfi);
+        if (book && locationsReadyRef.current) {
+          canonicalPage = getCanonicalPageFromCfi(book, cfi) ?? canonicalPage;
+          progressPercent = getProgressPercentFromCfi(book, cfi);
+        } else if (initialTargetRef.current.cfi === cfi && initialTargetRef.current.page) {
+          canonicalPage = initialTargetRef.current.page;
+        }
 
+        currentPageRef.current = canonicalPage;
         setCurrentPage(canonicalPage);
         onPageChange?.(canonicalPage);
         onRelocation?.({
@@ -189,6 +191,21 @@ export const EpubFlipReader = forwardRef<
         });
       },
       [onPageChange, onRelocation],
+    );
+
+    const handleRelocated = useCallback(
+      (location: {
+        start?: { cfi?: string };
+      }) => {
+        const cfi = location?.start?.cfi ?? null;
+
+        if (!cfi) {
+          return;
+        }
+
+        syncRelocationState(cfi);
+      },
+      [syncRelocationState],
     );
 
     const handlePrev = useCallback(async () => {
@@ -259,6 +276,15 @@ export const EpubFlipReader = forwardRef<
       const loadBook = async () => {
         setIsLoading(true);
         setError(null);
+        setTotalPages(0);
+        locationsReadyRef.current = false;
+        totalPagesRef.current = 0;
+        currentCfiRef.current = initialTargetRef.current.cfi;
+        currentPageRef.current =
+          typeof initialTargetRef.current.page === "number"
+            ? initialTargetRef.current.page
+            : 1;
+        setCurrentPage(currentPageRef.current);
 
         const response = await fetch(epubUrl, {
           credentials: "same-origin",
@@ -335,30 +361,26 @@ export const EpubFlipReader = forwardRef<
             }
           }
 
+          const applyResolvedLocations = (resolvedLocations: string[]) => {
+            if (!Array.isArray(resolvedLocations) || resolvedLocations.length === 0) {
+              return false;
+            }
+
+            locationsReadyRef.current = true;
+            totalPagesRef.current = resolvedLocations.length;
+            setTotalPages(resolvedLocations.length);
+            onTotalPages?.(resolvedLocations.length);
+            return true;
+          };
+
           const cachedLocations =
             typeof window === "undefined"
               ? null
               : parseStoredLocations(localStorage.getItem(locationsCacheKey));
 
-          const resolvedLocations =
-            cachedLocations && cachedLocations.length > 0
-              ? book.locations.load(cachedLocations as unknown as string)
-              : await book.locations.generate(EPUB_LOCATION_BREAK_CHARS);
-
-          if (!cachedLocations && typeof window !== "undefined") {
-            localStorage.setItem(
-              locationsCacheKey,
-              JSON.stringify(resolvedLocations),
-            );
+          if (cachedLocations) {
+            applyResolvedLocations(book.locations.load(cachedLocations));
           }
-
-          if (cancelled) {
-            return;
-          }
-
-          totalPagesRef.current = resolvedLocations.length;
-          setTotalPages(resolvedLocations.length);
-          onTotalPages?.(resolvedLocations.length);
 
           const rendition = book.renderTo(viewer, {
             width: "100%",
@@ -378,16 +400,64 @@ export const EpubFlipReader = forwardRef<
 
           await rendition.started;
 
-          const initialTarget = resolveInitialEpubTarget({
-            initialCfi: initialTargetRef.current.cfi,
-            initialPage: initialTargetRef.current.page,
-            book,
-          });
+          const initialTarget = locationsReadyRef.current
+            ? resolveInitialEpubTarget({
+                initialCfi: initialTargetRef.current.cfi,
+                initialPage: initialTargetRef.current.page,
+                book,
+              })
+            : initialTargetRef.current.cfi;
 
           await rendition.display(initialTarget || undefined);
 
           if (!cancelled) {
             setIsLoading(false);
+          }
+
+          if (!locationsReadyRef.current) {
+            const pendingCanonicalPage =
+              !initialTargetRef.current.cfi &&
+              typeof initialTargetRef.current.page === "number" &&
+              initialTargetRef.current.page > 1
+                ? initialTargetRef.current.page
+                : null;
+
+            void (async () => {
+              try {
+                const resolvedLocations = await book.locations.generate(
+                  EPUB_LOCATION_BREAK_CHARS,
+                );
+
+                if (cancelled) {
+                  return;
+                }
+
+                if (!applyResolvedLocations(resolvedLocations)) {
+                  return;
+                }
+
+                if (typeof window !== "undefined") {
+                  localStorage.setItem(locationsCacheKey, book.locations.save());
+                }
+
+                if (pendingCanonicalPage) {
+                  const targetCfi = getCfiFromCanonicalPage(book, pendingCanonicalPage);
+                  if (targetCfi) {
+                    await rendition.display(targetCfi);
+                    return;
+                  }
+                }
+
+                if (currentCfiRef.current) {
+                  syncRelocationState(currentCfiRef.current);
+                }
+              } catch (locationError) {
+                console.warn("Failed to prepare EPUB locations", locationError);
+                if (typeof window !== "undefined") {
+                  localStorage.removeItem(locationsCacheKey);
+                }
+              }
+            })();
           }
         } catch (loadError) {
           console.error("Failed to load EPUB", loadError);
@@ -448,6 +518,7 @@ export const EpubFlipReader = forwardRef<
       handleRelocated,
       locationsCacheKey,
       onTotalPages,
+      syncRelocationState,
     ]);
 
     useEffect(() => {
