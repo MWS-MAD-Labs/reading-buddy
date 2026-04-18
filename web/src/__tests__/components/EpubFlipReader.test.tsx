@@ -13,6 +13,7 @@ vi.mock("epubjs", () => {
     __esModule: true,
     default: vi.fn(() => ({
       ready: Promise.resolve(),
+      opened: Promise.resolve(),
       loaded: {
         metadata: Promise.resolve({
           title: "Mock Book",
@@ -29,6 +30,13 @@ vi.mock("epubjs", () => {
         locationFromCfi: vi.fn((cfi: string) => (cfi === "saved-cfi" ? 5 : 0)),
         cfiFromLocation: vi.fn((location: number) => `page-cfi-${location}`),
         percentageFromCfi: vi.fn(() => 0.5),
+      },
+      spine: {
+        hooks: {
+          content: {
+            register: vi.fn(),
+          },
+        },
       },
       renderTo: mockRenderTo,
       destroy: vi.fn(),
@@ -57,6 +65,17 @@ beforeAll(() => {
       storage.clear();
     },
   });
+
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      }),
+    ),
+  );
 });
 
 describe("EpubFlipReader resume behavior", () => {
