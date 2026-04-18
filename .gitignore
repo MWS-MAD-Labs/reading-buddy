@@ -21,7 +21,6 @@ docker-compose.override.yml
 *.sql.bak
 backup_*.sql
 staging_dump.sql
-database-setup.sql
 
 # Build artifacts
 build.log
