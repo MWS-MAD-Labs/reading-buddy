@@ -163,6 +163,8 @@ CREATE TABLE IF NOT EXISTS books (
   text_extraction_error TEXT,
   text_extraction_attempts INTEGER DEFAULT 0,
   last_extraction_attempt_at TIMESTAMPTZ,
+  text_json_url TEXT,
+  text_extraction_status VARCHAR(50),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
