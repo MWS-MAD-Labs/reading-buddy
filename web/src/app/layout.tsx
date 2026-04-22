@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Reading Buddy",
   description:
-    "Hybrid Supabase + MinIO e-library for K-12 schools with AI quiz generation.",
+    "A friendly, self-hosted e-library for K-12 schools with AI quiz generation.",
 };
 
 // Force dynamic rendering for all pages (no static generation at build time)

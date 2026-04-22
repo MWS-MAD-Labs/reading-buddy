@@ -18,6 +18,7 @@ type ReaderWithRatingPromptProps = {
   pdfUrl: string;
   epubUrl?: string | null;
   initialPage?: number;
+  initialCfi?: string | null;
   pageImages?: PageImageInfo | null;
   textJsonUrl?: string | null;
   textExtractionStatus?: string | null;
@@ -41,6 +42,7 @@ export function ReaderWithRatingPrompt({
   pdfUrl,
   epubUrl,
   initialPage = 1,
+  initialCfi,
   pageImages,
   textJsonUrl,
   textExtractionStatus,
@@ -55,6 +57,9 @@ export function ReaderWithRatingPrompt({
   const [hasShownPrompt, setHasShownPrompt] = useState(false);
   const [showFinishButton, setShowFinishButton] = useState(false);
   const [currentPage, setCurrentPage] = useState(initialPage);
+  const [effectiveTotalPages, setEffectiveTotalPages] = useState(
+    totalPages ?? null,
+  );
 
   const finishButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -100,7 +105,9 @@ export function ReaderWithRatingPrompt({
         finishButtonTimeoutRef.current = null;
       }
 
-      const progressPercent = totalPages ? (page / totalPages) * 100 : 0;
+      const progressPercent = effectiveTotalPages
+        ? (page / effectiveTotalPages) * 100
+        : 0;
       const hasReachedThreshold =
         progressPercent >= COMPLETION_THRESHOLD_PERCENT;
 
@@ -112,7 +119,7 @@ export function ReaderWithRatingPrompt({
         setShowFinishButton(false);
       }
     },
-    [totalPages],
+    [effectiveTotalPages],
   );
 
   return (
@@ -123,6 +130,7 @@ export function ReaderWithRatingPrompt({
         pdfUrl={pdfUrl}
         epubUrl={epubUrl}
         initialPage={initialPage}
+        initialCfi={initialCfi}
         pageImages={pageImages}
         textJsonUrl={textJsonUrl}
         textExtractionStatus={textExtractionStatus}
@@ -130,6 +138,7 @@ export function ReaderWithRatingPrompt({
         fileFormat={fileFormat}
         isPictureBook={isPictureBook}
         onPageChange={handlePageChange}
+        onTotalPagesChange={setEffectiveTotalPages}
         onComplete={handleFinishClick}
         showFinishButton={showFinishButton}
       />

@@ -402,7 +402,7 @@ export const TextFlipReader = forwardRef<
           }
         >
           <HTMLFlipBook
-            key={`textflip-${isFullscreen ? "fs" : "normal"}-${isMobile && isPortrait ? "portrait" : "landscape"}`}
+            key={`textflip-${isFullscreen ? "fs" : "normal"}-${isMobile && isPortrait ? "p" : "l"}`}
             ref={bookRef}
             width={width}
             height={height}
@@ -414,7 +414,7 @@ export const TextFlipReader = forwardRef<
             minHeight={Math.round(baseHeight * 0.6)}
             maxHeight={Math.round(baseHeight * 2)}
             drawShadow={true}
-            flippingTime={1000}
+            flippingTime={400}
             usePortrait={
               isFullscreen
                 ? typeof window !== "undefined"

@@ -16,6 +16,24 @@ docker-compose.override.yml
 # IDE
 .vscode/
 .idea/
+
+# Database dumps & backups
+*.sql.bak
+backup_*.sql
+staging_dump.sql
+
+# Build artifacts
+build.log
+build-local.log
+
+# Environment files
+.env.backup
+.env.test
+.env.docker
+
+# Empty/temp directories
+tmp/
+supabase/.temp/
 *.swp
 *.swo
 .claude/

@@ -52,13 +52,12 @@ export const RoleChecker = () => {
 
   return (
     <div
-      className={`rounded-lg border p-4 ${
-        isAuthorized
-          ? "border-green-700 bg-green-900/20"
-          : noProfile
-            ? "border-red-700 bg-red-900/20"
-            : "border-yellow-700 bg-yellow-900/20"
-      }`}
+      className={`rounded-lg border p-4 ${isAuthorized
+        ? "border-green-700 bg-green-900/20"
+        : noProfile
+          ? "border-red-700 bg-red-900/20"
+          : "border-yellow-700 bg-yellow-900/20"
+        }`}
     >
       <h3 className="mb-2 text-sm font-semibold text-white">
         Your Account Status
@@ -81,9 +80,8 @@ export const RoleChecker = () => {
             <p className="text-slate-300">
               <span className="font-medium">Current Role:</span>{" "}
               <span
-                className={`font-bold ${
-                  isAuthorized ? "text-green-400" : "text-yellow-400"
-                }`}
+                className={`font-bold ${isAuthorized ? "text-green-400" : "text-yellow-400"
+                  }`}
               >
                 {roleInfo?.profile?.role || "UNKNOWN"}
               </span>
@@ -119,7 +117,7 @@ export const RoleChecker = () => {
             for the app to work.
           </p>
           <p className="mt-2 text-xs text-red-200">
-            Run this SQL in your Supabase SQL Editor to create your profile:
+            Run this SQL in your database to create your profile:
           </p>
           <pre className="mt-2 overflow-x-auto rounded bg-slate-950 p-2 text-xs text-green-400">
             {`-- Create your profile with ADMIN role
@@ -144,7 +142,7 @@ SET role = 'ADMIN';`}
             must be fixed first!
           </p>
           <p className="mt-2 text-xs text-red-200">
-            Run this SQL in your Supabase SQL Editor to clean up duplicates:
+            Run this SQL in your database to clean up duplicates:
           </p>
           <pre className="mt-2 overflow-x-auto rounded bg-slate-950 p-2 text-xs text-green-400">
             {`-- Step 1: Delete duplicate profiles (keep the first one)
@@ -175,7 +173,7 @@ WHERE id = '${roleInfo?.userId}';`}
             LIBRARIAN or ADMIN users can upload books.
           </p>
           <p className="mt-2 text-xs text-yellow-200">
-            To fix this, run this SQL in your Supabase SQL Editor:
+            To fix this, run this SQL in your database:
           </p>
           <pre className="mt-2 overflow-x-auto rounded bg-slate-950 p-2 text-xs text-green-400">
             {`UPDATE profiles

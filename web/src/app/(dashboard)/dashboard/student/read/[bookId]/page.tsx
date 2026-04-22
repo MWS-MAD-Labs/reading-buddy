@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { queryWithContext } from "@/lib/db";
 import { ReaderWithRatingPrompt } from "@/components/dashboard/ReaderWithRatingPrompt";
-import { buildPublicPrefixUrl, normalizeMinioUrl } from "@/lib/minioUtils";
+import { buildPublicPrefixUrl } from "@/lib/minioUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -57,13 +57,13 @@ export default async function StudentReadPage({
   // Normalize the URL to use current MinIO endpoint configuration
   const epubUrl =
     book.file_format === "epub" && book.original_file_url
-      ? normalizeMinioUrl(book.original_file_url)
+      ? `/api/epub/${book.id}/file`
       : null;
 
   // Get student's reading progress
   const progressResult = await queryWithContext(
     user.userId,
-    `SELECT current_page FROM student_books
+    `SELECT current_page, epub_cfi FROM student_books
      WHERE student_id = $1 AND book_id = $2`,
     [user.profileId, bookId],
   );
@@ -75,6 +75,7 @@ export default async function StudentReadPage({
     : undefined;
 
   const initialPage = requestedPage ?? progress?.current_page ?? 1;
+  const initialCfi = requestedPage ? null : (progress?.epub_cfi ?? null);
 
   return (
     <div className="space-y-3">
@@ -93,6 +94,7 @@ export default async function StudentReadPage({
         pdfUrl={book.pdf_url}
         epubUrl={epubUrl}
         initialPage={initialPage}
+        initialCfi={initialCfi}
         pageImages={pageImages}
         textJsonUrl={book.text_json_url}
         textExtractionStatus={book.text_extraction_status}

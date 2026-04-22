@@ -214,6 +214,8 @@ CREATE TABLE student_books (
   student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   book_id INT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
   current_page INT NOT NULL DEFAULT 1,
+  epub_cfi TEXT,
+  progress_percent NUMERIC(5,2),
   completed BOOLEAN NOT NULL DEFAULT FALSE,
   started_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ,

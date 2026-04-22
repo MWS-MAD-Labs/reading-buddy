@@ -1,16 +1,31 @@
-import { getMinioBucketName } from '@/lib/minio';
+import { getMinioBucketName, getMinioPublicConfig } from '@/lib/minio';
+
+const buildBaseUrl = (endpoint: string, useSSL: boolean, port: number) => {
+  const protocol = useSSL ? 'https' : 'http';
+  const defaultPort = useSSL ? 443 : 80;
+  const portSegment = port !== defaultPort ? `:${port}` : '';
+  return `${protocol}://${endpoint}${portSegment}`;
+};
 
 const resolvePublicEndpoint = () => {
-  const endpoint = process.env.MINIO_ENDPOINT;
+  const config = getMinioPublicConfig();
+  return buildBaseUrl(config.endPoint, config.useSSL, config.port);
+};
+
+const resolveInternalEndpoint = () => {
+  const endpoint =
+    process.env.MINIO_INTERNAL_ENDPOINT || process.env.MINIO_ENDPOINT;
   if (!endpoint) {
-    throw new Error('MINIO_ENDPOINT is not configured.');
+    return null;
   }
-  const useSSL = process.env.MINIO_USE_SSL !== 'false';
-  const port = process.env.MINIO_PORT;
-  const protocol = useSSL ? 'https' : 'http';
-  const defaultPort = useSSL ? '443' : '80';
-  const portSegment = port && port !== defaultPort ? `:${port}` : '';
-  return `${protocol}://${endpoint}${portSegment}`;
+
+  const useSSL =
+    (process.env.MINIO_INTERNAL_USE_SSL ?? process.env.MINIO_USE_SSL) !== 'false';
+  const port = Number(
+    process.env.MINIO_INTERNAL_PORT ?? process.env.MINIO_PORT ?? (useSSL ? 443 : 80),
+  );
+
+  return buildBaseUrl(endpoint, useSSL, port);
 };
 
 export const getPublicBaseUrl = () => resolvePublicEndpoint();
@@ -37,15 +52,23 @@ export const getObjectKeyFromPublicUrl = (publicUrl: string | null | undefined) 
     return null;
   }
   const bucketName = getMinioBucketName();
-  const baseUrl = getPublicBaseUrl();
   const trimmed = publicUrl.trim();
   if (!trimmed) {
     return null;
   }
-  const prefix = `${baseUrl.replace(/\/$/, '')}/${bucketName}/`;
-  if (trimmed.startsWith(prefix)) {
-    return trimmed.slice(prefix.length);
+
+  const candidateBaseUrls = [getPublicBaseUrl(), resolveInternalEndpoint()].filter(
+    (value, index, all): value is string =>
+      Boolean(value) && all.indexOf(value) === index,
+  );
+
+  for (const baseUrl of candidateBaseUrls) {
+    const prefix = `${baseUrl.replace(/\/$/, '')}/${bucketName}/`;
+    if (trimmed.startsWith(prefix)) {
+      return trimmed.slice(prefix.length);
+    }
   }
+
   try {
     const parsed = new URL(trimmed);
     const pathParts = parsed.pathname

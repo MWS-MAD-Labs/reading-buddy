@@ -148,11 +148,14 @@ export interface StudentBook {
   book_id: number;
   class_id: number | null;
   current_page: number;
+  epub_cfi?: string | null;
+  progress_percent?: number | null;
   total_pages: number | null;
   status: "not_started" | "in_progress" | "completed";
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface StudentBookWithDetails extends StudentBook {

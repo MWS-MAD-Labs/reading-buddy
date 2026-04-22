@@ -2,7 +2,7 @@ services:
   reading-buddy:
     build:
       # Build directly from GitHub repository - always pulls latest code from main branch
-      # context: https://github.com/faisalnh/reading-companion.git#main
+      # Example remote build context: https://github.com/MWS-MAD-Labs/reading-buddy.git#main
       # To build from local files instead, comment the line above and uncomment below:
       context: .
       dockerfile: Dockerfile
