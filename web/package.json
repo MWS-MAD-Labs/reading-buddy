@@ -23,6 +23,7 @@
     "lhci": "lhci autorun",
     "prepare": "husky",
     "render:book-images": "tsx scripts/render-book-images.ts",
+    "check:reader-mode": "tsx scripts/check-reader-mode.ts",
     "extract:book-text": "tsx scripts/extract-book-text.ts",
     "list-books": "tsx scripts/list-books.ts",
     "check:extracted-text": "tsx scripts/check-extracted-text.ts",
