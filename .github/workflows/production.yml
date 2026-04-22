@@ -164,6 +164,51 @@ jobs:
             MINIO_PORT=443
             MINIO_USE_SSL=true
 
+      - name: Apply Production DB Migrations
+        if: success() && vars.AUTO_DB_MIGRATE_PRODUCTION == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.PRODUCTION_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.PRODUCTION_DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
+          DB_CONTAINER: reading-buddy-postgres-prod
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+
+          eval "$(ssh-agent -s)"
+          trap 'ssh-agent -k' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' | ssh-add -
+
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+          REMOTE_DIR="/tmp/reading-buddy-migrations-${GITHUB_RUN_ID}"
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "rm -rf \"$REMOTE_DIR\" && mkdir -p \"$REMOTE_DIR/migrations\""
+
+          scp scripts/apply_sql_migrations_via_docker.sh \
+            "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DIR/"
+
+          while IFS= read -r file; do
+            scp "$file" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DIR/migrations/"
+          done < <(find sql/migrations -maxdepth 1 -type f -name '20*.sql' | sort)
+
+          scp sql/deploy-migrations.txt \
+            "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DIR/"
+
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "
+            chmod +x \"$REMOTE_DIR/apply_sql_migrations_via_docker.sh\" &&
+            \"$REMOTE_DIR/apply_sql_migrations_via_docker.sh\" \
+              --db-container \"$DB_CONTAINER\" \
+              --db-user reading_buddy \
+              --db-name reading_buddy \
+              --migrations-dir \"$REMOTE_DIR/migrations\" \
+              --migration-manifest \"$REMOTE_DIR/deploy-migrations.txt\" &&
+            rm -rf \"$REMOTE_DIR\"
+          "
+
       - name: Trigger Komodo Procedure Deployment
         if: success()
         run: |

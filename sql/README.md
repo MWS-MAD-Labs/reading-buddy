@@ -24,6 +24,7 @@ This file includes:
 ```
 sql/
 ├── migrations/
+│   ├── 20*.sql              # Deploy-safe migrations applied in CI/CD order
 │   └── 2024-12-14/          # Historical migrations (already in main setup)
 │       ├── add-file-format-support.sql
 │       ├── add-book-specific-badges.sql
@@ -38,6 +39,53 @@ sql/
 ```
 
 ## Migrations (Historical)
+
+### Deploy-safe migrations
+
+Top-level files in `sql/migrations/` with names matching `20*.sql` are treated as
+the deploy migration stream for existing environments.
+
+These are the files the automation runner applies:
+
+- from `sql/deploy-migrations.txt` when that manifest is present
+- in lexicographic order
+- once per environment
+- with checksum tracking in `public.schema_migrations`
+
+Guidelines for future schema changes:
+
+1. Put new production/staging schema changes at the top level of `sql/migrations/`
+2. Use a sortable filename such as `20260422_add_example_column.sql`
+3. Add the filename to `sql/deploy-migrations.txt`
+4. Make migrations idempotent with `IF NOT EXISTS` / `IF EXISTS` where possible
+5. Do not put new deploy migrations into historical subdirectories
+
+The host-side runner is:
+
+```bash
+bash scripts/apply_sql_migrations_via_docker.sh \
+  --db-container reading-buddy-postgres-staging \
+  --db-user reading_buddy \
+  --db-name reading_buddy \
+  --migrations-dir sql/migrations
+```
+
+### CI/CD preparation
+
+Staging and production workflows now include guarded migration steps.
+They only run when the matching repository variable is enabled:
+
+- `AUTO_DB_MIGRATE_STAGING=true`
+- `AUTO_DB_MIGRATE_PRODUCTION=true`
+
+And the matching SSH secrets are configured:
+
+- `STAGING_DEPLOY_HOST`
+- `STAGING_DEPLOY_USER`
+- `STAGING_DEPLOY_SSH_KEY`
+- `PRODUCTION_DEPLOY_HOST`
+- `PRODUCTION_DEPLOY_USER`
+- `PRODUCTION_DEPLOY_SSH_KEY`
 
 ### 2024-12-14 Migrations
 

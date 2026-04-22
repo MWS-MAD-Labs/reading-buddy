@@ -1,0 +1,4 @@
+# Deploy-safe migrations for staging/production environments.
+# Add new top-level sql/migrations/*.sql files here in execution order.
+
+20260417_add_epub_progress_fields.sql

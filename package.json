@@ -7,6 +7,7 @@
     "build": "cd web && npm run build",
     "start": "cd web && npm run start",
     "lint": "cd web && npm run lint",
+    "db:migrate:docker": "bash scripts/apply_sql_migrations_via_docker.sh",
     "docker:up": "docker-compose up --build -d",
     "docker:up:github": "docker-compose -f docker-compose.github.yml up --build -d",
     "docker:deploy": "bash docker-deploy.sh",
