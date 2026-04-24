@@ -15,6 +15,8 @@ import {
   renderBookImages,
   checkRenderStatus,
   generateBookDescription,
+  extractBookText,
+  convertMobiToImages,
 } from "@/app/(dashboard)/dashboard/librarian/actions";
 import {
   ACCESS_LEVEL_OPTIONS,
@@ -22,6 +24,13 @@ import {
   normalizeAccessLevels,
 } from "@/constants/accessLevels";
 import type { ManagedBookRecord } from "@/components/dashboard/BookManager";
+import {
+  validateEbookFile,
+  getAcceptedMimeTypes,
+  getFormatName,
+  getFormatColor,
+  type SupportedEbookFormat,
+} from "@/lib/file-type-detector";
 
 type BookEditFormProps = {
   book: ManagedBookRecord;
@@ -37,6 +46,7 @@ type UploadState =
   | "uploading_pdf"
   | "uploading_cover"
   | "rendering"
+  | "extracting_text"
   | "save";
 type PdfDetectionState = "idle" | "working" | "error";
 
@@ -61,6 +71,10 @@ export const BookEditForm = ({
     Set<AccessLevelValue>
   >(new Set(normalizeAccessLevels(book.accessLevels)));
   const [pageCount, setPageCount] = useState<number | null>(book.pageCount);
+  const [detectedFormat, setDetectedFormat] =
+    useState<SupportedEbookFormat | null>(
+      (book.fileFormat as SupportedEbookFormat | undefined) ?? null,
+    );
   const [pdfDetectionState, setPdfDetectionState] =
     useState<PdfDetectionState>("idle");
   const [pdfDetectionMessage, setPdfDetectionMessage] = useState<string | null>(
@@ -134,6 +148,8 @@ export const BookEditForm = ({
     const file = event.target.files?.[0] ?? null;
     setPageCount(null);
     setPdfDetectionMessage(null);
+    setDetectedFormat(null);
+    setError(null);
 
     if (!file) {
       setPdfDetectionState("idle");
@@ -142,13 +158,34 @@ export const BookEditForm = ({
 
     setPdfDetectionState("working");
     try {
-      const detectedPages = await extractPageCount(file);
-      setPageCount(detectedPages);
+      const validation = await validateEbookFile(file);
+
+      if (!validation.valid) {
+        setPdfDetectionState("error");
+        setPdfDetectionMessage(validation.error || "Invalid file");
+        setError(validation.error || "Invalid file");
+        return;
+      }
+
+      setDetectedFormat(validation.format ?? null);
+
+      if (validation.format === "pdf") {
+        const detectedPages = await extractPageCount(file);
+        setPageCount(detectedPages);
+        setPdfDetectionMessage(null);
+      } else if (validation.format) {
+        const formatName = validation.format.toUpperCase();
+        setPdfDetectionMessage(
+          `${formatName} file detected. The replacement file will be processed automatically after upload.`,
+        );
+      }
+
       setPdfDetectionState("idle");
     } catch (err) {
-      console.error("Failed to detect page count:", err);
+      console.error("Failed to validate/detect file:", err);
       setPdfDetectionState("error");
-      setPdfDetectionMessage("Unable to detect page count from this PDF.");
+      setPdfDetectionMessage("Unable to process this file.");
+      setError("Unable to process this file.");
     }
   };
 
@@ -296,20 +333,24 @@ export const BookEditForm = ({
 
     // Access levels are optional - books with no levels are "draft" books
 
-    const hasNewPdf = pdfFile && pdfFile.size > 0;
-    const hasNewCover = coverFile && coverFile.size > 0;
+    const hasNewPdf = Boolean(pdfFile && pdfFile.size > 0);
+    const hasNewCover = Boolean(coverFile && coverFile.size > 0);
+    const replacementFormat = hasNewPdf
+      ? detectedFormat || "pdf"
+      : ((book.fileFormat as SupportedEbookFormat | undefined) ?? "pdf");
 
     try {
       let pdfUrl = book.pdfUrl;
       let coverUrl = book.coverUrl;
       let resolvedPageCount = pageCount || book.pageCount;
 
-      // If new files are uploaded, handle upload
       if (hasNewPdf || hasNewCover) {
-        if (hasNewPdf && !resolvedPageCount) {
+        const replacementPdfFile = hasNewPdf ? pdfFile : null;
+        const replacementCoverFile = hasNewCover ? coverFile : null;
+        if (hasNewPdf && replacementFormat === "pdf" && !resolvedPageCount) {
           setPdfDetectionState("working");
           try {
-            resolvedPageCount = await extractPageCount(pdfFile);
+            resolvedPageCount = await extractPageCount(replacementPdfFile!);
             setPageCount(resolvedPageCount);
             setPdfDetectionState("idle");
             setPdfDetectionMessage(null);
@@ -322,40 +363,54 @@ export const BookEditForm = ({
           }
         }
 
+        if (
+          hasNewPdf &&
+          ["epub", "mobi", "azw", "azw3"].includes(replacementFormat) &&
+          !resolvedPageCount
+        ) {
+          resolvedPageCount = 1;
+        }
+
         setStatus("request");
         const uploadInfo = await generatePresignedUploadUrls({
           pdfFilename: hasNewPdf
-            ? pdfFile.name
-            : getFilenameFromUrl(book.pdfUrl, "book.pdf"),
+            ? replacementPdfFile!.name
+            : getFilenameFromUrl(
+                book.pdfUrl,
+                `book.${book.fileFormat || "pdf"}`,
+              ),
           coverFilename: hasNewCover
-            ? coverFile.name
+            ? replacementCoverFile!.name
             : getFilenameFromUrl(book.coverUrl, "cover.jpg"),
         });
 
-        // Upload PDF if new one provided
         if (hasNewPdf) {
           setStatus("uploading_pdf");
           setUploadProgress({ pdf: 0, cover: 0 });
           const pdfResponse = await fetch(uploadInfo.pdfUploadUrl, {
             method: "PUT",
-            headers: { "Content-Type": pdfFile.type || "application/pdf" },
-            body: pdfFile,
+            headers: {
+              "Content-Type":
+                replacementPdfFile!.type || "application/octet-stream",
+            },
+            body: replacementPdfFile!,
           });
 
           if (!pdfResponse.ok) {
-            throw new Error("PDF upload to MinIO failed.");
+            throw new Error("Book file upload to MinIO failed.");
           }
           setUploadProgress((prev) => ({ ...prev, pdf: 100 }));
           pdfUrl = uploadInfo.pdfPublicUrl;
         }
 
-        // Upload Cover if new one provided
         if (hasNewCover) {
           setStatus("uploading_cover");
           const coverResponse = await fetch(uploadInfo.coverUploadUrl, {
             method: "PUT",
-            headers: { "Content-Type": coverFile.type || "image/png" },
-            body: coverFile,
+            headers: {
+              "Content-Type": replacementCoverFile!.type || "image/png",
+            },
+            body: replacementCoverFile!,
           });
 
           if (!coverResponse.ok) {
@@ -366,7 +421,6 @@ export const BookEditForm = ({
         }
       }
 
-      // Update book metadata
       setStatus("save");
       await updateBookMetadata({
         id: book.id,
@@ -379,73 +433,161 @@ export const BookEditForm = ({
         language,
         description: description || null,
         accessLevels,
-        pdfUrl,
+        pdfUrl: hasNewPdf ? pdfUrl : pdfUrl,
         coverUrl,
         pageCount: resolvedPageCount,
+        isPictureBook:
+          book.isPictureBook === null ? undefined : book.isPictureBook,
+        fileFormat: replacementFormat,
+        originalFileUrl: hasNewPdf ? pdfUrl : undefined,
+        fileSizeBytes: hasNewPdf ? pdfFile!.size : undefined,
+        resetDerivedData: hasNewPdf,
       });
 
-      // If new PDF was uploaded, trigger re-rendering
       if (hasNewPdf) {
-        setStatus("rendering");
-        setRenderingProgress("Starting book rendering...");
-
-        const renderResult = await renderBookImages(book.id);
-
-        if (!("success" in renderResult) || !renderResult.success) {
-          throw new Error(
-            "error" in renderResult ? renderResult.error : "Rendering failed",
+        if (replacementFormat === "epub") {
+          setStatus("rendering");
+          setRenderingProgress(
+            "EPUB file ready! No additional processing needed.",
           );
-        }
+          setSuccess("Book updated successfully! EPUB is ready for reading.");
+        } else if (["mobi", "azw", "azw3"].includes(replacementFormat)) {
+          setStatus("rendering");
+          const formatUpper = replacementFormat.toUpperCase();
+          setRenderingProgress(
+            `Converting ${formatUpper} to readable format...`,
+          );
 
-        setRenderingProgress(
-          "Rendering in progress (this may take a few minutes)...",
-        );
+          const renderResult = await convertMobiToImages(book.id);
 
-        // Poll for render completion
-        let attempts = 0;
-        const maxAttempts = 120; // 10 minutes max
-        let renderComplete = false;
-
-        while (attempts < maxAttempts && !renderComplete) {
-          await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
-          attempts++;
-
-          const renderStatus = await checkRenderStatus(book.id);
-
-          if (renderStatus.completed) {
-            renderComplete = true;
-            setRenderingProgress(
-              `Rendering complete! ${renderStatus.pageCount} pages rendered.`,
+          if (!("success" in renderResult) || !renderResult.success) {
+            throw new Error(
+              renderResult.message || `${formatUpper} conversion failed`,
             );
-          } else if (renderStatus.error) {
-            throw new Error(`Rendering failed: ${renderStatus.error}`);
-          } else {
-            // Show progress as "X / Y pages"
-            if (renderStatus.processedPages && renderStatus.totalPages) {
+          }
+
+          let attempts = 0;
+          const maxAttempts = 120;
+          let renderComplete = false;
+
+          while (attempts < maxAttempts && !renderComplete) {
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+            attempts++;
+
+            const renderStatus = await checkRenderStatus(book.id);
+
+            if (renderStatus.completed) {
+              renderComplete = true;
+              setRenderingProgress(
+                `Conversion complete! ${renderStatus.pageCount} pages ready.`,
+              );
+            } else if (renderStatus.error) {
+              throw new Error(`Conversion failed: ${renderStatus.error}`);
+            } else if (renderStatus.processedPages && renderStatus.totalPages) {
               setRenderingPageProgress({
                 current: renderStatus.processedPages,
                 total: renderStatus.totalPages,
               });
               setRenderingProgress(
-                `Rendering: ${renderStatus.processedPages} / ${renderStatus.totalPages} pages`,
+                `Converting: ${renderStatus.processedPages} / ${renderStatus.totalPages} pages`,
               );
             } else {
-              setRenderingProgress(`Rendering: ${attempts * 5}s elapsed`);
+              setRenderingProgress(`Converting: ${attempts * 5}s elapsed`);
             }
           }
-        }
 
-        if (!renderComplete) {
-          setRenderingProgress(
-            "Rendering is taking longer than expected. It will continue in the background.",
+          setSuccess(
+            renderComplete
+              ? `Book updated successfully! ${formatUpper} is ready for reading.`
+              : `Book updated successfully. ${formatUpper} conversion continues in background.`,
           );
-        }
+        } else {
+          setStatus("extracting_text");
+          setRenderingProgress("Analyzing PDF content...");
 
-        setSuccess(
-          renderComplete
-            ? "Book updated and rendered successfully!"
-            : "Book updated successfully. Rendering continues in background.",
-        );
+          try {
+            const extractResult = await extractBookText(book.id);
+
+            if (extractResult.success) {
+              setRenderingProgress(
+                `✓ Text extracted: ${extractResult.totalWords?.toLocaleString()} words`,
+              );
+              setSuccess(
+                "Book updated successfully! PDF text content is ready for reading.",
+              );
+            } else if (extractResult.errorType === "insufficient_text") {
+              setRenderingProgress(
+                "Scanned PDF detected. Rendering pages as images...",
+              );
+              setStatus("rendering");
+
+              const renderResult = await renderBookImages(book.id);
+
+              if (!("success" in renderResult) || !renderResult.success) {
+                throw new Error(
+                  "error" in renderResult
+                    ? renderResult.error
+                    : "Rendering failed",
+                );
+              }
+
+              let attempts = 0;
+              const maxAttempts = 120;
+              let renderComplete = false;
+
+              while (attempts < maxAttempts && !renderComplete) {
+                await new Promise((resolve) => setTimeout(resolve, 5000));
+                attempts++;
+
+                const renderStatus = await checkRenderStatus(book.id);
+
+                if (renderStatus.completed) {
+                  renderComplete = true;
+                  setRenderingProgress(
+                    `✓ Rendered ${renderStatus.pageCount} pages as images`,
+                  );
+                } else if (renderStatus.error) {
+                  throw new Error(`Rendering failed: ${renderStatus.error}`);
+                } else if (
+                  renderStatus.processedPages &&
+                  renderStatus.totalPages
+                ) {
+                  setRenderingPageProgress({
+                    current: renderStatus.processedPages,
+                    total: renderStatus.totalPages,
+                  });
+                  setRenderingProgress(
+                    `Rendering: ${renderStatus.processedPages} / ${renderStatus.totalPages} pages`,
+                  );
+                } else {
+                  setRenderingProgress(`Rendering: ${attempts * 5}s elapsed`);
+                }
+              }
+
+              setSuccess(
+                renderComplete
+                  ? "Book updated successfully! Scanned PDF is using the image-based reader."
+                  : "Book updated successfully. Image rendering continues in background.",
+              );
+            } else {
+              console.warn("Text extraction issue:", extractResult.message);
+              setRenderingProgress(`⚠️ ${extractResult.message}`);
+              setSuccess(
+                "Book updated successfully. You may need to retry text extraction manually.",
+              );
+            }
+          } catch (extractErr) {
+            console.warn("Text extraction error:", extractErr);
+            const errorMessage =
+              extractErr instanceof Error
+                ? extractErr.message
+                : "Unknown error occurred";
+            setRenderingProgress(`⚠️ Processing issue: ${errorMessage}`);
+            setSuccess(
+              "Book updated successfully. Processing encountered an issue - please check the book status.",
+            );
+          }
+        }
       } else {
         setSuccess("Book updated successfully!");
       }
@@ -468,6 +610,9 @@ export const BookEditForm = ({
     setSuccess(null);
     setSelectedAccessLevels(new Set(normalizeAccessLevels(book.accessLevels)));
     setPageCount(book.pageCount);
+    setDetectedFormat(
+      (book.fileFormat as SupportedEbookFormat | undefined) ?? null,
+    );
     setPdfDetectionState("idle");
     setPdfDetectionMessage(null);
     setUploadProgress({ pdf: 0, cover: 0 });
@@ -673,10 +818,22 @@ export const BookEditForm = ({
           <div className="rounded-2xl border border-dashed border-indigo-200 bg-white/80 px-3 py-2 text-sm text-indigo-900">
             {pageCount
               ? `${pageCount} pages`
-              : "Upload new PDF to detect page count"}
+              : "Select a PDF to detect page count"}
           </div>
           {pdfDetectionState === "working" ? (
-            <p className="text-xs text-indigo-500">Analyzing PDF…</p>
+            <p className="text-xs text-indigo-500">Analyzing file…</p>
+          ) : null}
+          {detectedFormat && pdfDetectionState === "idle" ? (
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getFormatColor(detectedFormat)}`}
+              >
+                {getFormatName(detectedFormat)}
+              </span>
+              {pdfDetectionMessage ? (
+                <p className="text-xs text-indigo-600">{pdfDetectionMessage}</p>
+              ) : null}
+            </div>
           ) : null}
           {pdfDetectionState === "error" && pdfDetectionMessage ? (
             <p className="text-xs text-rose-500">{pdfDetectionMessage}</p>
@@ -690,23 +847,27 @@ export const BookEditForm = ({
           📁 Replace Book Files (Optional)
         </p>
         <p className="text-xs text-amber-700">
-          Upload new files only if you want to replace the existing PDF or
-          cover. If you upload a new PDF, the book will be automatically
-          re-rendered.
+          Upload new files only if you want to replace the existing book file or
+          cover. Replacement files can be PDF, EPUB, MOBI, AZW, or AZW3 and will
+          be processed automatically based on format.
         </p>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <label className="space-y-2 text-base font-bold text-purple-700">
-            Replace PDF
+            Replace Book File
             <input
               name="pdfFile"
               type="file"
-              accept="application/pdf"
+              accept={getAcceptedMimeTypes()}
               onChange={handlePdfFileChange}
               className="w-full rounded-2xl border border-dashed border-indigo-200 bg-white/50 px-3 py-2 text-indigo-900 file:mr-4 file:rounded-full file:border-0 file:bg-gradient-to-r file:from-rose-400 file:to-fuchsia-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
             />
             <p className="text-xs text-indigo-500">
-              Current: {getFilenameFromUrl(book.pdfUrl, "book.pdf")}
+              Current:{" "}
+              {getFilenameFromUrl(
+                book.pdfUrl,
+                `book.${book.fileFormat || "pdf"}`,
+              )}
             </p>
           </label>
 
@@ -732,7 +893,7 @@ export const BookEditForm = ({
         <div className="space-y-3 rounded-2xl border-2 border-purple-200 bg-purple-50 p-4">
           <div>
             <div className="mb-1 flex items-center justify-between text-sm font-semibold text-purple-700">
-              <span>📄 PDF Upload</span>
+              <span>📄 Book File Upload</span>
               <span>{uploadProgress.pdf}%</span>
             </div>
             <div className="h-2 rounded-full bg-purple-200">
