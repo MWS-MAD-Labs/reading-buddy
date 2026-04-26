@@ -1,11 +1,13 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const minioHost =
-  process.env.MINIO_PUBLIC_ENDPOINT && process.env.MINIO_PUBLIC_ENDPOINT.trim() !== ""
+  process.env.MINIO_PUBLIC_ENDPOINT &&
+  process.env.MINIO_PUBLIC_ENDPOINT.trim() !== ""
     ? process.env.MINIO_PUBLIC_ENDPOINT.trim()
     : process.env.MINIO_ENDPOINT && process.env.MINIO_ENDPOINT.trim() !== ""
       ? process.env.MINIO_ENDPOINT.trim()
-    : "storage.yourschool.com";
+      : "storage.yourschool.com";
 const minioProtocol =
   (process.env.MINIO_PUBLIC_USE_SSL ?? process.env.MINIO_USE_SSL) === "false"
     ? "http"
@@ -15,7 +17,7 @@ const minioPort =
     ? process.env.MINIO_PUBLIC_PORT
     : process.env.MINIO_PORT && process.env.MINIO_PORT !== ""
       ? process.env.MINIO_PORT
-    : undefined;
+      : undefined;
 
 const internalMinioHost =
   process.env.MINIO_INTERNAL_ENDPOINT &&
@@ -36,6 +38,9 @@ const internalMinioPort =
 const nextConfig: NextConfig = {
   reactCompiler: true,
   output: "standalone", // Required for Docker deployment
+  turbopack: {
+    root: path.join(__dirname, ".."),
+  },
   images: {
     unoptimized: true, // Disable Next.js Image Optimization (needed for self-hosted MinIO with private IP)
     remotePatterns: [
