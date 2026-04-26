@@ -9,22 +9,15 @@ set -euo pipefail
 #   - .env
 #   - web/.env.local
 #
-# Optional dependency sharing:
-#   --link-deps   Also symlink:
-#                   - node_modules
-#                   - web/node_modules
-#
 # Notes:
 # - Secrets remain gitignored because this script only creates local symlinks.
-# - Sharing node_modules is convenient but safest when worktrees are on the
-#   same commit or at least the same lockfile/dependency graph.
+# - Do not symlink node_modules into sibling worktrees. Next.js/Turbopack can
+#   reject dependency symlinks that point outside the worktree root.
 #
 # Usage:
 #   ./scripts/sync-worktree-local-files.sh
-#   ./scripts/sync-worktree-local-files.sh --link-deps
 #   ./scripts/sync-worktree-local-files.sh --force
 #   ./scripts/sync-worktree-local-files.sh --source /path/to/canonical/worktree
-#   ./scripts/sync-worktree-local-files.sh --source . --link-deps --force
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -33,7 +26,6 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 FORCE=0
-LINK_DEPS=0
 SOURCE_ROOT=""
 DRY_RUN=0
 
@@ -46,14 +38,12 @@ Usage:
 
 Options:
   --source PATH   Canonical worktree to link from. Defaults to current git root.
-  --link-deps     Also symlink node_modules and web/node_modules.
   --force         Replace existing non-symlink files/directories in target worktrees.
   --dry-run       Print planned actions without changing anything.
   -h, --help      Show this help.
 
 Examples:
   ./scripts/sync-worktree-local-files.sh
-  ./scripts/sync-worktree-local-files.sh --link-deps
   ./scripts/sync-worktree-local-files.sh --source /Users/you/reading-buddy --force
 EOF
 }
@@ -155,23 +145,7 @@ collect_worktrees() {
   '
 }
 
-compare_lockfiles_hint() {
-  local source_root="$1"
-  local target_root="$2"
 
-  local source_web_lock="${source_root}/web/package-lock.json"
-  local target_web_lock="${target_root}/web/package-lock.json"
-
-  if [ ! -f "$source_web_lock" ] || [ ! -f "$target_web_lock" ]; then
-    return 0
-  fi
-
-  if ! cmp -s "$source_web_lock" "$target_web_lock"; then
-    log_warn "Dependency lockfile differs for:"
-    log_warn "  ${target_root}"
-    log_warn "Sharing node_modules may be unsafe for this worktree."
-  fi
-}
 
 main() {
   while [ $# -gt 0 ]; do
@@ -184,10 +158,7 @@ main() {
         SOURCE_ROOT="$2"
         shift 2
         ;;
-      --link-deps)
-        LINK_DEPS=1
-        shift
-        ;;
+
       --force)
         FORCE=1
         shift
@@ -241,9 +212,6 @@ main() {
   fi
 
   log_info "Canonical source worktree: ${SOURCE_ROOT}"
-  if [ "$LINK_DEPS" -eq 1 ]; then
-    log_warn "Dependency sharing is enabled (--link-deps)"
-  fi
   if [ "$FORCE" -eq 1 ]; then
     log_warn "Existing paths will be replaced (--force)"
   fi
@@ -281,12 +249,6 @@ main() {
     replace_path_with_symlink "${SOURCE_ROOT}/.env" "${wt}/.env" ".env" || skipped=$((skipped + 1))
     replace_path_with_symlink "${SOURCE_ROOT}/web/.env.local" "${wt}/web/.env.local" "web/.env.local" || skipped=$((skipped + 1))
 
-    if [ "$LINK_DEPS" -eq 1 ]; then
-      compare_lockfiles_hint "$SOURCE_ROOT" "$wt"
-      replace_path_with_symlink "${SOURCE_ROOT}/node_modules" "${wt}/node_modules" "node_modules" || skipped=$((skipped + 1))
-      replace_path_with_symlink "${SOURCE_ROOT}/web/node_modules" "${wt}/web/node_modules" "web/node_modules" || skipped=$((skipped + 1))
-    fi
-
     linked=$((linked + 1))
     echo
   done <<EOF
@@ -296,16 +258,9 @@ EOF
   log_success "Done."
   echo "Worktrees discovered: ${count}"
   echo "Target worktrees processed: ${linked}"
-  if [ "$LINK_DEPS" -eq 1 ]; then
-    echo "Synced paths per target: .env, web/.env.local, node_modules, web/node_modules"
-  else
-    echo "Synced paths per target: .env, web/.env.local"
-  fi
-
-  if [ "$LINK_DEPS" -eq 1 ]; then
-    echo
-    log_warn "If a worktree changes dependencies or lockfiles, run npm install in that worktree instead of sharing node_modules."
-  fi
+  echo "Synced paths per target: .env, web/.env.local"
+  echo
+  log_warn "Install dependencies inside each worktree separately when needed."
 }
 
 main "$@"
