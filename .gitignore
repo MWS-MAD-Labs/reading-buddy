@@ -45,6 +45,6 @@ yarn-debug.log*
 yarn-error.log*
 
 # Node modules
-node_modules/
+node_modules
 staging_dump.sql
 DEPLOYMENT.md
