@@ -141,7 +141,7 @@ describe("BookEditForm", () => {
 
     expect(
       screen.getByText(
-        /epub file detected\. the replacement file will be processed automatically after upload\./i,
+        /epub detected\. the replacement file will be ready without page rendering\./i,
       ),
     ).toBeInTheDocument();
 
