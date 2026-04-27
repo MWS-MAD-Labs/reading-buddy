@@ -28,14 +28,13 @@ export default async function StudentReadPage({
     notFound();
   }
 
-  // Get book details including text extraction columns
+  // Get book details needed for the reader
   const bookResult = await queryWithContext(
     user.userId,
     `SELECT
       id, title, author, pdf_url, page_count,
       page_images_prefix, page_images_count,
-      file_format, original_file_url, text_json_url, text_extraction_status,
-      page_text_content, text_extracted_at, is_picture_book
+      file_format, original_file_url, is_picture_book
      FROM books WHERE id = $1`,
     [bookId],
   );
@@ -96,11 +95,7 @@ export default async function StudentReadPage({
         initialPage={initialPage}
         initialCfi={initialCfi}
         pageImages={pageImages}
-        textJsonUrl={book.text_json_url}
-        textExtractionStatus={book.text_extraction_status}
-        pageTextContent={book.page_text_content}
         fileFormat={book.file_format || "pdf"}
-        isPictureBook={book.is_picture_book ?? false}
         totalPages={book.page_count}
       />
     </div>

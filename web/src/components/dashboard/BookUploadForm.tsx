@@ -7,6 +7,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
+import { useRouter } from "next/navigation";
 import {
   checkRenderStatus,
   extractBookText,
@@ -114,7 +115,9 @@ export const BookUploadForm = ({
   onCancel,
   onSuccess,
 }: BookUploadFormProps) => {
+  const router = useRouter();
   const [status, setStatus] = useState<UploadState>("idle");
+  const [isClosing, setIsClosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<BookFormFieldErrors>({});
@@ -135,6 +138,10 @@ export const BookUploadForm = ({
     total: number;
   }>({ current: 0, total: 0 });
   const [generatingDescription, setGeneratingDescription] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    book: number;
+    cover: number;
+  }>({ book: 0, cover: 0 });
 
   const formRef = useRef<HTMLFormElement | null>(null);
   const genreListId = useId();
@@ -182,10 +189,12 @@ export const BookUploadForm = ({
     setSelectedAccessLevels(new Set());
     setRenderingProgress("");
     setRenderingPageProgress({ current: 0, total: 0 });
+    setUploadProgress({ book: 0, cover: 0 });
     setFieldErrors({});
     setError(null);
     setSuccess(null);
     setStatus("idle");
+    setIsClosing(false);
   };
 
   const validateForm = (formData: FormData) => {
@@ -330,7 +339,7 @@ export const BookUploadForm = ({
         const detectedPages = await extractPageCount(file);
         setPageCount(detectedPages);
         setPdfDetectionMessage(
-          `PDF detected. The system will attempt text extraction after upload.`,
+          `PDF detected. The system will render page images after upload.`,
         );
       } else {
         const formatName = validation.format.toUpperCase();
@@ -349,6 +358,48 @@ export const BookUploadForm = ({
       setFieldErrors((prev) => ({ ...prev, bookFile: message }));
       setError(message);
     }
+  };
+
+  const uploadFileWithProgress = async ({
+    url,
+    file,
+    contentType,
+    onProgress,
+    failureMessage,
+  }: {
+    url: string;
+    file: File;
+    contentType: string;
+    onProgress: (progress: number) => void;
+    failureMessage: string;
+  }) => {
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", url);
+      xhr.setRequestHeader("Content-Type", contentType);
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable || event.total === 0) {
+          return;
+        }
+
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      };
+
+      xhr.onerror = () => reject(new Error(failureMessage));
+      xhr.onabort = () => reject(new Error(failureMessage));
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          onProgress(100);
+          resolve();
+          return;
+        }
+
+        reject(new Error(failureMessage));
+      };
+
+      xhr.send(file);
+    });
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -403,7 +454,7 @@ export const BookUploadForm = ({
           setPageCount(resolvedPageCount);
           setPdfDetectionState("idle");
           setPdfDetectionMessage(
-            "PDF detected. The system will attempt text extraction after upload.",
+            "PDF detected. The system will render page images after upload.",
           );
         } catch (ex) {
           setPdfDetectionState("error");
@@ -430,31 +481,27 @@ export const BookUploadForm = ({
         coverFilename: coverFile.name,
       });
 
-      setStatus("uploading_pdf");
-      const pdfResponse = await fetch(uploadInfo.pdfUploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": bookFile.type || "application/octet-stream",
-        },
-        body: bookFile,
-      });
+      setUploadProgress({ book: 0, cover: 0 });
 
-      if (!pdfResponse.ok) {
-        throw new Error("Book file upload to storage failed.");
-      }
+      setStatus("uploading_pdf");
+      await uploadFileWithProgress({
+        url: uploadInfo.pdfUploadUrl,
+        file: bookFile,
+        contentType: bookFile.type || "application/octet-stream",
+        onProgress: (progress) =>
+          setUploadProgress((prev) => ({ ...prev, book: progress })),
+        failureMessage: "Book file upload to storage failed.",
+      });
 
       setStatus("uploading_cover");
-      const coverResponse = await fetch(uploadInfo.coverUploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": coverFile.type || "image/png",
-        },
-        body: coverFile,
+      await uploadFileWithProgress({
+        url: uploadInfo.coverUploadUrl,
+        file: coverFile,
+        contentType: coverFile.type || "image/png",
+        onProgress: (progress) =>
+          setUploadProgress((prev) => ({ ...prev, cover: progress })),
+        failureMessage: "Cover upload to storage failed.",
       });
-
-      if (!coverResponse.ok) {
-        throw new Error("Cover upload to storage failed.");
-      }
 
       setStatus("save");
       const saveResult = await saveBookMetadata({
@@ -531,104 +578,82 @@ export const BookUploadForm = ({
           }
         }
 
-        setSuccess(
-          renderComplete
-            ? `${formatUpper} converted successfully. The book is ready for reading.`
-            : `${formatUpper} uploaded successfully. Conversion continues in the background.`,
-        );
-      } else {
-        setStatus("extracting_text");
-        setRenderingProgress("Analyzing PDF content and extracting text...");
-
-        try {
-          const extractResult = await extractBookText(saveResult.bookId);
-
-          if (extractResult.success) {
-            setRenderingProgress(
-              `Text extracted successfully. ${extractResult.totalWords?.toLocaleString()} words found.`,
-            );
-            setSuccess(
-              "PDF uploaded with extracted text and is ready to read.",
-            );
-          } else if (extractResult.errorType === "insufficient_text") {
-            setStatus("rendering");
-            setRenderingProgress(
-              "Scanned PDF detected. Rendering pages as images...",
-            );
-
-            const renderResult = await renderBookImages(saveResult.bookId);
-
-            if (!renderResult.success) {
-              throw new Error(renderResult.message);
-            }
-
-            let attempts = 0;
-            const maxAttempts = 120;
-            let renderComplete = false;
-
-            while (attempts < maxAttempts && !renderComplete) {
-              await new Promise((resolve) => setTimeout(resolve, 5000));
-              attempts++;
-
-              const renderStatus = await checkRenderStatus(saveResult.bookId);
-
-              if (renderStatus.completed) {
-                renderComplete = true;
-                setRenderingProgress(
-                  `Rendered ${renderStatus.pageCount} pages as images.`,
-                );
-              } else if (renderStatus.error) {
-                throw new Error(`Rendering failed: ${renderStatus.error}`);
-              } else if (
-                renderStatus.processedPages &&
-                renderStatus.totalPages
-              ) {
-                setRenderingPageProgress({
-                  current: renderStatus.processedPages,
-                  total: renderStatus.totalPages,
-                });
-                setRenderingProgress(
-                  `Rendering pages: ${renderStatus.processedPages} / ${renderStatus.totalPages}`,
-                );
-              } else {
-                setRenderingProgress(
-                  `Rendering page images... ${attempts * 5}s`,
-                );
-              }
-            }
-
-            setSuccess(
-              renderComplete
-                ? "Scanned PDF uploaded successfully and is ready with the image reader."
-                : "Scanned PDF uploaded successfully. Page rendering continues in the background.",
-            );
-          } else {
-            setRenderingProgress(
-              extractResult.message || "Processing finished.",
-            );
-            setSuccess(
-              "PDF uploaded successfully. Text extraction may need a manual retry.",
-            );
-          }
-        } catch (extractErr) {
-          const errorMessage =
-            extractErr instanceof Error
-              ? extractErr.message
-              : "Unknown processing error";
-          setRenderingProgress(errorMessage);
-          setSuccess(
-            "PDF uploaded successfully, but processing needs attention in the background.",
+        if (!renderComplete) {
+          throw new Error(
+            `${formatUpper} conversion did not finish within the expected time.`,
           );
         }
+
+        setSuccess(
+          `${formatUpper} converted successfully. The book is ready for reading.`,
+        );
+      } else {
+        setStatus("rendering");
+        setRenderingProgress("Rendering PDF pages for reading...");
+
+        const renderResult = await renderBookImages(saveResult.bookId);
+
+        if (!renderResult.success) {
+          throw new Error(renderResult.message);
+        }
+
+        let attempts = 0;
+        const maxAttempts = 120;
+        let renderComplete = false;
+
+        while (attempts < maxAttempts && !renderComplete) {
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          attempts++;
+
+          const renderStatus = await checkRenderStatus(saveResult.bookId);
+
+          if (renderStatus.completed) {
+            renderComplete = true;
+            setRenderingProgress(
+              `Rendered ${renderStatus.pageCount} pages as images.`,
+            );
+          } else if (renderStatus.error) {
+            throw new Error(`Rendering failed: ${renderStatus.error}`);
+          } else if (renderStatus.processedPages && renderStatus.totalPages) {
+            setRenderingPageProgress({
+              current: renderStatus.processedPages,
+              total: renderStatus.totalPages,
+            });
+            setRenderingProgress(
+              `Rendering pages: ${renderStatus.processedPages} / ${renderStatus.totalPages}`,
+            );
+          } else {
+            setRenderingProgress(`Rendering page images... ${attempts * 5}s`);
+          }
+        }
+
+        if (!renderComplete) {
+          throw new Error(
+            "PDF rendering did not finish within the expected time.",
+          );
+        }
+
+        setSuccess(
+          "PDF uploaded successfully and is ready with the image reader.",
+        );
       }
 
-      form.reset();
-      resetTransientState();
+      router.refresh();
+      setFieldErrors({});
       setSuccess(
         (prev) =>
           prev ?? "Book uploaded successfully and added to the catalog.",
       );
-      onSuccess?.();
+      setUploadProgress({ book: 100, cover: 100 });
+      setRenderingProgress(
+        (prev) => prev || "Everything is ready. Closing this form...",
+      );
+      setIsClosing(true);
+      setTimeout(() => {
+        form.reset();
+        resetTransientState();
+        onSuccess?.();
+      }, 1200);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed.";
       setError(message);
@@ -643,7 +668,7 @@ export const BookUploadForm = ({
     onCancel?.();
   };
 
-  const isBusy = status !== "idle";
+  const isBusy = status !== "idle" || isClosing;
   const stageMeta = mapStatusToStage(status);
   const stages =
     isBusy || Boolean(success) || Boolean(error) || Boolean(renderingProgress)
@@ -653,6 +678,15 @@ export const BookUploadForm = ({
           stageMeta.processDescription,
         )
       : [];
+
+  const renderingPercent =
+    renderingPageProgress.total > 0
+      ? Math.round(
+          (renderingPageProgress.current / renderingPageProgress.total) * 100,
+        )
+      : isClosing
+        ? 100
+        : 0;
 
   const processingSummaryParts = [
     renderingProgress,
@@ -742,6 +776,90 @@ export const BookUploadForm = ({
         errors={fieldErrors}
       />
 
+      {(uploadProgress.book > 0 ||
+        uploadProgress.cover > 0 ||
+        renderingProgress ||
+        renderingPageProgress.total > 0) && (
+        <div className="space-y-4 rounded-[28px] border border-indigo-100 bg-white/90 p-5 shadow-[0_18px_50px_rgba(99,102,241,0.10)]">
+          <div className="space-y-1">
+            <h3 className="text-lg font-black text-indigo-950">
+              Upload and processing progress
+            </h3>
+            <p className="text-sm font-medium text-indigo-600">
+              Stay on this form while the book uploads and the reader assets are
+              prepared automatically.
+            </p>
+          </div>
+
+          {(uploadProgress.book > 0 || status === "uploading_pdf") && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm font-bold text-indigo-800">
+                <span>Book file upload</span>
+                <span>{uploadProgress.book}%</span>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-indigo-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 transition-all duration-300"
+                  style={{ width: `${uploadProgress.book}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {(uploadProgress.cover > 0 || status === "uploading_cover") && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm font-bold text-indigo-800">
+                <span>Cover upload</span>
+                <span>{uploadProgress.cover}%</span>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-indigo-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 transition-all duration-300"
+                  style={{ width: `${uploadProgress.cover}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {(renderingProgress ||
+            renderingPageProgress.total > 0 ||
+            status === "rendering" ||
+            status === "extracting_text") && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm font-bold text-indigo-800">
+                <span>
+                  {status === "extracting_text"
+                    ? "Text extraction"
+                    : "Page rendering"}
+                </span>
+                <span>
+                  {renderingPageProgress.total > 0
+                    ? `${renderingPercent}%`
+                    : status === "idle"
+                      ? "Done"
+                      : "Working..."}
+                </span>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-indigo-100">
+                {renderingPageProgress.total > 0 ? (
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-amber-400 to-fuchsia-500 transition-all duration-300"
+                    style={{ width: `${renderingPercent}%` }}
+                  />
+                ) : (
+                  <div className="h-full w-full animate-pulse rounded-full bg-gradient-to-r from-amber-300 via-fuchsia-400 to-indigo-500" />
+                )}
+              </div>
+              {renderingProgress ? (
+                <p className="text-sm font-medium text-indigo-600">
+                  {renderingProgress}
+                </p>
+              ) : null}
+            </div>
+          )}
+        </div>
+      )}
+
       {stages.length > 0 ? (
         <BookProcessingStatus
           stages={stages}
@@ -756,7 +874,7 @@ export const BookUploadForm = ({
       <BookFormActions
         isBusy={isBusy}
         submitLabel="Upload book"
-        busyLabel={getBusyLabel(status)}
+        busyLabel={isClosing ? "Finishing..." : getBusyLabel(status)}
         onCancel={handleCancel}
       />
     </form>

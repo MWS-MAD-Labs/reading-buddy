@@ -80,7 +80,7 @@ Open your browser: **http://localhost:3000**
 
 ### Required Environment Variables
 
-Edit `.env` file:
+For the Docker-based self-hosted setup in this guide, edit the repo-root `.env` file:
 
 ```bash
 # Database
@@ -92,6 +92,31 @@ NEXTAUTH_SECRET=your-nextauth-secret-here
 # MinIO
 MINIO_SECRET_KEY=your-minio-password-here
 ```
+
+### Environment File Notes
+
+- `./.env` is used for the Docker/self-hosted stack started with `docker compose -f docker-compose.selfhosted.yml up -d`.
+- `web/.env.local` is used when you run the Next.js app directly on your host with `npm run dev`.
+- Docker service names such as `postgres` and `minio` only work from inside containers.
+- If you run the app directly on your host, use host-accessible values such as `localhost` instead of Docker service names.
+
+Example host-run local development values for `web/.env.local`:
+
+```bash
+DB_HOST=localhost
+DB_PORT=5434
+NEXTAUTH_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_USE_SSL=false
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET_NAME=reading-buddy
+```
+
+If uploads fail with `InvalidAccessKeyId`, check `web/.env.local` first when using `npm run dev`.
 
 ### Optional Configuration
 

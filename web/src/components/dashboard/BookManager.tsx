@@ -116,16 +116,16 @@ const getContentStatusBadge = (book: ManagedBookRecord) => {
     );
   }
 
-  // PDFs without images need rendering
+  // PDFs are only ready once rendered images exist
   if (book.fileFormat === "pdf") {
     return (
       <Badge
         variant="amber"
         size="sm"
-        title="Click menu (⋮) → Render Images to make this book available"
+        title="PDF uploads are processed automatically after upload."
         className="rounded-full"
       >
-        ⚠ Needs Render
+        ⏳ Processing
       </Badge>
     );
   }
@@ -182,18 +182,6 @@ export const BookManager = ({
     left: number;
   } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const renderPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const activeRenderBookIdRef = useRef<number | null>(null);
-
-  const clearRenderPolling = () => {
-    if (renderPollTimeoutRef.current) {
-      clearTimeout(renderPollTimeoutRef.current);
-      renderPollTimeoutRef.current = null;
-    }
-    activeRenderBookIdRef.current = null;
-  };
 
   // Calculate menu position when actionMenu changes
   useEffect(() => {
@@ -363,120 +351,6 @@ export const BookManager = ({
       }
     });
   };
-
-  const pollRenderStatus = async (bookId: number, bookTitle: string) => {
-    if (activeRenderBookIdRef.current !== bookId) {
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `/api/render-book-images?bookId=${encodeURIComponent(bookId)}`,
-        {
-          method: "GET",
-          cache: "no-store",
-        },
-      );
-      const status = await response.json();
-
-      if (!response.ok) {
-        throw new Error(status?.error || "Unable to check render progress.");
-      }
-
-      if (activeRenderBookIdRef.current !== bookId) {
-        return;
-      }
-
-      if (status.completed) {
-        clearRenderPolling();
-        setFeedback({
-          type: "success",
-          message: `Rendering complete for "${bookTitle}" (${status.pageCount ?? 0} pages).`,
-        });
-        router.refresh();
-        return;
-      }
-
-      if (status.error) {
-        clearRenderPolling();
-        setFeedback({
-          type: "error",
-          message: `Rendering failed for "${bookTitle}": ${status.error}`,
-        });
-        return;
-      }
-
-      const processedPages = status.processedPages ?? 0;
-      const totalPages = status.totalPages ?? 0;
-      const statusLabel = status.status === "pending" ? "Queued" : "Rendering";
-
-      setFeedback({
-        type: "info",
-        message:
-          totalPages > 0
-            ? `${statusLabel} "${bookTitle}": ${processedPages} / ${totalPages} pages`
-            : `${statusLabel} "${bookTitle}"...`,
-      });
-
-      renderPollTimeoutRef.current = setTimeout(() => {
-        void pollRenderStatus(bookId, bookTitle);
-      }, 2000);
-    } catch (error) {
-      clearRenderPolling();
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to check render progress.";
-      setFeedback({
-        type: "error",
-        message: `Render status check failed for "${bookTitle}": ${message}`,
-      });
-    }
-  };
-
-  const handleRenderImages = async (book: ManagedBookRecord) => {
-    clearRenderPolling();
-    setFeedback({
-      type: "info",
-      message: `Starting render for "${book.title}"...`,
-    });
-
-    const response = await fetch(
-      `/api/render-book-images?bookId=${encodeURIComponent(book.id)}`,
-      {
-        method: "POST",
-      },
-    );
-    const result = await response.json();
-
-    if (!response.ok || !("success" in result) || !result.success) {
-      setFeedback({
-        type: "error",
-        message:
-          "error" in result && result.error
-            ? result.error
-            : "Failed to render images.",
-      });
-      return;
-    }
-
-    activeRenderBookIdRef.current = book.id;
-    setFeedback({
-      type: "info",
-      message: `Render started for "${book.title}". Checking progress...`,
-    });
-    void pollRenderStatus(book.id, book.title);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (renderPollTimeoutRef.current) {
-        clearTimeout(renderPollTimeoutRef.current);
-        renderPollTimeoutRef.current = null;
-      }
-      activeRenderBookIdRef.current = null;
-    };
-  }, []);
 
   return (
     <section className="space-y-5">
@@ -899,10 +773,6 @@ export const BookManager = ({
           const book = books.find((b) => b.id === actionMenu.id);
           if (!book) return null;
 
-          const needsRenderImages =
-            book.fileFormat === "pdf" &&
-            (!book.pageImagesCount || book.pageImagesCount === 0);
-
           return createPortal(
             <div
               ref={menuRef}
@@ -924,21 +794,6 @@ export const BookManager = ({
                   <span aria-hidden>📝</span>
                   <span>Quizzes</span>
                 </button>
-
-                {needsRenderImages && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setActionMenu(null);
-                      await handleRenderImages(book);
-                    }}
-                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-purple-600 transition hover:bg-purple-50"
-                    title="Render PDF pages as images for reading"
-                  >
-                    <span aria-hidden>🖼️</span>
-                    <span>Render Images</span>
-                  </button>
-                )}
 
                 <button
                   type="button"

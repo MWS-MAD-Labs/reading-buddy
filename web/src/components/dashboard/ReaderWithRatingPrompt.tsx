@@ -20,11 +20,8 @@ type ReaderWithRatingPromptProps = {
   initialPage?: number;
   initialCfi?: string | null;
   pageImages?: PageImageInfo | null;
-  textJsonUrl?: string | null;
-  textExtractionStatus?: string | null;
-  pageTextContent?: any;
+
   fileFormat?: "pdf" | "epub";
-  isPictureBook?: boolean;
   totalPages?: number | null;
 };
 
@@ -44,11 +41,8 @@ export function ReaderWithRatingPrompt({
   initialPage = 1,
   initialCfi,
   pageImages,
-  textJsonUrl,
-  textExtractionStatus,
-  pageTextContent,
+
   fileFormat = "pdf",
-  isPictureBook = false,
   totalPages,
 }: ReaderWithRatingPromptProps) {
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
@@ -132,11 +126,7 @@ export function ReaderWithRatingPrompt({
         initialPage={initialPage}
         initialCfi={initialCfi}
         pageImages={pageImages}
-        textJsonUrl={textJsonUrl}
-        textExtractionStatus={textExtractionStatus}
-        pageTextContent={pageTextContent}
         fileFormat={fileFormat}
-        isPictureBook={isPictureBook}
         onPageChange={handlePageChange}
         onTotalPagesChange={setEffectiveTotalPages}
         onComplete={handleFinishClick}

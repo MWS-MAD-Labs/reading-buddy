@@ -2,7 +2,20 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+### Local host-run development
+
+This app loads local development environment variables from `web/.env.local`.
+
+When you run the Next.js dev server on your machine, use host-reachable service values such as:
+
+- `DB_HOST=localhost`
+- `MINIO_ENDPOINT=localhost`
+- `MINIO_PORT=9000`
+- `MINIO_USE_SSL=false`
+
+Do not use Docker-only service names like `postgres` or `minio` in `web/.env.local` unless the app itself is also running inside Docker.
+
+Then run the development server:
 
 ```bash
 npm run dev
@@ -19,6 +32,12 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+### Environment file notes
+
+- `web/.env.local` is for local host-run Next.js development.
+- The repo-root `.env` is primarily used by Docker and self-hosted compose setups.
+- If local uploads fail with MinIO auth or connection errors, verify that `web/.env.local` points to your local MinIO instance instead of a remote staging or production endpoint.
 
 ## Learn More
 
