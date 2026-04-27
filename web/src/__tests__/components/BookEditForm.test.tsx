@@ -122,7 +122,7 @@ describe("BookEditForm", () => {
     );
 
     const fileInput = screen.getByLabelText(
-      /replace book file/i,
+      /replacement file/i,
     ) as HTMLInputElement;
 
     expect(fileInput.accept).toContain(".epub");
