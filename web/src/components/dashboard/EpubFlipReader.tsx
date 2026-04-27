@@ -34,6 +34,7 @@ import { FullscreenReaderOverlay } from "./reader/FullscreenReaderOverlay";
 
 import "@/styles/reader-fonts.css";
 import "@/styles/reader-theme.css";
+import "@/styles/reader-flip.css";
 
 type RenditionLike = Book["rendition"];
 
@@ -64,6 +65,21 @@ type TouchPoint = {
   y: number;
 };
 
+type FlipOverlayBar = {
+  top: string;
+  left: string;
+  width: string;
+  height: string;
+  opacity: number;
+};
+
+type FlipOverlayState = {
+  direction: "next" | "prev";
+  bars: FlipOverlayBar[];
+};
+
+const FLIP_DURATION_MS = 900;
+
 export const EpubFlipReader = forwardRef<
   EpubFlipReaderRef,
   EpubFlipReaderProps
@@ -86,10 +102,17 @@ export const EpubFlipReader = forwardRef<
     const bookRef = useRef<Book | null>(null);
     const renditionRef = useRef<RenditionLike | null>(null);
     const currentCfiRef = useRef<string | null>(null);
-    const currentPageRef = useRef(typeof initialPage === "number" ? initialPage : 1);
+    const currentPageRef = useRef(
+      typeof initialPage === "number" ? initialPage : 1,
+    );
     const locationsReadyRef = useRef(false);
     const totalPagesRef = useRef(0);
     const touchStartRef = useRef<TouchPoint | null>(null);
+    const flipStageRef = useRef<HTMLDivElement>(null);
+    const lastNavDirectionRef = useRef<"next" | "prev" | null>(null);
+    const flipTimeoutRef = useRef<number | null>(null);
+    const pendingNavTimerRef = useRef<number | null>(null);
+    const isFlipAnimatingRef = useRef(false);
     const readerLifecycleRef = useRef<{
       key: string;
       initializing: boolean;
@@ -98,7 +121,10 @@ export const EpubFlipReader = forwardRef<
       key: string;
       timerId: number;
     } | null>(null);
-    const initialTargetRef = useRef<{ cfi: string | null; page: number | null }>({
+    const initialTargetRef = useRef<{
+      cfi: string | null;
+      page: number | null;
+    }>({
       cfi: initialCfi,
       page: initialPage,
     });
@@ -116,6 +142,9 @@ export const EpubFlipReader = forwardRef<
     const [author, setAuthor] = useState("Unknown Author");
     const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
     const [tocItems, setTocItems] = useState<NormalizedTocItem[]>([]);
+    const [flipOverlay, setFlipOverlay] = useState<FlipOverlayState | null>(
+      null,
+    );
 
     const { preferences, updatePreferences, resetPreferences, isLoaded } =
       useReadingPreferences();
@@ -130,21 +159,24 @@ export const EpubFlipReader = forwardRef<
       [bookId],
     );
 
-    const displayTarget = useCallback(async (target?: string | number | null) => {
-      if (!renditionRef.current) {
-        return;
-      }
-
-      try {
-        if (typeof target === "number") {
-          await renditionRef.current.display(target);
-        } else {
-          await renditionRef.current.display(target ?? undefined);
+    const displayTarget = useCallback(
+      async (target?: string | number | null) => {
+        if (!renditionRef.current) {
+          return;
         }
-      } catch (displayError) {
-        console.error("Failed to navigate EPUB", displayError);
-      }
-    }, []);
+
+        try {
+          if (typeof target === "number") {
+            await renditionRef.current.display(target);
+          } else {
+            await renditionRef.current.display(target ?? undefined);
+          }
+        } catch (displayError) {
+          console.error("Failed to navigate EPUB", displayError);
+        }
+      },
+      [],
+    );
 
     const goToPage = useCallback(
       async (page: number) => {
@@ -176,7 +208,10 @@ export const EpubFlipReader = forwardRef<
         if (book && locationsReadyRef.current) {
           canonicalPage = getCanonicalPageFromCfi(book, cfi) ?? canonicalPage;
           progressPercent = getProgressPercentFromCfi(book, cfi);
-        } else if (initialTargetRef.current.cfi === cfi && initialTargetRef.current.page) {
+        } else if (
+          initialTargetRef.current.cfi === cfi &&
+          initialTargetRef.current.page
+        ) {
           canonicalPage = initialTargetRef.current.page;
         }
 
@@ -193,10 +228,145 @@ export const EpubFlipReader = forwardRef<
       [onPageChange, onRelocation],
     );
 
+    const buildFallbackOverlayBars = useCallback((): FlipOverlayBar[] => {
+      return [
+        { top: "10%", left: "9%", width: "78%", height: "2.2%", opacity: 0.2 },
+        { top: "16%", left: "9%", width: "80%", height: "1.8%", opacity: 0.16 },
+        { top: "20%", left: "9%", width: "80%", height: "1.8%", opacity: 0.16 },
+        { top: "24%", left: "9%", width: "80%", height: "1.8%", opacity: 0.16 },
+        { top: "31%", left: "9%", width: "80%", height: "1.7%", opacity: 0.15 },
+        { top: "35%", left: "9%", width: "80%", height: "1.7%", opacity: 0.15 },
+        { top: "39%", left: "9%", width: "80%", height: "1.7%", opacity: 0.15 },
+        { top: "47%", left: "9%", width: "80%", height: "1.7%", opacity: 0.15 },
+        { top: "51%", left: "9%", width: "80%", height: "1.7%", opacity: 0.15 },
+        { top: "55%", left: "9%", width: "80%", height: "1.7%", opacity: 0.15 },
+        { top: "63%", left: "9%", width: "80%", height: "1.7%", opacity: 0.15 },
+        { top: "67%", left: "9%", width: "80%", height: "1.7%", opacity: 0.15 },
+        { top: "71%", left: "9%", width: "80%", height: "1.7%", opacity: 0.15 },
+      ];
+    }, []);
+
+    const captureVisiblePageStructure = useCallback(
+      (_direction: "next" | "prev"): FlipOverlayBar[] => {
+        return buildFallbackOverlayBars();
+      },
+      [buildFallbackOverlayBars],
+    );
+
+    const resetFlipAnimation = useCallback(() => {
+      const stage = flipStageRef.current;
+      if (stage) {
+        stage.classList.remove(
+          "is-flipping",
+          "is-flipping-next",
+          "is-flipping-prev",
+        );
+      }
+
+      if (flipTimeoutRef.current !== null) {
+        window.clearTimeout(flipTimeoutRef.current);
+        flipTimeoutRef.current = null;
+      }
+
+      if (pendingNavTimerRef.current !== null) {
+        window.clearTimeout(pendingNavTimerRef.current);
+        pendingNavTimerRef.current = null;
+      }
+
+      setFlipOverlay(null);
+      lastNavDirectionRef.current = null;
+      isFlipAnimatingRef.current = false;
+    }, []);
+
+    const playFlipAnimation = useCallback(
+      (direction: "next" | "prev", bars: FlipOverlayBar[]) => {
+        const stage = flipStageRef.current;
+        if (!stage) {
+          return;
+        }
+
+        const directionClass =
+          direction === "next" ? "is-flipping-next" : "is-flipping-prev";
+
+        setFlipOverlay({ direction, bars });
+
+        stage.classList.remove(
+          "is-flipping",
+          "is-flipping-next",
+          "is-flipping-prev",
+        );
+        void stage.offsetWidth;
+        stage.classList.add("is-flipping", directionClass);
+
+        if (flipTimeoutRef.current !== null) {
+          window.clearTimeout(flipTimeoutRef.current);
+        }
+
+        flipTimeoutRef.current = window.setTimeout(() => {
+          resetFlipAnimation();
+        }, FLIP_DURATION_MS + 1500);
+      },
+      [resetFlipAnimation],
+    );
+
+    const scheduleFlipNavigation = useCallback(
+      (direction: "next" | "prev") => {
+        const rendition = renditionRef.current;
+        if (!rendition || isFlipAnimatingRef.current) {
+          return;
+        }
+
+        if (
+          typeof window !== "undefined" &&
+          window.matchMedia &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ) {
+          void (async () => {
+            try {
+              if (direction === "next") {
+                await rendition.next();
+              } else {
+                await rendition.prev();
+              }
+            } catch (navigationError) {
+              console.error("Failed to navigate EPUB page", navigationError);
+            }
+          })();
+          return;
+        }
+
+        const bars = captureVisiblePageStructure(direction);
+
+        isFlipAnimatingRef.current = true;
+        lastNavDirectionRef.current = direction;
+        playFlipAnimation(direction, bars);
+
+        if (pendingNavTimerRef.current !== null) {
+          window.clearTimeout(pendingNavTimerRef.current);
+        }
+
+        pendingNavTimerRef.current = window.setTimeout(() => {
+          void (async () => {
+            try {
+              if (direction === "next") {
+                await rendition.next();
+              } else {
+                await rendition.prev();
+              }
+            } catch (navigationError) {
+              resetFlipAnimation();
+              console.error("Failed to navigate EPUB page", navigationError);
+            } finally {
+              pendingNavTimerRef.current = null;
+            }
+          })();
+        }, FLIP_DURATION_MS);
+      },
+      [captureVisiblePageStructure, playFlipAnimation, resetFlipAnimation],
+    );
+
     const handleRelocated = useCallback(
-      (location: {
-        start?: { cfi?: string };
-      }) => {
+      (location: { start?: { cfi?: string } }) => {
         const cfi = location?.start?.cfi ?? null;
 
         if (!cfi) {
@@ -204,24 +374,40 @@ export const EpubFlipReader = forwardRef<
         }
 
         syncRelocationState(cfi);
+
+        if (lastNavDirectionRef.current) {
+          if (flipTimeoutRef.current !== null) {
+            window.clearTimeout(flipTimeoutRef.current);
+          }
+
+          flipTimeoutRef.current = window.setTimeout(() => {
+            resetFlipAnimation();
+          }, 60);
+        }
       },
-      [syncRelocationState],
+      [resetFlipAnimation, syncRelocationState],
     );
 
-    const handlePrev = useCallback(async () => {
-      try {
-        await renditionRef.current?.prev();
-      } catch (navigationError) {
-        console.error("Failed to navigate to previous EPUB page", navigationError);
-      }
-    }, []);
+    const handlePrev = useCallback(() => {
+      scheduleFlipNavigation("prev");
+    }, [scheduleFlipNavigation]);
 
-    const handleNext = useCallback(async () => {
-      try {
-        await renditionRef.current?.next();
-      } catch (navigationError) {
-        console.error("Failed to navigate to next EPUB page", navigationError);
-      }
+    const handleNext = useCallback(() => {
+      scheduleFlipNavigation("next");
+    }, [scheduleFlipNavigation]);
+
+    useEffect(() => {
+      return () => {
+        if (flipTimeoutRef.current !== null) {
+          window.clearTimeout(flipTimeoutRef.current);
+          flipTimeoutRef.current = null;
+        }
+        if (pendingNavTimerRef.current !== null) {
+          window.clearTimeout(pendingNavTimerRef.current);
+          pendingNavTimerRef.current = null;
+        }
+        isFlipAnimatingRef.current = false;
+      };
     }, []);
 
     useEffect(() => {
@@ -319,7 +505,10 @@ export const EpubFlipReader = forwardRef<
           }
 
           book.spine.hooks.content.register(
-            async (document: Document, section: { url?: string; document?: Document }) => {
+            async (
+              document: Document,
+              section: { url?: string; document?: Document },
+            ) => {
               await rewriteArchivedSectionAssetUrls(book, {
                 url: section.url,
                 document,
@@ -362,7 +551,10 @@ export const EpubFlipReader = forwardRef<
           }
 
           const applyResolvedLocations = (resolvedLocations: string[]) => {
-            if (!Array.isArray(resolvedLocations) || resolvedLocations.length === 0) {
+            if (
+              !Array.isArray(resolvedLocations) ||
+              resolvedLocations.length === 0
+            ) {
               return false;
             }
 
@@ -437,11 +629,17 @@ export const EpubFlipReader = forwardRef<
                 }
 
                 if (typeof window !== "undefined") {
-                  localStorage.setItem(locationsCacheKey, book.locations.save());
+                  localStorage.setItem(
+                    locationsCacheKey,
+                    book.locations.save(),
+                  );
                 }
 
                 if (pendingCanonicalPage) {
-                  const targetCfi = getCfiFromCanonicalPage(book, pendingCanonicalPage);
+                  const targetCfi = getCfiFromCanonicalPage(
+                    book,
+                    pendingCanonicalPage,
+                  );
                   if (targetCfi) {
                     await rendition.display(targetCfi);
                     return;
@@ -581,7 +779,10 @@ export const EpubFlipReader = forwardRef<
       );
 
       return () => {
-        document.removeEventListener("fullscreenchange", handleFullscreenChange);
+        document.removeEventListener(
+          "fullscreenchange",
+          handleFullscreenChange,
+        );
         document.removeEventListener(
           "webkitfullscreenchange",
           handleFullscreenChange,
@@ -605,7 +806,11 @@ export const EpubFlipReader = forwardRef<
           void handlePrev();
         }
 
-        if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
+        if (
+          event.key === "ArrowRight" ||
+          event.key === "PageDown" ||
+          event.key === " "
+        ) {
           event.preventDefault();
           void handleNext();
         }
@@ -636,7 +841,9 @@ export const EpubFlipReader = forwardRef<
           } else if (
             "webkitRequestFullscreen" in container &&
             typeof (
-              container as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }
+              container as HTMLElement & {
+                webkitRequestFullscreen?: () => Promise<void>;
+              }
             ).webkitRequestFullscreen === "function"
           ) {
             await (
@@ -663,10 +870,13 @@ export const EpubFlipReader = forwardRef<
       }
     }, []);
 
-    const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
-      const touch = event.touches[0];
-      touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-    }, []);
+    const handleTouchStart = useCallback(
+      (event: React.TouchEvent<HTMLDivElement>) => {
+        const touch = event.touches[0];
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+      },
+      [],
+    );
 
     const handleTouchEnd = useCallback(
       (event: React.TouchEvent<HTMLDivElement>) => {
@@ -701,7 +911,10 @@ export const EpubFlipReader = forwardRef<
 
     const adjustFontSize = useCallback(
       (delta: number) => {
-        const nextSize = Math.min(200, Math.max(80, preferences.fontSize + delta));
+        const nextSize = Math.min(
+          200,
+          Math.max(80, preferences.fontSize + delta),
+        );
         updatePreferences({ fontSize: nextSize });
       },
       [preferences.fontSize, updatePreferences],
@@ -744,7 +957,10 @@ export const EpubFlipReader = forwardRef<
             : "space-y-4 py-6",
           themeClasses,
         )}
-        style={{ backgroundColor: readerTheme.background, color: readerTheme.foreground }}
+        style={{
+          backgroundColor: readerTheme.background,
+          color: readerTheme.foreground,
+        }}
       >
         <FullscreenReaderOverlay
           isOpen={isFullscreen}
@@ -758,7 +974,9 @@ export const EpubFlipReader = forwardRef<
         {!isFullscreen && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-indigo-100 bg-white/80 p-3 shadow-sm">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-indigo-900">{title}</p>
+              <p className="truncate text-sm font-semibold text-indigo-900">
+                {title}
+              </p>
               <p className="truncate text-xs text-indigo-500">{author}</p>
             </div>
 
@@ -805,7 +1023,9 @@ export const EpubFlipReader = forwardRef<
         <div
           className={clsx(
             "relative mx-auto flex w-full gap-4",
-            isFullscreen ? "min-h-0 flex-1 px-3 pb-3 pt-14 sm:px-4 sm:pb-4" : "",
+            isFullscreen
+              ? "min-h-0 flex-1 px-3 pb-3 pt-14 sm:px-4 sm:pb-4"
+              : "",
           )}
         >
           {showToc && (
@@ -824,7 +1044,9 @@ export const EpubFlipReader = forwardRef<
                   />
                 ) : null}
                 <div className="min-w-0">
-                  <p className="line-clamp-2 text-sm font-bold text-slate-900">{title}</p>
+                  <p className="line-clamp-2 text-sm font-bold text-slate-900">
+                    {title}
+                  </p>
                   <p className="mt-1 text-xs text-slate-500">{author}</p>
                   <p className="mt-2 text-xs font-semibold text-emerald-700">
                     Page {currentPage} of {Math.max(totalPages, 1)}
@@ -835,7 +1057,9 @@ export const EpubFlipReader = forwardRef<
                 {tocItems.length > 0 ? (
                   renderTocItems(tocItems)
                 ) : (
-                  <p className="text-sm text-slate-500">No table of contents found.</p>
+                  <p className="text-sm text-slate-500">
+                    No table of contents found.
+                  </p>
                 )}
               </div>
             </aside>
@@ -852,7 +1076,9 @@ export const EpubFlipReader = forwardRef<
                   ? "linear-gradient(180deg, #202024 0%, #16161a 100%)"
                   : "linear-gradient(180deg, #fffdf8 0%, #f7f1e5 100%)",
               borderColor:
-                preferences.theme === "dark" ? "rgba(255,255,255,0.08)" : "#e6dcc7",
+                preferences.theme === "dark"
+                  ? "rgba(255,255,255,0.08)"
+                  : "#e6dcc7",
             }}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
@@ -860,7 +1086,9 @@ export const EpubFlipReader = forwardRef<
             {(isLoading || !isLoaded) && (
               <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-white/70 backdrop-blur-sm">
                 <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-purple-500 border-t-transparent"></div>
-                <p className="text-lg font-semibold text-purple-600">Opening EPUB...</p>
+                <p className="text-lg font-semibold text-purple-600">
+                  Opening EPUB...
+                </p>
                 <p className="text-sm text-purple-400">
                   Building stable reading locations and loading chapters.
                 </p>
@@ -880,11 +1108,71 @@ export const EpubFlipReader = forwardRef<
               className="absolute inset-y-0 right-0 z-20 w-1/6 min-w-12"
               aria-label="Next page"
             />
-            <div className="absolute inset-0 px-6 py-8 sm:px-10 sm:py-10">
-              <div
-                ref={viewerRef}
-                className="h-full w-full overflow-hidden rounded-[1.5rem] bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)]"
-              />
+            <div
+              ref={flipStageRef}
+              className="absolute inset-0 px-6 py-8 sm:px-10 sm:py-10 epub-flip-stage"
+            >
+              <div className="epub-flip-page h-full w-full overflow-hidden rounded-[1.5rem] bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)]">
+                <div ref={viewerRef} className="h-full w-full" />
+                <div className="epub-flip-overlay" aria-hidden="true">
+                  <div className="epub-flip-overlay__static">
+                    <div className="epub-flip-overlay__static-shade" />
+                  </div>
+                  <div className="epub-flip-overlay__sheet">
+                    <div className="epub-flip-overlay__face epub-flip-overlay__face--front">
+                      {flipOverlay?.bars.map((bar, index) => (
+                        <div
+                          key={`flip-front-${index}`}
+                          style={{
+                            position: "absolute",
+                            top: bar.top,
+                            left: bar.left,
+                            width: bar.width,
+                            height: bar.height,
+                            borderRadius: "999px",
+                            background:
+                              preferences.theme === "dark"
+                                ? `rgba(226, 232, 240, ${Math.min(
+                                    bar.opacity * 1.05,
+                                    0.28,
+                                  )})`
+                                : `rgba(15, 23, 42, ${bar.opacity})`,
+                          }}
+                        />
+                      ))}
+                      <div className="epub-flip-overlay__edge" />
+                      <div className="epub-flip-overlay__sheen" />
+                    </div>
+                    <div className="epub-flip-overlay__face epub-flip-overlay__face--back">
+                      {flipOverlay?.bars.map((bar, index) => (
+                        <div
+                          key={`flip-back-${index}`}
+                          style={{
+                            position: "absolute",
+                            top: bar.top,
+                            left: bar.left,
+                            width: bar.width,
+                            height: bar.height,
+                            borderRadius: "999px",
+                            background:
+                              preferences.theme === "dark"
+                                ? `rgba(226, 232, 240, ${Math.min(
+                                    bar.opacity * 0.75,
+                                    0.18,
+                                  )})`
+                                : `rgba(51, 65, 85, ${Math.min(
+                                    bar.opacity * 0.7,
+                                    0.12,
+                                  )})`,
+                          }}
+                        />
+                      ))}
+                      <div className="epub-flip-overlay__back-grain" />
+                    </div>
+                  </div>
+                  <div className="epub-flip-overlay__spine-shadow" />
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -1,0 +1,607 @@
+/* Single-Sheet Book Flip Overlay (Paper-Thin Single Plane)
+ *
+ * Pure CSS overlay that fakes a turning page on top of the live epub.js
+ * viewer. The viewer DOM is never animated.
+ *
+ * Design notes:
+ *
+ *   - The flipping sheet is a SINGLE rotating plane. Multi-strip approaches
+ *     produce visible crease lines, which look worse than a flat sheet.
+ *   - Paper-thin styling instead of card thickness:
+ *       * no inset borders
+ *       * very light drop shadow
+ *       * slightly translucent face so the sheet reads as paper, not slate
+ *       * subtle scaleY at the apex of the turn fakes a bow
+ *   - A trailing-edge specular highlight on the outer edge sells the
+ *     "this is paper catching light", not "a tile turning".
+ *   - All sub-animations share one easing curve so motion stays smooth.
+ *
+ * Expected structure (rendered by EpubFlipReader.tsx):
+ *
+ * .epub-flip-stage
+ *   .epub-flip-page                          (real EPUB viewer surface)
+ *   .epub-flip-overlay
+ *     .epub-flip-overlay__static
+ *       .epub-flip-overlay__static-shade     (gutter darkening)
+ *     .epub-flip-overlay__sheet              (single rotating plane)
+ *       .epub-flip-overlay__face--front
+ *         .epub-flip-overlay__edge           (trailing-edge highlight)
+ *         .epub-flip-overlay__sheen          (specular sweep)
+ *       .epub-flip-overlay__face--back
+ *         .epub-flip-overlay__back-grain
+ *     .epub-flip-overlay__spine-shadow       (cast on stationary page)
+ *
+ * Runtime classes added to the stage:
+ *   .is-flipping
+ *   .is-flipping-next   (right page turning leftward)
+ *   .is-flipping-prev   (left page turning rightward)
+ */
+
+/* ------------------------------------------------------------------ */
+/* Stage                                                               */
+/* ------------------------------------------------------------------ */
+
+.epub-flip-stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    perspective: 2200px;
+    perspective-origin: 50% 55%;
+    transform-style: preserve-3d;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.epub-flip-page {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    transform: translateZ(0);
+}
+
+/* ------------------------------------------------------------------ */
+/* Overlay container                                                   */
+/* ------------------------------------------------------------------ */
+
+.epub-flip-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    pointer-events: none;
+    opacity: 0;
+    transform-style: preserve-3d;
+    border-radius: inherit;
+    overflow: visible;
+}
+
+.epub-flip-stage.is-flipping .epub-flip-overlay {
+    opacity: 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* Static half — gutter darkening only                                 */
+/* ------------------------------------------------------------------ */
+
+.epub-flip-overlay__static {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    pointer-events: none;
+    overflow: hidden;
+    border-radius: inherit;
+    opacity: 0;
+}
+
+.epub-flip-overlay__static-shade {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.epub-flip-stage.is-flipping-next .epub-flip-overlay__static {
+    left: 50%;
+    right: auto;
+    animation: epub-flip-static-fade 900ms ease-in-out both;
+}
+
+.epub-flip-stage.is-flipping-next .epub-flip-overlay__static-shade {
+    background: linear-gradient(
+        to right,
+        rgba(0, 0, 0, 0.16) 0%,
+        rgba(0, 0, 0, 0.06) 6%,
+        rgba(0, 0, 0, 0.02) 14%,
+        transparent 30%
+    );
+}
+
+.epub-flip-stage.is-flipping-prev .epub-flip-overlay__static {
+    left: 0;
+    right: auto;
+    animation: epub-flip-static-fade 900ms ease-in-out both;
+}
+
+.epub-flip-stage.is-flipping-prev .epub-flip-overlay__static-shade {
+    background: linear-gradient(
+        to left,
+        rgba(0, 0, 0, 0.16) 0%,
+        rgba(0, 0, 0, 0.06) 6%,
+        rgba(0, 0, 0, 0.02) 14%,
+        transparent 30%
+    );
+}
+
+@keyframes epub-flip-static-fade {
+    0% {
+        opacity: 0;
+    }
+    20% {
+        opacity: 1;
+    }
+    80% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Lifting sheet — single rotating plane                               */
+/* ------------------------------------------------------------------ */
+
+.epub-flip-overlay__sheet {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    transform-style: preserve-3d;
+    backface-visibility: visible;
+    will-change: transform;
+    border-radius: inherit;
+}
+
+.epub-flip-stage.is-flipping-next .epub-flip-overlay__sheet {
+    left: 50%;
+    transform-origin: left center;
+    animation: epub-flip-sheet-next 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.epub-flip-stage.is-flipping-prev .epub-flip-overlay__sheet {
+    left: 0;
+    transform-origin: right center;
+    animation: epub-flip-sheet-prev 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* The sheet rotates -180deg / 180deg with a subtle vertical bow at
+ * the apex (scaleY shrinks ~2%) so the page reads as flexing rather
+ * than rotating as a rigid tile. A single from->mid->to keeps motion
+ * smooth and avoids visible inflection points.
+ */
+@keyframes epub-flip-sheet-next {
+    from {
+        transform: rotateY(0deg) scaleY(1);
+    }
+    50% {
+        transform: rotateY(-90deg) scaleY(0.98);
+    }
+    to {
+        transform: rotateY(-180deg) scaleY(1);
+    }
+}
+
+@keyframes epub-flip-sheet-prev {
+    from {
+        transform: rotateY(0deg) scaleY(1);
+    }
+    50% {
+        transform: rotateY(90deg) scaleY(0.98);
+    }
+    to {
+        transform: rotateY(180deg) scaleY(1);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Sheet faces                                                         */
+/* ------------------------------------------------------------------ */
+
+.epub-flip-overlay__face {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+/* Front face — slightly translucent so it reads as a thin sheet
+ * rather than an opaque card. Only a soft drop shadow is used to
+ * suggest the page floating above the spread; no hard inset border,
+ * no heavy embossing.
+ */
+.epub-flip-overlay__face--front {
+    transform: translateZ(0.05px);
+    background:
+        radial-gradient(
+            ellipse at 30% 20%,
+            rgba(255, 255, 255, 0.35) 0%,
+            rgba(255, 255, 255, 0) 60%
+        ),
+        radial-gradient(
+            ellipse at 70% 80%,
+            rgba(120, 90, 50, 0.04) 0%,
+            rgba(255, 255, 255, 0) 70%
+        ),
+        linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.04),
+            rgba(0, 0, 0, 0.012) 100%
+        ),
+        linear-gradient(
+            to right,
+            rgba(255, 252, 244, 0.93),
+            rgba(252, 246, 232, 0.94)
+        );
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+}
+
+/* Back face — slightly cooler, slightly darker. */
+.epub-flip-overlay__face--back {
+    transform: rotateY(180deg);
+    background:
+        radial-gradient(
+            ellipse at 70% 30%,
+            rgba(255, 255, 255, 0.12) 0%,
+            rgba(255, 255, 255, 0) 65%
+        ),
+        linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.025),
+            rgba(0, 0, 0, 0.008) 100%
+        ),
+        linear-gradient(
+            to right,
+            rgba(244, 238, 222, 0.93),
+            rgba(248, 242, 226, 0.94)
+        );
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.09);
+}
+
+/* ------------------------------------------------------------------ */
+/* Trailing-edge highlight                                             */
+/* A thin specular line that brightens at the outer edge during the    */
+/* turn. This is the strongest "paper catching light" cue available    */
+/* to a single-plane flip.                                             */
+/* ------------------------------------------------------------------ */
+
+.epub-flip-overlay__edge {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 6px;
+    pointer-events: none;
+    background: linear-gradient(
+        to left,
+        rgba(255, 255, 255, 0.5) 0%,
+        rgba(255, 255, 255, 0.14) 60%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    opacity: 0;
+    mix-blend-mode: screen;
+}
+
+.epub-flip-stage.is-flipping-prev .epub-flip-overlay__edge {
+    right: auto;
+    left: 0;
+    background: linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0.5) 0%,
+        rgba(255, 255, 255, 0.14) 60%,
+        rgba(255, 255, 255, 0) 100%
+    );
+}
+
+.epub-flip-stage.is-flipping .epub-flip-overlay__edge {
+    animation: epub-flip-edge 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes epub-flip-edge {
+    0% {
+        opacity: 0;
+    }
+    30% {
+        opacity: 0.8;
+    }
+    65% {
+        opacity: 0.35;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Sheen — diagonal specular sweep across the front face               */
+/* ------------------------------------------------------------------ */
+
+.epub-flip-overlay__sheen {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+        108deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0) 38%,
+        rgba(255, 255, 255, 0.4) 49%,
+        rgba(255, 255, 255, 0.12) 55%,
+        rgba(255, 255, 255, 0) 66%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 240% 100%;
+    background-position: 100% 0;
+    mix-blend-mode: screen;
+    opacity: 0;
+}
+
+.epub-flip-stage.is-flipping-next .epub-flip-overlay__sheen {
+    animation: epub-flip-sheen-next 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.epub-flip-stage.is-flipping-prev .epub-flip-overlay__sheen {
+    animation: epub-flip-sheen-prev 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes epub-flip-sheen-next {
+    0% {
+        background-position: 100% 0;
+        opacity: 0;
+    }
+    50% {
+        opacity: 0.6;
+    }
+    100% {
+        background-position: -40% 0;
+        opacity: 0;
+    }
+}
+
+@keyframes epub-flip-sheen-prev {
+    0% {
+        background-position: -40% 0;
+        opacity: 0;
+    }
+    50% {
+        opacity: 0.6;
+    }
+    100% {
+        background-position: 100% 0;
+        opacity: 0;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Back-of-page paper grain                                            */
+/* ------------------------------------------------------------------ */
+
+.epub-flip-overlay__back-grain {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        92deg,
+        rgba(0, 0, 0, 0.012) 0 2px,
+        rgba(255, 255, 255, 0) 2px 5px
+    );
+    mix-blend-mode: multiply;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Spine cast shadow on the stationary half                            */
+/* ------------------------------------------------------------------ */
+
+.epub-flip-overlay__spine-shadow {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 60%;
+    pointer-events: none;
+    opacity: 0;
+    border-radius: inherit;
+    z-index: 1;
+}
+
+.epub-flip-stage.is-flipping-next .epub-flip-overlay__spine-shadow {
+    right: 50%;
+    left: auto;
+    background: linear-gradient(
+        to left,
+        rgba(0, 0, 0, 0.24) 0%,
+        rgba(0, 0, 0, 0.12) 14%,
+        rgba(0, 0, 0, 0.04) 34%,
+        transparent 60%
+    );
+    animation: epub-flip-spine-cast 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.epub-flip-stage.is-flipping-prev .epub-flip-overlay__spine-shadow {
+    left: 50%;
+    right: auto;
+    background: linear-gradient(
+        to right,
+        rgba(0, 0, 0, 0.24) 0%,
+        rgba(0, 0, 0, 0.12) 14%,
+        rgba(0, 0, 0, 0.04) 34%,
+        transparent 60%
+    );
+    animation: epub-flip-spine-cast 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes epub-flip-spine-cast {
+    0% {
+        opacity: 0;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Single-page (portrait / narrow) layout                              */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 959px) {
+    .epub-flip-overlay__static,
+    .epub-flip-overlay__spine-shadow {
+        display: none !important;
+    }
+
+    .epub-flip-overlay__sheet {
+        width: 100%;
+        left: 0 !important;
+    }
+
+    .epub-flip-stage.is-flipping-next .epub-flip-overlay__sheet {
+        transform-origin: right center;
+        animation: epub-flip-sheet-next-mobile 780ms
+            cubic-bezier(0.4, 0, 0.2, 1) both;
+    }
+
+    .epub-flip-stage.is-flipping-prev .epub-flip-overlay__sheet {
+        transform-origin: left center;
+        animation: epub-flip-sheet-prev-mobile 780ms
+            cubic-bezier(0.4, 0, 0.2, 1) both;
+    }
+
+    @keyframes epub-flip-sheet-next-mobile {
+        from {
+            transform: rotateY(0deg) scaleY(1);
+            opacity: 1;
+        }
+        50% {
+            transform: rotateY(-60deg) scaleY(0.985);
+            opacity: 1;
+        }
+        to {
+            transform: rotateY(-115deg) scaleY(1);
+            opacity: 0;
+        }
+    }
+
+    @keyframes epub-flip-sheet-prev-mobile {
+        from {
+            transform: rotateY(0deg) scaleY(1);
+            opacity: 1;
+        }
+        50% {
+            transform: rotateY(60deg) scaleY(0.985);
+            opacity: 1;
+        }
+        to {
+            transform: rotateY(115deg) scaleY(1);
+            opacity: 0;
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Dark theme                                                          */
+/* ------------------------------------------------------------------ */
+
+.reader-theme-dark .epub-flip-overlay__face--front {
+    background:
+        radial-gradient(
+            ellipse at 30% 20%,
+            rgba(255, 255, 255, 0.04) 0%,
+            rgba(255, 255, 255, 0) 60%
+        ),
+        linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.015),
+            rgba(0, 0, 0, 0.14) 100%
+        ),
+        linear-gradient(
+            to right,
+            rgba(34, 34, 40, 0.93),
+            rgba(20, 20, 24, 0.94)
+        );
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
+}
+
+.reader-theme-dark .epub-flip-overlay__face--back {
+    background:
+        radial-gradient(
+            ellipse at 70% 30%,
+            rgba(255, 255, 255, 0.03) 0%,
+            rgba(255, 255, 255, 0) 65%
+        ),
+        linear-gradient(
+            to right,
+            rgba(28, 28, 32, 0.93),
+            rgba(34, 34, 40, 0.94)
+        );
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.32);
+}
+
+.reader-theme-dark .epub-flip-overlay__sheen {
+    background: linear-gradient(
+        108deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0) 38%,
+        rgba(255, 255, 255, 0.14) 49%,
+        rgba(255, 255, 255, 0.04) 55%,
+        rgba(255, 255, 255, 0) 66%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 240% 100%;
+}
+
+.reader-theme-dark .epub-flip-overlay__edge {
+    background: linear-gradient(
+        to left,
+        rgba(255, 255, 255, 0.2) 0%,
+        rgba(255, 255, 255, 0.05) 60%,
+        rgba(255, 255, 255, 0) 100%
+    );
+}
+
+.reader-theme-dark .epub-flip-stage.is-flipping-prev .epub-flip-overlay__edge {
+    background: linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0.2) 0%,
+        rgba(255, 255, 255, 0.05) 60%,
+        rgba(255, 255, 255, 0) 100%
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion                                                      */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+    .epub-flip-stage,
+    .epub-flip-page,
+    .epub-flip-overlay,
+    .epub-flip-overlay__sheet,
+    .epub-flip-overlay__static,
+    .epub-flip-overlay__face,
+    .epub-flip-overlay__edge,
+    .epub-flip-overlay__sheen,
+    .epub-flip-overlay__spine-shadow {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+
+    .epub-flip-stage.is-flipping .epub-flip-overlay,
+    .epub-flip-stage.is-flipping .epub-flip-overlay__static,
+    .epub-flip-stage.is-flipping .epub-flip-overlay__spine-shadow {
+        opacity: 0 !important;
+    }
+}
