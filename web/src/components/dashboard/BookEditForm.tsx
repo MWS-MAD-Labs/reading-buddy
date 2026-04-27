@@ -395,13 +395,13 @@ export const BookEditForm = ({
     const hasNewPdf = Boolean(pdfFile && pdfFile.size > 0);
     const hasNewCover = Boolean(coverFile && coverFile.size > 0);
 
-    const initialFormat =
+    const initialFormat: SupportedEbookFormat =
       (book.fileFormat as SupportedEbookFormat | undefined) ?? "pdf";
 
     try {
       setStatus("request");
 
-      let replacementFormat = hasNewPdf ? detectedFormat : initialFormat;
+      let replacementFormat: SupportedEbookFormat = initialFormat;
       let pdfUrl = book.pdfUrl;
       let coverUrl = book.coverUrl;
       let resolvedPageCount = pageCount ?? book.pageCount;
