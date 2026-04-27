@@ -985,6 +985,13 @@ export const renderBookImages = async (bookId: number) => {
     ),
     path.join(
       process.cwd(),
+      "..",
+      "node_modules",
+      ".bin",
+      process.platform === "win32" ? "tsx.cmd" : "tsx",
+    ),
+    path.join(
+      process.cwd(),
       "web",
       "node_modules",
       ".bin",
@@ -997,6 +1004,7 @@ export const renderBookImages = async (bookId: number) => {
 
   const tsxCliCandidates = [
     path.join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs"),
+    path.join(process.cwd(), "..", "node_modules", "tsx", "dist", "cli.mjs"),
     path.join(process.cwd(), "web", "node_modules", "tsx", "dist", "cli.mjs"),
   ];
   const tsxCliPath = tsxCliCandidates.find((candidate) =>
