@@ -91,7 +91,7 @@ RUN groupadd --system --gid 1001 nodejs \
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./web/.next/static
 
 # Include full runtime node_modules for background TS worker dependencies
 # (e.g. tsx/esbuild/minio/pg) which may not be fully traced by standalone output.
@@ -107,7 +107,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/web/src ./web/src
 COPY --from=builder --chown=nextjs:nodejs /app/web/tsconfig.json ./web/tsconfig.json
 
 # Set the correct permission for prerender cache
-RUN mkdir -p ./.next && chown -R nextjs:nodejs ./.next
+RUN mkdir -p ./web/.next && chown -R nextjs:nodejs ./web/.next
 
 USER nextjs
 
