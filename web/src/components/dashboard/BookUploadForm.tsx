@@ -117,7 +117,7 @@ export const BookUploadForm = ({
 }: BookUploadFormProps) => {
   const router = useRouter();
   const [status, setStatus] = useState<UploadState>("idle");
-  const [isClosing, setIsClosing] = useState(false);
+  const [isReadyToClose, setIsReadyToClose] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<BookFormFieldErrors>({});
@@ -194,7 +194,7 @@ export const BookUploadForm = ({
     setError(null);
     setSuccess(null);
     setStatus("idle");
-    setIsClosing(false);
+    setIsReadyToClose(false);
   };
 
   const validateForm = (formData: FormData) => {
@@ -646,14 +646,11 @@ export const BookUploadForm = ({
       );
       setUploadProgress({ book: 100, cover: 100 });
       setRenderingProgress(
-        (prev) => prev || "Everything is ready. Closing this form...",
+        (prev) =>
+          prev ||
+          "Everything is ready. Review the result, then click Finish Upload to close this form.",
       );
-      setIsClosing(true);
-      setTimeout(() => {
-        form.reset();
-        resetTransientState();
-        onSuccess?.();
-      }, 1200);
+      setIsReadyToClose(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed.";
       setError(message);
@@ -662,13 +659,19 @@ export const BookUploadForm = ({
     }
   };
 
+  const handleFinishUpload = () => {
+    formRef.current?.reset();
+    resetTransientState();
+    onSuccess?.();
+  };
+
   const handleCancel = () => {
     formRef.current?.reset();
     resetTransientState();
     onCancel?.();
   };
 
-  const isBusy = status !== "idle" || isClosing;
+  const isBusy = status !== "idle";
   const stageMeta = mapStatusToStage(status);
   const stages =
     isBusy || Boolean(success) || Boolean(error) || Boolean(renderingProgress)
@@ -684,9 +687,7 @@ export const BookUploadForm = ({
       ? Math.round(
           (renderingPageProgress.current / renderingPageProgress.total) * 100,
         )
-      : isClosing
-        ? 100
-        : 0;
+      : 0;
 
   const processingSummaryParts = [
     renderingProgress,
@@ -871,12 +872,31 @@ export const BookUploadForm = ({
         />
       ) : null}
 
-      <BookFormActions
-        isBusy={isBusy}
-        submitLabel="Upload book"
-        busyLabel={isClosing ? "Finishing..." : getBusyLabel(status)}
-        onCancel={handleCancel}
-      />
+      {isReadyToClose ? (
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={handleFinishUpload}
+            className="btn-3d btn-squish flex-1 rounded-2xl border-4 border-emerald-300 bg-gradient-to-r from-emerald-500 to-teal-500 px-8 py-4 text-xl font-black text-white shadow-xl transition hover:from-emerald-600 hover:to-teal-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-400/60 sm:flex-none"
+          >
+            Finish Upload
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsReadyToClose(false)}
+            className="rounded-2xl border-4 border-indigo-200 bg-white px-6 py-4 text-base font-bold text-indigo-700 transition hover:bg-indigo-50"
+          >
+            Keep Open
+          </button>
+        </div>
+      ) : (
+        <BookFormActions
+          isBusy={isBusy}
+          submitLabel="Upload book"
+          busyLabel={getBusyLabel(status)}
+          onCancel={handleCancel}
+        />
+      )}
     </form>
   );
 };
