@@ -543,6 +543,15 @@ export const BookEditForm = ({
 
             if (renderStatus.completed) {
               renderComplete = true;
+              const completedPageCount =
+                renderStatus.pageCount ??
+                renderStatus.totalPages ??
+                renderStatus.processedPages ??
+                0;
+              setRenderingPageProgress({
+                current: completedPageCount,
+                total: completedPageCount,
+              });
               setRenderingProgress(
                 `Conversion complete. ${renderStatus.pageCount} pages are ready.`,
               );
@@ -610,6 +619,15 @@ export const BookEditForm = ({
 
                 if (renderStatus.completed) {
                   renderComplete = true;
+                  const completedPageCount =
+                    renderStatus.pageCount ??
+                    renderStatus.totalPages ??
+                    renderStatus.processedPages ??
+                    0;
+                  setRenderingPageProgress({
+                    current: completedPageCount,
+                    total: completedPageCount,
+                  });
                   setRenderingProgress(
                     `Rendered ${renderStatus.pageCount} pages as images.`,
                   );

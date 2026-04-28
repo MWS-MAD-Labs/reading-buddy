@@ -560,6 +560,15 @@ export const BookUploadForm = ({
 
           if (renderStatus.completed) {
             renderComplete = true;
+            const finalPageCount =
+              renderStatus.pageCount ??
+              renderStatus.totalPages ??
+              renderStatus.processedPages ??
+              renderingPageProgress.total;
+            setRenderingPageProgress({
+              current: finalPageCount,
+              total: finalPageCount,
+            });
             setRenderingProgress(
               `Conversion complete. ${renderStatus.pageCount} pages are ready.`,
             );
@@ -609,6 +618,15 @@ export const BookUploadForm = ({
 
           if (renderStatus.completed) {
             renderComplete = true;
+            const finalPageCount =
+              renderStatus.pageCount ??
+              renderStatus.totalPages ??
+              renderStatus.processedPages ??
+              renderingPageProgress.total;
+            setRenderingPageProgress({
+              current: finalPageCount,
+              total: finalPageCount,
+            });
             setRenderingProgress(
               `Rendered ${renderStatus.pageCount} pages as images.`,
             );

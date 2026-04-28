@@ -2,7 +2,11 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { getMinioBucketName, getMinioClient } from "@/lib/minio";
+import {
+  getMinioBucketName,
+  getMinioClient,
+  getMinioPublicClient,
+} from "@/lib/minio";
 import { getCurrentUser } from "@/lib/auth/server";
 import { queryWithContext } from "@/lib/db";
 import {
@@ -154,7 +158,6 @@ export const generatePresignedUploadUrls = async (input: {
   pdfFilename: string;
   coverFilename: string;
 }) => {
-  const minioClient = getMinioClient();
   const bucketName = getMinioBucketName();
 
   const sanitizedPdfFilename = sanitizeFilename(input.pdfFilename);
@@ -163,9 +166,11 @@ export const generatePresignedUploadUrls = async (input: {
   const pdfObjectKey = `books/${randomUUID()}-${sanitizedPdfFilename}`;
   const coverObjectKey = `covers/${randomUUID()}-${sanitizedCoverFilename}`;
 
+  const publicMinioClient = getMinioPublicClient();
+
   const [pdfUploadUrl, coverUploadUrl] = await Promise.all([
-    minioClient.presignedPutObject(bucketName, pdfObjectKey, 60 * 5),
-    minioClient.presignedPutObject(bucketName, coverObjectKey, 60 * 5),
+    publicMinioClient.presignedPutObject(bucketName, pdfObjectKey, 60 * 5),
+    publicMinioClient.presignedPutObject(bucketName, coverObjectKey, 60 * 5),
   ]);
 
   return {

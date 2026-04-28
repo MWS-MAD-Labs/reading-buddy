@@ -1,4 +1,4 @@
-import { Client as MinioClient } from 'minio';
+import { Client as MinioClient } from "minio";
 
 type MinioConfig = {
   endPoint: string;
@@ -10,6 +10,7 @@ type MinioConfig = {
 };
 
 let client: MinioClient | null = null;
+let publicClient: MinioClient | null = null;
 
 const getEndpointEnv = (scope: "internal" | "public") => {
   if (scope === "internal") {
@@ -28,17 +29,17 @@ const getEndpointEnv = (scope: "internal" | "public") => {
   };
 };
 
-const getConfig = (): MinioConfig => {
-  const endpointEnv = getEndpointEnv("internal");
+const getConfig = (scope: "internal" | "public" = "internal"): MinioConfig => {
+  const endpointEnv = getEndpointEnv(scope);
   const endPoint = endpointEnv.endPoint;
   const port = Number(endpointEnv.port ?? 443);
-  const useSSL = endpointEnv.useSSL !== 'false';
+  const useSSL = endpointEnv.useSSL !== "false";
   const accessKey = process.env.MINIO_ACCESS_KEY;
   const secretKey = process.env.MINIO_SECRET_KEY;
   const bucketName = process.env.MINIO_BUCKET_NAME;
 
   if (!endPoint || !accessKey || !secretKey || !bucketName) {
-    throw new Error('MinIO environment variables are missing.');
+    throw new Error("MinIO environment variables are missing.");
   }
 
   return {
@@ -56,10 +57,21 @@ export const getMinioClient = () => {
     return client;
   }
 
-  const { bucketName, ...clientConfig } = getConfig();
+  const { bucketName, ...clientConfig } = getConfig("internal");
   void bucketName;
   client = new MinioClient(clientConfig);
   return client;
+};
+
+export const getMinioPublicClient = () => {
+  if (publicClient) {
+    return publicClient;
+  }
+
+  const { bucketName, ...clientConfig } = getConfig("public");
+  void bucketName;
+  publicClient = new MinioClient(clientConfig);
+  return publicClient;
 };
 
 export const getMinioBucketName = () => getConfig().bucketName;
