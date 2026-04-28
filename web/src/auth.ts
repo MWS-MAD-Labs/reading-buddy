@@ -202,7 +202,6 @@ export const authOptions: NextAuthConfig = {
 
         // Store user_id in session for RLS context
         session.user.userId = userId;
-        console.log("Session callback - setting userId:", userId);
 
         // Get profile
         const result = await authPool.query(
