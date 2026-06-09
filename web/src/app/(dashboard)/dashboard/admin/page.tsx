@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { AdminUserTable } from "@/components/dashboard/AdminUserTable";
+import {
+  Badge,
+  buttonVariants,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { query } from "@/lib/db";
+import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 
@@ -34,37 +43,49 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-3xl border border-[#1F2A44]/15 bg-gradient-to-br from-white to-[#E9EDF6] p-6 soft-shadow">
-        <div className="heading-font mb-3 inline-flex rounded-full bg-[#E9EDF6] px-4 py-1 text-xs font-bold uppercase tracking-[0.22em] text-[#1F2A44]">
-          Admin panel
+      <Card variant="glow" padding="cozy">
+        <CardHeader className="mb-5">
+          <Badge variant="neutral" className="w-fit">
+            Admin panel
+          </Badge>
+          <CardTitle className="text-3xl text-[#7E1518] md:text-4xl">
+            User Management
+          </CardTitle>
+          <CardDescription className="max-w-2xl">
+            Manage users, roles, access levels, badges, and login messages for
+            the entire Reading Buddy system.
+          </CardDescription>
+        </CardHeader>
+        <div className="mb-5 flex flex-wrap gap-2">
+          <Badge variant="bubble">{users.length} users</Badge>
+          <Badge variant="sky">
+            {new Set(users.map((user) => user.role)).size} roles active
+          </Badge>
+          <Badge variant="lime">
+            {users.filter((user) => user.role === "STUDENT").length} students
+          </Badge>
         </div>
-        <h1 className="heading-font text-3xl font-extrabold text-[#7E1518]">
-          User Management
-        </h1>
-        <p className="mt-2 max-w-2xl text-base leading-7 text-[#5d4b4c]">
-          Manage users, roles, and access levels for the entire system.
-        </p>
-        <div className="mt-4 flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Link
             href="/dashboard/admin/badges"
-            className="heading-font inline-flex items-center gap-2 rounded-full bg-[#D6A13A] px-4 py-2 text-sm font-bold text-[#241718] transition hover:bg-[#c28e28]"
+            className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
           >
             Manage Badges
           </Link>
           <Link
             href="/dashboard/admin/broadcasts"
-            className="heading-font inline-flex items-center gap-2 rounded-full border border-[#1F2A44]/15 bg-white px-4 py-2 text-sm font-bold text-[#1F2A44] transition hover:bg-[#E9EDF6]"
+            className={cn(buttonVariants({ variant: "neutral", size: "sm" }))}
           >
             Login Messages
           </Link>
           <Link
             href="/dashboard"
-            className="heading-font inline-flex items-center gap-2 rounded-full border border-[#7E1518]/20 bg-white px-4 py-2 text-sm font-bold text-[#7E1518] transition hover:bg-[#F5E7E8]"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
-            📊 System Overview
+            System Overview
           </Link>
         </div>
-      </header>
+      </Card>
 
       <AdminUserTable users={users} />
     </div>

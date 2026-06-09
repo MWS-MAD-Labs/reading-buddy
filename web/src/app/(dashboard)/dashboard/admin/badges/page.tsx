@@ -1,9 +1,15 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/auth/roleCheck";
 import {
-  getAllBadges,
-  getBooksForBadgeAssignment,
-} from "../badge-actions";
+  Badge,
+  buttonVariants,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
+import { requireRole } from "@/lib/auth/roleCheck";
+import { cn } from "@/lib/cn";
+import { getAllBadges, getBooksForBadgeAssignment } from "../badge-actions";
 import {
   BadgeManager,
   type UserPermissions,
@@ -43,30 +49,33 @@ export default async function AdminBadgesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <header className="rounded-[32px] border border-white/60 bg-white/85 p-6 text-indigo-950 shadow-[0_25px_70px_rgba(147,118,255,0.25)]">
-        <div className="flex items-center gap-2 text-sm text-indigo-400">
-          <Link
-            href={isAdmin ? "/dashboard/admin" : "/dashboard/librarian"}
-            className="hover:text-indigo-600"
-          >
-            {isAdmin ? "Admin" : "Librarian"} Dashboard
-          </Link>
-          <span>/</span>
-          <span className="text-indigo-600">Badge Management</span>
-        </div>
-        <h1 className="mt-2 text-3xl font-black">Badge Management</h1>
-        <p className="text-sm text-indigo-500">{headerDescription}</p>
-      </header>
+      <Card variant="glow" padding="cozy">
+        <CardHeader className="mb-5">
+          <Badge variant="neutral" className="w-fit">
+            {isAdmin ? "Admin panel" : "Librarian tools"}
+          </Badge>
+          <CardTitle className="text-3xl text-[#7E1518] md:text-4xl">
+            Badge Management
+          </CardTitle>
+          <CardDescription className="max-w-3xl">
+            {headerDescription}
+          </CardDescription>
+        </CardHeader>
+        <Link
+          href={isAdmin ? "/dashboard/admin" : "/dashboard/librarian"}
+          className={cn(buttonVariants({ variant: "neutral", size: "sm" }))}
+        >
+          Back to {isAdmin ? "admin" : "librarian"} home
+        </Link>
+      </Card>
 
-      {/* Badge Manager Component */}
-      <div className="rounded-[28px] border border-white/70 bg-white/85 p-6 shadow-[0_20px_60px_rgba(147,118,255,0.18)]">
+      <Card variant="frosted" padding="cozy">
         <BadgeManager
           initialBadges={badges}
           books={books}
           permissions={permissions}
         />
-      </div>
+      </Card>
     </div>
   );
 }

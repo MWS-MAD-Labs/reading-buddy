@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { BroadcastManager } from "@/components/dashboard/BroadcastManager";
+import {
+  Badge,
+  buttonVariants,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { query } from "@/lib/db";
 import type { LoginBroadcast } from "@/lib/broadcasts";
+import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 
@@ -30,25 +39,28 @@ export default async function AdminBroadcastsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-3xl border border-[#B8DDF8]/60 bg-gradient-to-br from-white to-[#EFF8FE] p-6 soft-shadow">
-        <div className="heading-font mb-3 inline-flex rounded-full bg-[#E9EDF6] px-4 py-1 text-xs font-bold uppercase tracking-[0.22em] text-[#1F2A44]">
-          Admin panel
-        </div>
-        <h1 className="heading-font text-3xl font-extrabold text-[#7E1518]">
-          Login Broadcasts
-        </h1>
-        <p className="mt-2 max-w-2xl text-base leading-7 text-[#5d4b4c]">
-          Publish short changelog or status notes that appear on the login page.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
+      <Card variant="glow" padding="cozy">
+        <CardHeader className="mb-5">
+          <Badge variant="neutral" className="w-fit">
+            Admin panel
+          </Badge>
+          <CardTitle className="text-3xl text-[#7E1518] md:text-4xl">
+            Login Broadcasts
+          </CardTitle>
+          <CardDescription className="max-w-2xl">
+            Publish short changelog or status notes that appear on the login
+            page.
+          </CardDescription>
+        </CardHeader>
+        <div className="flex flex-wrap gap-3">
           <Link
             href="/dashboard/admin"
-            className="heading-font inline-flex items-center gap-2 rounded-full border border-[#1F2A44]/15 bg-white px-4 py-2 text-sm font-bold text-[#1F2A44] transition hover:bg-[#E9EDF6]"
+            className={cn(buttonVariants({ variant: "neutral", size: "sm" }))}
           >
             Back to admin home
           </Link>
         </div>
-      </header>
+      </Card>
 
       <BroadcastManager broadcasts={broadcasts} />
     </div>

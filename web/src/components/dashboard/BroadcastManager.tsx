@@ -158,7 +158,7 @@ export function BroadcastManager({
                   required
                   rows={5}
                   maxLength={500}
-                  className="w-full rounded-2xl border-4 border-purple-200 bg-white/90 px-4 py-3 text-base font-semibold text-indigo-950 shadow-inner transition focus-visible:border-purple-400 focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                  className="focus-ring w-full rounded-2xl border border-[#eadfda] bg-white px-4 py-3 text-base font-medium text-[#241718] placeholder:text-[#9b898a] transition focus-visible:border-[#D6A13A]"
                   value={form.body}
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, body: event.target.value }))
@@ -174,7 +174,7 @@ export function BroadcastManager({
                   <select
                     id="tone"
                     name="tone"
-                    className="w-full rounded-2xl border-4 border-purple-200 bg-white/90 px-4 py-3 text-base font-semibold text-indigo-950 shadow-inner transition focus-visible:border-purple-400 focus-visible:ring-2 focus-visible:ring-purple-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                    className="focus-ring w-full rounded-2xl border border-[#eadfda] bg-white px-4 py-3 text-base font-medium text-[#241718] transition focus-visible:border-[#D6A13A]"
                     value={form.tone}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -192,12 +192,12 @@ export function BroadcastManager({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="isActive">Status</Label>
-                  <div className="flex items-center gap-2 rounded-2xl border-4 border-purple-200 bg-white/90 px-4 py-3 text-sm font-semibold text-indigo-900 shadow-inner">
+                  <div className="flex items-center gap-2 rounded-2xl border border-[#eadfda] bg-white px-4 py-3 text-sm font-semibold text-[#241718]">
                     <input
                       id="isActive"
                       name="isActive"
                       type="checkbox"
-                      className="h-5 w-5 accent-purple-600"
+                      className="h-5 w-5 accent-[#7E1518]"
                       checked={form.isActive}
                       onChange={(event) =>
                         setForm((prev) => ({
@@ -248,7 +248,6 @@ export function BroadcastManager({
                 type="submit"
                 loading={isSaving}
                 size="md"
-                icon="✦"
                 className="w-full"
               >
                 Publish message
@@ -266,7 +265,7 @@ export function BroadcastManager({
             </Badge>
             <CardTitle className="text-2xl">Recent broadcasts</CardTitle>
           </div>
-          <span className="text-sm font-semibold text-indigo-600">
+          <span className="text-sm font-semibold text-[#6f6061]">
             {rows.length} saved
           </span>
         </CardHeader>
@@ -279,14 +278,14 @@ export function BroadcastManager({
             rows.map((row: any) => (
               <div
                 key={row.id}
-                className="rounded-2xl border-2 border-indigo-100 bg-white/90 p-4 shadow-sm"
+                className="rounded-2xl border border-[#eadfda] bg-white p-4 shadow-sm"
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
                         className={cn(
-                          "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide",
+                          "heading-font inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide",
                           toneBadgeStyles[
                             row.tone as keyof typeof toneBadgeStyles
                           ] ?? toneBadgeStyles.info,
@@ -303,15 +302,15 @@ export function BroadcastManager({
                         {row.isActive ? "Active" : "Inactive"}
                       </Badge>
                       {row.createdAt ? (
-                        <span className="text-xs font-semibold text-indigo-500">
+                        <span className="text-xs font-semibold text-[#6f6061]">
                           {new Date(row.createdAt).toLocaleString()}
                         </span>
                       ) : null}
                     </div>
-                    <h3 className="text-lg font-black text-indigo-900">
+                    <h3 className="heading-font text-lg font-bold text-[#241718]">
                       {row.title}
                     </h3>
-                    <p className="text-sm font-semibold text-indigo-700 whitespace-pre-wrap">
+                    <p className="text-sm font-semibold text-[#5d4b4c] whitespace-pre-wrap">
                       {row.body}
                     </p>
                     {row.linkUrl ? (
@@ -319,7 +318,7 @@ export function BroadcastManager({
                         href={row.linkUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-2 text-sm font-bold text-indigo-700 underline-offset-4 hover:underline"
+                        className="inline-flex items-center gap-2 text-sm font-bold text-[#7E1518] underline-offset-4 hover:underline"
                       >
                         {row.linkLabel || "Open link"}
                       </a>

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type {
-  Badge,
   BadgeType,
   BadgeTier,
   BadgeCategory,
@@ -13,13 +12,22 @@ import {
   updateBadge,
   deleteBadge,
   toggleBadgeActive,
-  createBookCompletionBadge,
   uploadBadgeIcon,
   generateBadgeIconWithAI,
   type BadgeWithBook,
   type CreateBadgeInput,
   type UpdateBadgeInput,
 } from "@/app/(dashboard)/dashboard/admin/badge-actions";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  FieldError,
+  Input,
+  Label,
+  Select,
+} from "@/components/ui";
 
 // ============================================================================
 // Constants
@@ -290,55 +298,46 @@ export function BadgeManager({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-indigo-950">
+          <h2 className="heading-font text-2xl font-bold text-[#241718]">
             Badge Management
           </h2>
-          <p className="text-sm text-indigo-500">
+          <p className="text-sm text-[#5d4b4c]">
             {permissions.canCreateAllBadges
               ? "Create, edit, and manage all badges for students."
               : "Create and manage book-specific completion badges."}
           </p>
         </div>
-        <button
+        <Button
+          type="button"
           onClick={() => setIsCreateModalOpen(true)}
-          className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-2 font-semibold text-white shadow-lg transition hover:scale-105"
+          variant="secondary"
         >
-          +{" "}
           {permissions.canOnlyCreateBookBadges
             ? "Create Book Badge"
             : "Create Badge"}
-        </button>
+        </Button>
       </div>
 
-      {/* Message */}
       {message && (
-        <div
-          className={`rounded-lg p-4 ${
-            message.type === "success"
-              ? "border border-green-200 bg-green-50 text-green-800"
-              : "border border-red-200 bg-red-50 text-red-800"
-          }`}
-        >
+        <Alert variant={message.type === "success" ? "success" : "error"}>
           {message.text}
-        </div>
+        </Alert>
       )}
 
-      {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
-        <input
+        <Input
           type="text"
           placeholder="Search badges..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="rounded-lg border border-indigo-200 px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          className="max-w-sm"
         />
-        <select
+        <Select
           value={filter}
           onChange={(e) => setFilter(e.target.value as typeof filter)}
-          className="rounded-lg border border-indigo-200 px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          className="max-w-xs"
         >
           <option value="all">All Badges ({badges.length})</option>
           <option value="active">
@@ -350,19 +349,17 @@ export function BadgeManager({
           <option value="book-specific">
             Book-Specific ({badges.filter((b: any) => b.book_id).length})
           </option>
-        </select>
+        </Select>
       </div>
 
       {/* Badge Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredBadges.map((badge: any) => (
-          <div
+          <Card
             key={badge.id}
-            className={`relative rounded-2xl border-2 p-4 transition ${
-              badge.is_active
-                ? "border-indigo-200 bg-white"
-                : "border-gray-200 bg-gray-50 opacity-60"
-            }`}
+            variant="frosted"
+            padding="snug"
+            className={badge.is_active ? "relative" : "relative opacity-60"}
           >
             {/* Tier Badge */}
             <div className="absolute -top-2 left-3">
@@ -375,20 +372,14 @@ export function BadgeManager({
 
             {/* Active/Inactive indicator */}
             <div className="absolute -top-2 right-3">
-              <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                  badge.is_active
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-200 text-gray-500"
-                }`}
-              >
+              <Badge variant={badge.is_active ? "lime" : "neutral"} size="sm">
                 {badge.is_active ? "Active" : "Inactive"}
-              </span>
+              </Badge>
             </div>
 
             <div className="mt-3 flex items-start gap-3">
               {/* Icon */}
-              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-2xl">
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#EFF8FE] text-2xl">
                 {badge.icon_url ? (
                   <img
                     src={badge.icon_url}
@@ -402,21 +393,21 @@ export function BadgeManager({
 
               {/* Info */}
               <div className="flex-1 space-y-1">
-                <h3 className="font-bold text-indigo-900">{badge.name}</h3>
-                <p className="text-xs text-gray-600 line-clamp-2">
+                <h3 className="font-bold text-[#241718]">{badge.name}</h3>
+                <p className="text-xs text-[#5d4b4c] line-clamp-2">
                   {badge.description}
                 </p>
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="rounded bg-indigo-50 px-2 py-0.5 text-indigo-600">
+                  <Badge variant="sky" size="sm">
                     +{badge.xp_reward} XP
-                  </span>
-                  <span className="rounded bg-gray-100 px-2 py-0.5 text-gray-600">
+                  </Badge>
+                  <Badge variant="neutral" size="sm">
                     {badge.badge_type.replace(/_/g, " ")}
-                  </span>
+                  </Badge>
                 </div>
                 {badge.book && (
-                  <p className="text-xs text-purple-600">
-                    📚 {badge.book.title}
+                  <p className="text-xs font-semibold text-[#7E1518]">
+                    {badge.book.title}
                   </p>
                 )}
               </div>
@@ -425,47 +416,51 @@ export function BadgeManager({
             {/* Actions */}
             <div className="mt-4 flex gap-2">
               {canEditBadge(badge) && (
-                <button
+                <Button
+                  type="button"
+                  variant="neutral"
+                  size="sm"
+                  className="flex-1"
                   onClick={() => setEditingBadge(badge)}
-                  className="flex-1 rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
                 >
                   Edit
-                </button>
+                </Button>
               )}
               {canEditBadge(badge) && (
-                <button
+                <Button
+                  type="button"
+                  variant={badge.is_active ? "outline" : "secondary"}
+                  size="sm"
+                  className="flex-1"
                   onClick={() => handleToggleActive(badge)}
-                  className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
-                    badge.is_active
-                      ? "border-amber-200 text-amber-600 hover:bg-amber-50"
-                      : "border-green-200 text-green-600 hover:bg-green-50"
-                  }`}
                 >
                   {badge.is_active ? "Deactivate" : "Activate"}
-                </button>
+                </Button>
               )}
               {canDeleteBadge(badge) && (
-                <button
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
                   onClick={() => handleDeleteBadge(badge)}
-                  className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
                 >
                   Delete
-                </button>
+                </Button>
               )}
               {!canEditBadge(badge) && (
-                <span className="flex-1 rounded-lg bg-gray-100 px-3 py-1.5 text-center text-xs text-gray-500">
+                <Badge variant="neutral" className="flex-1 justify-center">
                   View Only
-                </span>
+                </Badge>
               )}
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
       {filteredBadges.length === 0 && (
-        <div className="rounded-2xl border-2 border-dashed border-indigo-200 p-8 text-center">
-          <p className="text-indigo-500">No badges found.</p>
-        </div>
+        <Card variant="frosted" padding="cozy" className="text-center">
+          <p className="text-[#5d4b4c]">No badges found.</p>
+        </Card>
       )}
 
       {/* Create Modal */}
@@ -664,40 +659,34 @@ function BadgeFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-black text-indigo-950">{title}</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            ✕
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] border border-[#eadfda] bg-white p-6 shadow-2xl">
+        <div className="mb-6 flex items-center justify-between border-b border-[#eadfda] pb-4">
+          <h2 className="heading-font text-xl font-bold text-[#241718]">
+            {title}
+          </h2>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            Close
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
-              Badge Name *
-            </label>
-            <input
+            <Label>Badge Name *</Label>
+            <Input
               type="text"
               value={formData.name}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, name: e.target.value }))
               }
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
               required
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
-              Description
-            </label>
+            <Label>Description</Label>
             <textarea
               value={formData.description}
               onChange={(e) =>
@@ -706,7 +695,7 @@ function BadgeFormModal({
                   description: e.target.value,
                 }))
               }
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
+              className="focus-ring w-full rounded-2xl border border-[#eadfda] bg-white px-4 py-3 text-base font-medium text-[#241718] transition focus-visible:border-[#D6A13A]"
               rows={2}
             />
           </div>
@@ -714,10 +703,8 @@ function BadgeFormModal({
           {/* Type and Category Row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                Badge Type *
-              </label>
-              <select
+              <Label>Badge Type *</Label>
+              <Select
                 value={formData.badge_type}
                 onChange={(e) => {
                   const newType = e.target.value as BadgeType;
@@ -733,21 +720,18 @@ function BadgeFormModal({
                     setCriteriaType("books_completed");
                   }
                 }}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
               >
-                {availableBadgeTypes.map((type: any) => (
+                {availableBadgeTypes.map((type) => (
                   <option key={type.value} value={type.value}>
                     {type.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                Category
-              </label>
-              <select
+              <Label>Category</Label>
+              <Select
                 value={formData.category}
                 onChange={(e) =>
                   setFormData((prev) => ({
@@ -755,74 +739,64 @@ function BadgeFormModal({
                     category: e.target.value as BadgeCategory,
                   }))
                 }
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
               >
-                {BADGE_CATEGORIES.map((cat: any) => (
+                {BADGE_CATEGORIES.map((cat) => (
                   <option key={cat.value} value={cat.value}>
                     {cat.icon} {cat.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
           {/* Book Selection (for book-specific badges) */}
           {formData.badge_type === "book_completion_specific" && (
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                Select Book *
-              </label>
-              <select
+              <Label>Select Book *</Label>
+              <Select
                 value={formData.book_id || ""}
                 onChange={(e) =>
                   handleBookChange(
                     e.target.value ? Number(e.target.value) : undefined,
                   )
                 }
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
                 required
               >
                 <option value="">Select a book...</option>
-                {books.map((book: any) => (
+                {books.map((book) => (
                   <option key={book.id} value={book.id}>
                     {book.title} by {book.author}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
 
           {/* Criteria Section */}
           {formData.badge_type !== "book_completion_specific" && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Unlock Criteria
-              </label>
+            <Card variant="frosted" padding="snug">
+              <Label>Unlock Criteria</Label>
               <div className="space-y-3">
-                <select
+                <Select
                   value={criteriaType}
                   onChange={(e) => setCriteriaType(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
                 >
-                  {CRITERIA_TYPES.map((type: any) => (
+                  {CRITERIA_TYPES.map((type) => (
                     <option key={type.value} value={type.value}>
                       {type.label}
                     </option>
                   ))}
-                </select>
+                </Select>
 
                 {CRITERIA_TYPES.find((c) => c.value === criteriaType)
                   ?.hasCount && (
                   <div>
-                    <label className="text-xs text-gray-500">
-                      Required Count
-                    </label>
-                    <input
+                    <Label className="text-xs">Required Count</Label>
+                    <Input
                       type="number"
                       min="1"
                       value={criteriaCount}
                       onChange={(e) => setCriteriaCount(Number(e.target.value))}
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
                     />
                   </div>
                 )}
@@ -830,15 +804,12 @@ function BadgeFormModal({
                 {CRITERIA_TYPES.find((c) => c.value === criteriaType)
                   ?.hasDays && (
                   <div>
-                    <label className="text-xs text-gray-500">
-                      Required Days
-                    </label>
-                    <input
+                    <Label className="text-xs">Required Days</Label>
+                    <Input
                       type="number"
                       min="1"
                       value={criteriaDays}
                       onChange={(e) => setCriteriaDays(Number(e.target.value))}
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
                     />
                   </div>
                 )}
@@ -846,10 +817,8 @@ function BadgeFormModal({
                 {CRITERIA_TYPES.find((c) => c.value === criteriaType)
                   ?.hasMinScore && (
                   <div>
-                    <label className="text-xs text-gray-500">
-                      Minimum Score (%)
-                    </label>
-                    <input
+                    <Label className="text-xs">Minimum Score (%)</Label>
+                    <Input
                       type="number"
                       min="1"
                       max="100"
@@ -857,21 +826,18 @@ function BadgeFormModal({
                       onChange={(e) =>
                         setCriteriaMinScore(Number(e.target.value))
                       }
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
                     />
                   </div>
                 )}
               </div>
-            </div>
+            </Card>
           )}
 
           {/* Tier and XP Row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                Tier
-              </label>
-              <select
+              <Label>Tier</Label>
+              <Select
                 value={formData.tier}
                 onChange={(e) =>
                   setFormData((prev) => ({
@@ -879,21 +845,18 @@ function BadgeFormModal({
                     tier: e.target.value as BadgeTier,
                   }))
                 }
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
               >
-                {BADGE_TIERS.map((tier: any) => (
+                {BADGE_TIERS.map((tier) => (
                   <option key={tier.value} value={tier.value}>
                     {tier.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">
-                XP Reward
-              </label>
-              <input
+              <Label>XP Reward</Label>
+              <Input
                 type="number"
                 min="0"
                 value={formData.xp_reward}
@@ -903,21 +866,18 @@ function BadgeFormModal({
                     xp_reward: Number(e.target.value),
                   }))
                 }
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
               />
             </div>
           </div>
 
           {/* Badge Icon */}
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
-              Badge Icon (optional)
-            </label>
+            <Label>Badge Icon (optional)</Label>
 
             {/* Icon Preview */}
             {formData.icon_url && (
               <div className="mb-3 flex items-center gap-3">
-                <div className="flex h-16 w-16 items-center justify-center rounded-xl border-2 border-indigo-200 bg-indigo-50">
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-[#eadfda] bg-[#EFF8FE]">
                   <img
                     src={formData.icon_url}
                     alt="Badge icon preview"
@@ -927,51 +887,30 @@ function BadgeFormModal({
                     }}
                   />
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="danger"
+                  size="sm"
                   onClick={() =>
                     setFormData((prev) => ({ ...prev, icon_url: "" }))
                   }
-                  className="text-sm text-red-500 hover:text-red-700"
                 >
                   Remove
-                </button>
+                </Button>
               </div>
             )}
 
             {/* AI Generation Button */}
-            <button
+            <Button
               type="button"
               onClick={handleGenerateAI}
-              disabled={isGeneratingAI || !formData.name}
-              className="w-full rounded-lg border-2 border-purple-300 bg-gradient-to-r from-purple-500 to-indigo-500 px-4 py-3 font-bold text-white transition hover:from-purple-600 hover:to-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+              loading={isGeneratingAI}
+              disabled={!formData.name}
+              fullWidth
+              variant="secondary"
             >
-              {isGeneratingAI ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Generating with AI...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  ✨ Generate Icon with AI
-                </span>
-              )}
-            </button>
+              Generate Icon with AI
+            </Button>
 
             {/* Upload Image Section */}
             <div className="space-y-3">
@@ -1035,7 +974,7 @@ function BadgeFormModal({
                   )}
                 </label>
                 {uploadError && (
-                  <p className="mt-2 text-sm text-red-500">{uploadError}</p>
+                  <FieldError className="mt-2">{uploadError}</FieldError>
                 )}
               </div>
             </div>
@@ -1043,24 +982,17 @@ function BadgeFormModal({
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-gray-300 py-2 font-semibold text-gray-600 hover:bg-gray-50"
+              variant="neutral"
+              className="flex-1"
             >
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 py-2 font-semibold text-white hover:opacity-90 disabled:opacity-50"
-            >
-              {isLoading
-                ? "Saving..."
-                : badge
-                  ? "Update Badge"
-                  : "Create Badge"}
-            </button>
+            </Button>
+            <Button type="submit" loading={isLoading} className="flex-1">
+              {badge ? "Update Badge" : "Create Badge"}
+            </Button>
           </div>
         </form>
       </div>

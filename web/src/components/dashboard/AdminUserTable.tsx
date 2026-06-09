@@ -2,11 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import {
-  updateUserRole,
-  updateUserAccessLevel,
-  deleteUser,
-} from "@/app/(dashboard)/dashboard/admin/actions";
+import { deleteUser } from "@/app/(dashboard)/dashboard/admin/actions";
 import { ACCESS_LEVEL_OPTIONS } from "@/constants/accessLevels";
 import {
   PencilIcon,
@@ -18,6 +14,14 @@ import {
 import { AddUserModal } from "./AddUserModal";
 import { EditUserModal } from "./EditUserModal";
 import { BulkUploadModal } from "./BulkUploadModal";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  Input,
+} from "@/components/ui";
 
 type UserRecord = {
   id: string;
@@ -27,12 +31,15 @@ type UserRecord = {
   access_level: string | null;
 };
 
-const ROLES: UserRecord["role"][] = [
-  "STUDENT",
-  "TEACHER",
-  "LIBRARIAN",
-  "ADMIN",
-];
+const roleBadgeVariant: Record<
+  UserRecord["role"],
+  "bubble" | "sky" | "lime" | "amber"
+> = {
+  ADMIN: "bubble",
+  TEACHER: "sky",
+  LIBRARIAN: "lime",
+  STUDENT: "amber",
+};
 
 export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
   const router = useRouter();
@@ -48,7 +55,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
     if (!searchQuery.trim()) return users;
 
     const query = searchQuery.toLowerCase();
-    return users.filter((user: any) => {
+    return users.filter((user) => {
       return (
         user.full_name?.toLowerCase().includes(query) ||
         user.email?.toLowerCase().includes(query) ||
@@ -104,104 +111,85 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
 
   return (
     <div className="space-y-4">
-      {/* Action Bar */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        {/* Search Bar */}
-        <div className="relative flex-1 max-w-md">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-            <MagnifyingGlassIcon className="h-5 w-5 text-violet-400" />
+      <Card variant="frosted" padding="snug">
+        <CardContent className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative max-w-md flex-1">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+              <MagnifyingGlassIcon className="h-5 w-5 text-[#9b898a]" />
+            </div>
+            <Input
+              type="text"
+              placeholder="Search by name, email, role, or access level..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="rounded-full pl-11 text-sm"
+            />
           </div>
-          <input
-            type="text"
-            placeholder="Search by name, email, role, or access level..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-full border-2 border-violet-200 bg-white/90 py-2.5 pl-11 pr-4 text-sm font-medium text-violet-900 placeholder-violet-400 outline-none transition-all focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-          />
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 rounded-full border-2 border-emerald-300 bg-emerald-500 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-emerald-600 hover:shadow-lg active:scale-95"
-          >
-            <UserPlusIcon className="h-5 w-5" />
-            Add User
-          </button>
-          <button
-            onClick={() => setShowBulkModal(true)}
-            className="inline-flex items-center gap-2 rounded-full border-2 border-blue-300 bg-blue-500 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-blue-600 hover:shadow-lg active:scale-95"
-          >
-            <ArrowUpTrayIcon className="h-5 w-5" />
-            Bulk Upload
-          </button>
-        </div>
-      </div>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowAddModal(true)}
+              icon={<UserPlusIcon className="h-5 w-5" />}
+            >
+              Add User
+            </Button>
+            <Button
+              type="button"
+              variant="neutral"
+              size="sm"
+              onClick={() => setShowBulkModal(true)}
+              icon={<ArrowUpTrayIcon className="h-5 w-5" />}
+            >
+              Bulk Upload
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Status Messages */}
-      {message && (
-        <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
-          <p className="text-sm font-semibold text-emerald-700">{message}</p>
-        </div>
-      )}
-      {error && (
-        <div className="rounded-2xl border-2 border-rose-300 bg-rose-50 p-4">
-          <p className="text-sm font-semibold text-rose-700">{error}</p>
-        </div>
-      )}
+      {message && <Alert variant="success">{message}</Alert>}
+      {error && <Alert variant="error">{error}</Alert>}
 
       {/* Mobile Card View */}
       <div className="space-y-4 lg:hidden">
         {filteredUsers.length === 0 ? (
-          <div className="rounded-3xl border-2 border-white/60 bg-white/85 px-6 py-12 text-center shadow-[0_20px_60px_rgba(147,118,255,0.18)] backdrop-blur-xl">
-            <p className="text-sm font-semibold text-violet-500">
+          <Card variant="frosted" padding="cozy" className="text-center">
+            <p className="text-sm font-semibold text-[#5d4b4c]">
               {searchQuery
                 ? "No users found matching your search."
                 : "No users found."}
             </p>
-          </div>
+          </Card>
         ) : (
           <>
-            {filteredUsers.map((user: any) => (
-              <div
-                key={user.id}
-                className="rounded-3xl border-2 border-white/60 bg-white/85 p-5 shadow-[0_20px_60px_rgba(147,118,255,0.18)] backdrop-blur-xl transition-all hover:shadow-[0_25px_70px_rgba(147,118,255,0.25)]"
-              >
+            {filteredUsers.map((user) => (
+              <Card key={user.id} variant="frosted" padding="snug">
                 <div className="mb-4">
-                  <h3 className="mb-1 text-lg font-black text-violet-900">
+                  <h3 className="heading-font mb-1 text-lg font-bold text-[#241718]">
                     {user.full_name || "No name"}
                   </h3>
-                  <p className="text-sm font-medium text-violet-700">
+                  <p className="text-sm font-medium text-[#5d4b4c]">
                     {user.email || "No email"}
                   </p>
                 </div>
 
                 <div className="mb-4 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black uppercase tracking-wider text-violet-600">
+                    <span className="text-xs font-black uppercase tracking-wider text-[#6f6061]">
                       Role:
                     </span>
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
-                        user.role === "ADMIN"
-                          ? "bg-purple-100 text-purple-800"
-                          : user.role === "TEACHER"
-                            ? "bg-blue-100 text-blue-800"
-                            : user.role === "LIBRARIAN"
-                              ? "bg-indigo-100 text-indigo-800"
-                              : "bg-pink-100 text-pink-800"
-                      }`}
-                    >
+                    <Badge variant={roleBadgeVariant[user.role]} size="sm">
                       {user.role}
-                    </span>
+                    </Badge>
                   </div>
                   {user.role === "STUDENT" && (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-black uppercase tracking-wider text-violet-600">
+                      <span className="text-xs font-black uppercase tracking-wider text-[#6f6061]">
                         Access Level:
                       </span>
-                      <span className="text-sm font-semibold text-violet-800">
+                      <span className="text-sm font-semibold text-[#241718]">
                         {getAccessLevelLabel(user.access_level)}
                       </span>
                     </div>
@@ -209,62 +197,72 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
                 </div>
 
                 <div className="flex gap-2">
-                  <button
+                  <Button
+                    type="button"
+                    variant="neutral"
+                    size="sm"
+                    className="flex-1"
                     onClick={() => handleEditUser(user)}
-                    className="min-h-[44px] flex-1 rounded-2xl bg-violet-500 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-violet-600 hover:shadow-md active:scale-95"
+                    icon={<PencilIcon className="h-4 w-4" />}
                   >
-                    <PencilIcon className="mx-auto h-5 w-5 lg:hidden" />
-                    <span className="hidden lg:inline">Edit</span>
-                  </button>
-                  <button
+                    Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    className="flex-1"
                     onClick={() =>
                       handleDeleteUser(user.id, user.full_name || "this user")
                     }
-                    className="min-h-[44px] flex-1 rounded-2xl bg-rose-500 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-rose-600 hover:shadow-md active:scale-95"
+                    icon={<TrashIcon className="h-4 w-4" />}
                   >
-                    <TrashIcon className="mx-auto h-5 w-5 lg:hidden" />
-                    <span className="hidden lg:inline">Delete</span>
-                  </button>
+                    Delete
+                  </Button>
                 </div>
-              </div>
+              </Card>
             ))}
-            <div className="rounded-2xl border-2 border-violet-200 bg-violet-50/50 px-4 py-3">
-              <p className="text-xs font-semibold text-violet-600">
+            <Card variant="frosted" padding="snug">
+              <p className="text-xs font-semibold text-[#6f6061]">
                 Showing {filteredUsers.length} of {users.length} users
               </p>
-            </div>
+            </Card>
           </>
         )}
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden overflow-hidden rounded-3xl border-2 border-white/60 bg-white/85 shadow-[0_20px_60px_rgba(147,118,255,0.18)] backdrop-blur-xl lg:block">
+      <Card
+        variant="frosted"
+        padding="snug"
+        className="hidden overflow-hidden lg:block"
+      >
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-violet-100">
-            <thead className="bg-gradient-to-r from-violet-100 to-purple-100">
+          <table className="min-w-full divide-y divide-[#eadfda]">
+            <thead className="bg-[#fffaf4]">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-violet-700">
+                <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-[#6f6061]">
                   Name
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-violet-700">
+                <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-[#6f6061]">
                   Email
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-violet-700">
+                <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-[#6f6061]">
                   Role
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-violet-700">
+                <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-[#6f6061]">
                   Access Level
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-black uppercase tracking-wider text-violet-700">
+                <th className="px-6 py-4 text-center text-xs font-black uppercase tracking-wider text-[#6f6061]">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-violet-50 bg-white">
+            <tbody className="divide-y divide-[#eadfda] bg-white">
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
-                    <p className="text-sm font-semibold text-violet-500">
+                    <p className="text-sm font-semibold text-[#5d4b4c]">
                       {searchQuery
                         ? "No users found matching your search."
                         : "No users found."}
@@ -272,38 +270,28 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user: any) => (
+                filteredUsers.map((user) => (
                   <tr
                     key={user.id}
-                    className="transition-colors hover:bg-violet-50/50"
+                    className="transition-colors hover:bg-[#fffaf4]"
                   >
                     <td className="px-6 py-4">
-                      <p className="font-bold text-violet-900">
+                      <p className="font-bold text-[#241718]">
                         {user.full_name || "No name"}
                       </p>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-violet-700">
+                      <p className="text-sm font-medium text-[#5d4b4c]">
                         {user.email || "No email"}
                       </p>
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
-                          user.role === "ADMIN"
-                            ? "bg-purple-100 text-purple-800"
-                            : user.role === "TEACHER"
-                              ? "bg-blue-100 text-blue-800"
-                              : user.role === "LIBRARIAN"
-                                ? "bg-indigo-100 text-indigo-800"
-                                : "bg-pink-100 text-pink-800"
-                        }`}
-                      >
+                      <Badge variant={roleBadgeVariant[user.role]} size="sm">
                         {user.role}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm font-semibold text-violet-800">
+                      <span className="text-sm font-semibold text-[#241718]">
                         {user.role === "STUDENT"
                           ? getAccessLevelLabel(user.access_level)
                           : "—"}
@@ -311,25 +299,31 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
-                        <button
+                        <Button
+                          type="button"
+                          variant="neutral"
+                          size="sm"
                           onClick={() => handleEditUser(user)}
-                          className="min-h-[44px] min-w-[44px] rounded-full bg-violet-500 p-2 text-white transition-all hover:bg-violet-600 hover:shadow-md active:scale-95"
                           title="Edit user"
+                          icon={<PencilIcon className="h-4 w-4" />}
                         >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          size="sm"
                           onClick={() =>
                             handleDeleteUser(
                               user.id,
                               user.full_name || "this user",
                             )
                           }
-                          className="min-h-[44px] min-w-[44px] rounded-full bg-rose-500 p-2 text-white transition-all hover:bg-rose-600 hover:shadow-md active:scale-95"
                           title="Delete user"
+                          icon={<TrashIcon className="h-4 w-4" />}
                         >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                          Delete
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -340,12 +334,12 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
         </div>
 
         {/* Results count */}
-        <div className="border-t border-violet-100 bg-violet-50/50 px-6 py-3">
-          <p className="text-xs font-semibold text-violet-600">
+        <div className="border-t border-[#eadfda] bg-[#fffaf4] px-6 py-3">
+          <p className="text-xs font-semibold text-[#6f6061]">
             Showing {filteredUsers.length} of {users.length} users
           </p>
         </div>
-      </div>
+      </Card>
 
       {/* Modals */}
       {showAddModal && (
