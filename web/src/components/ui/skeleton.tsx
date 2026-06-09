@@ -8,7 +8,7 @@ export function Skeleton({
   return (
     <div
       className={cn(
-        "animate-shimmer rounded-2xl bg-gradient-to-r from-purple-100 via-pink-100 to-purple-100 bg-[length:200%_100%]",
+        "animate-shimmer rounded-2xl bg-gradient-to-r from-[#F5E7E8] via-[#EFF8FE] to-[#FBF2DF] bg-[length:200%_100%]",
         className,
       )}
       {...props}
@@ -18,7 +18,7 @@ export function Skeleton({
 
 export function SkeletonCard() {
   return (
-    <div className="rounded-[28px] border-4 border-purple-100 bg-white/80 p-6 md:p-8">
+    <div className="rounded-[28px] border border-[#eadfda] bg-white/80 p-6 card-shadow md:p-8">
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-start justify-between">
@@ -31,7 +31,7 @@ export function SkeletonCard() {
         </div>
 
         {/* Details grid */}
-        <div className="grid grid-cols-2 gap-2 border-t-2 border-indigo-100 pt-3">
+        <div className="grid grid-cols-2 gap-2 border-t border-[#eadfda] pt-3">
           <div className="space-y-1">
             <Skeleton className="h-3 w-16" />
             <Skeleton className="h-6 w-12" />

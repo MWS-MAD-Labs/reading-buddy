@@ -23,24 +23,24 @@ const toneStyles: Record<
   { border: string; bg: string; text: string }
 > = {
   info: {
-    border: "border-sky-200",
-    bg: "bg-sky-50/80",
-    text: "text-sky-900",
+    border: "border-[#B8DDF8]/70",
+    bg: "bg-[#EFF8FE]",
+    text: "text-[#1F2A44]",
   },
   success: {
-    border: "border-emerald-200",
-    bg: "bg-emerald-50/80",
-    text: "text-emerald-900",
+    border: "border-[#6F8B6A]/35",
+    bg: "bg-[#EDF3EB]",
+    text: "text-[#486142]",
   },
   warning: {
-    border: "border-amber-200",
-    bg: "bg-amber-50/80",
-    text: "text-amber-900",
+    border: "border-[#D6A13A]/45",
+    bg: "bg-[#FBF2DF]",
+    text: "text-[#7a5311]",
   },
   alert: {
-    border: "border-rose-200",
-    bg: "bg-rose-50/80",
-    text: "text-rose-900",
+    border: "border-[#B94A4E]/35",
+    bg: "bg-[#F8EAEB]",
+    text: "text-[#B94A4E]",
   },
 };
 
@@ -108,21 +108,21 @@ export const LoginForm = ({ broadcast }: LoginFormProps) => {
     <div className="pop-in w-full max-w-5xl">
       <Card
         variant="playful"
-        className="border-4 border-white/70"
+        className="border border-[#eadfda] soft-shadow"
         padding="cozy"
       >
         <CardContent className="grid gap-8 md:grid-cols-[1.35fr_1fr] md:items-center">
           <div className="space-y-5 md:space-y-6">
-            <Badge variant="bubble" className="uppercase tracking-[0.2em]">
-              Welcome back
+            <Badge variant="bubble" className="tracking-[0.2em]">
+              Reading Buddy
             </Badge>
             <div className="space-y-2">
-              <CardTitle className="text-3xl md:text-4xl">
-                Reading Buddy Sign In
+              <CardTitle className="text-3xl text-[#7E1518] md:text-4xl">
+                Welcome to Reading Buddy
               </CardTitle>
-              <p className="text-base font-semibold text-indigo-600 md:text-lg">
-                Use your Millennia21 Google account to hop into the library and
-                track progress.
+              <p className="max-w-xl text-base leading-8 text-[#5d4b4c] md:text-lg">
+                Use your Millennia21 Google account to continue into a warm,
+                school-ready reading space for books, quizzes, and growth.
               </p>
             </div>
 
@@ -153,28 +153,28 @@ export const LoginForm = ({ broadcast }: LoginFormProps) => {
 
           <div
             className={cn(
-              "relative h-full rounded-[24px] border-4 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.08)] backdrop-blur",
+              "relative h-full rounded-[24px] border p-5 card-shadow backdrop-blur",
               toneStyles[effectiveBroadcast.tone].border,
               toneStyles[effectiveBroadcast.tone].bg,
             )}
           >
-            <div className="absolute inset-0 -z-10 rounded-[24px] bg-gradient-to-br from-indigo-200/50 via-sky-100/50 to-amber-50/40 blur-3xl" />
+            <div className="absolute inset-0 -z-10 rounded-[24px] bg-gradient-to-br from-[#B8DDF8]/40 via-white to-[#FBF2DF]/70 blur-3xl" />
             <div className="mb-4 flex items-center justify-between">
-              <span className="text-xs font-black uppercase tracking-[0.18em] text-indigo-800">
+              <span className="heading-font text-xs font-bold uppercase tracking-[0.18em] text-[#7E1518]">
                 Announcement
               </span>
             </div>
             <div className="space-y-3">
-              <h3 className="text-xl font-black text-indigo-900">
+              <h3 className="heading-font text-xl font-bold text-[#241718]">
                 {effectiveBroadcast.title}
               </h3>
-              <p className="text-sm font-semibold text-indigo-800 whitespace-pre-wrap">
+              <p className="whitespace-pre-wrap text-sm leading-6 text-[#5d4b4c]">
                 {effectiveBroadcast.body}
               </p>
               {effectiveBroadcast.linkUrl ? (
                 <Link
                   href={effectiveBroadcast.linkUrl}
-                  className="inline-flex items-center gap-2 text-sm font-bold text-indigo-800 underline-offset-4 hover:underline"
+                  className="heading-font inline-flex items-center gap-2 text-sm font-bold text-[#7E1518] underline-offset-4 hover:underline"
                 >
                   {effectiveBroadcast.linkLabel || "Read more"}
                 </Link>

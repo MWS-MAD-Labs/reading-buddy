@@ -20,10 +20,9 @@ export default async function LeaderboardPage() {
   }
 
   // Fetch role
-  const profileResult = await query(
-    `SELECT role FROM profiles WHERE id = $1`,
-    [user.userId]
-  );
+  const profileResult = await query(`SELECT role FROM profiles WHERE id = $1`, [
+    user.userId,
+  ]);
 
   const role = profileResult.rows[0]?.role || "STUDENT";
   const isStudent = role === "STUDENT";
@@ -43,12 +42,14 @@ export default async function LeaderboardPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <header className="rounded-[32px] border border-white/60 bg-gradient-to-br from-violet-50 to-purple-50 p-8 text-indigo-950 shadow-[0_30px_90px_rgba(147,118,255,0.25)]">
-        <div className="mb-3 inline-block rounded-full border border-purple-200 bg-gradient-to-r from-purple-200 to-pink-200 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-purple-700">
+      <header className="rounded-[32px] border border-[#D6A13A]/30 bg-gradient-to-br from-white via-[#FBF2DF] to-[#EFF8FE] p-8 soft-shadow">
+        <div className="heading-font mb-3 inline-flex rounded-full bg-[#FBF2DF] px-4 py-1 text-xs font-bold uppercase tracking-[0.24em] text-[#7a5311]">
           Leaderboard
         </div>
-        <h1 className="mt-2 text-4xl font-black">Reading Champions</h1>
-        <p className="mt-3 max-w-2xl text-lg text-indigo-500">
+        <h1 className="heading-font mt-2 text-4xl font-extrabold text-[#7E1518]">
+          Reading Champions
+        </h1>
+        <p className="mt-3 max-w-2xl text-lg leading-8 text-[#5d4b4c]">
           See who&apos;s leading the way in reading excellence. Earn XP by
           reading pages, finishing books, and completing quizzes!
         </p>

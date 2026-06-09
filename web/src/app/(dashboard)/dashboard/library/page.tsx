@@ -70,22 +70,26 @@ export default async function LibraryPage() {
 
   // Format access level for display
   const accessLevelDisplay = userAccessLevel
-    ? userAccessLevel.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())
+    ? userAccessLevel
+        .replace(/_/g, " ")
+        .toLowerCase()
+        .replace(/\b\w/g, (c: string) => c.toUpperCase())
     : null;
 
   return (
     <div className="space-y-6">
-      <header className="pop-in rounded-3xl border-4 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 p-6 shadow-lg">
-        <div className="mb-2 inline-block rounded-2xl border-4 border-cyan-300 bg-cyan-400 px-4 py-1">
-          <p className="text-sm font-black uppercase tracking-wide text-cyan-900">
-            Book Collection
-          </p>
+      <header className="pop-in relative overflow-hidden rounded-3xl border border-[#B8DDF8]/60 bg-gradient-to-br from-white via-[#EFF8FE] to-[#FBF2DF] p-6 soft-shadow">
+        <div className="absolute right-6 top-4 h-20 w-20 rounded-full bg-[#B8DDF8]/40 blur-2xl" />
+        <div className="heading-font mb-3 inline-flex rounded-full bg-[#EFF8FE] px-4 py-1 text-xs font-bold uppercase tracking-[0.22em] text-[#25638e]">
+          Book collection
         </div>
-        <h1 className="text-3xl font-black text-blue-900">Library</h1>
-        <p className="text-base font-semibold text-blue-700">
+        <h1 className="heading-font text-3xl font-extrabold text-[#7E1518]">
+          Library
+        </h1>
+        <p className="mt-2 max-w-2xl text-base leading-7 text-[#5d4b4c]">
           {isStudent && accessLevelDisplay
             ? `Showing books for ${accessLevelDisplay} level`
-            : "Explore all the amazing books in Reading Buddy!"}
+            : "Explore a warm, school-ready collection of stories and reading adventures."}
         </p>
       </header>
 
@@ -93,4 +97,3 @@ export default async function LibraryPage() {
     </div>
   );
 }
-

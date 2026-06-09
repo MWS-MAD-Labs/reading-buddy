@@ -83,7 +83,9 @@ export default async function StudentDashboardPage() {
   console.log("Student ID:", profileId);
   console.log("Assignments count:", assignments.length);
 
-  const assignedBookIds = assignments.map((assignment: any) => assignment.book_id);
+  const assignedBookIds = assignments.map(
+    (assignment: any) => assignment.book_id,
+  );
 
   // Get student's classes
   const studentClassesResult = await queryWithContext(
@@ -142,12 +144,14 @@ export default async function StudentDashboardPage() {
   return (
     <div className="space-y-8">
       {/* Header with XP */}
-      <header className="space-y-2 rounded-[32px] border border-white/60 bg-white/85 p-6 text-indigo-950 shadow-[0_25px_70px_rgba(147,118,255,0.25)]">
-        <p className="text-xs uppercase tracking-[0.3em] text-rose-400">
+      <header className="space-y-2 rounded-[32px] border border-[#D6A13A]/30 bg-gradient-to-br from-white to-[#FBF2DF] p-6 soft-shadow">
+        <p className="heading-font text-xs font-bold uppercase tracking-[0.24em] text-[#7a5311]">
           Student zone
         </p>
-        <h1 className="text-3xl font-black">My Dashboard</h1>
-        <p className="text-sm text-indigo-500">
+        <h1 className="heading-font text-3xl font-extrabold text-[#7E1518]">
+          My Dashboard
+        </h1>
+        <p className="text-sm leading-6 text-[#5d4b4c]">
           Track your reading progress and achievements.
         </p>
       </header>
@@ -175,8 +179,12 @@ export default async function StudentDashboardPage() {
       {/* Current Readings */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-xl font-black text-indigo-950">My Readings</h2>
-          <p className="text-sm text-indigo-500">Pick up where you left off.</p>
+          <h2 className="heading-font text-xl font-bold text-[#7E1518]">
+            My Readings
+          </h2>
+          <p className="text-sm leading-6 text-[#5d4b4c]">
+            Pick up where you left off.
+          </p>
         </div>
 
         {assignments?.length ? (
@@ -186,7 +194,7 @@ export default async function StudentDashboardPage() {
               return (
                 <li
                   key={assignment.book_id}
-                  className="rounded-[28px] border border-white/70 bg-gradient-to-br from-white via-pink-50 to-amber-50 p-5 text-indigo-900 shadow-[0_15px_50px_rgba(255,158,197,0.3)]"
+                  className="rounded-[28px] border border-[#eadfda] bg-gradient-to-br from-white via-[#fffaf4] to-[#EFF8FE] p-5 text-[#241718] card-shadow"
                 >
                   <div className="flex gap-4">
                     {/* Book Cover */}
@@ -227,7 +235,7 @@ export default async function StudentDashboardPage() {
                       </p>
                       <Link
                         href={`/dashboard/student/read/${assignment.book_id}?page=${assignment.current_page ?? 1}`}
-                        className="mt-3 inline-flex w-fit items-center gap-2 rounded-full bg-gradient-to-r from-indigo-400 to-sky-400 px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
+                        className="heading-font mt-3 inline-flex w-fit items-center gap-2 rounded-full bg-[#7E1518] px-5 py-2 text-sm font-bold text-white transition hover:bg-[#681114]"
                       >
                         Continue reading
                       </Link>

@@ -15,7 +15,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const cardClass =
-  "space-y-4 rounded-[28px] border border-white/60 bg-white/85 p-6 text-indigo-950 shadow-[0_20px_60px_rgba(147,118,255,0.18)] backdrop-blur-xl";
+  "space-y-4 rounded-[28px] border border-[#eadfda] bg-white/90 p-6 text-[#241718] card-shadow backdrop-blur-xl";
 
 export default async function TeacherDashboardPage() {
   const { user, role } = await requireRole(["TEACHER", "ADMIN"]);
@@ -68,12 +68,14 @@ export default async function TeacherDashboardPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <header className="space-y-2 rounded-[32px] border border-white/60 bg-white/85 p-6 text-indigo-950 shadow-[0_25px_70px_rgba(147,118,255,0.25)]">
-        <p className="text-xs uppercase tracking-[0.3em] text-rose-400">
-          Teacher Dashboard
+      <header className="space-y-2 rounded-[32px] border border-[#B94A4E]/20 bg-gradient-to-br from-white to-[#F8EAEB] p-6 soft-shadow">
+        <p className="heading-font text-xs font-bold uppercase tracking-[0.24em] text-[#B94A4E]">
+          Teacher dashboard
         </p>
-        <h1 className="text-3xl font-black">Welcome Back!</h1>
-        <p className="text-sm text-indigo-500">
+        <h1 className="heading-font text-3xl font-extrabold text-[#7E1518]">
+          Welcome Back!
+        </h1>
+        <p className="text-sm leading-6 text-[#5d4b4c]">
           Monitor your classes and student progress
         </p>
       </header>

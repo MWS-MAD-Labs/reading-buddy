@@ -14,7 +14,7 @@ export default async function AdminBroadcastsPage() {
   const { rows } = await query(
     `SELECT id, title, body, tone, link_label, link_url, created_at, is_active
      FROM login_broadcasts
-     ORDER BY created_at DESC`
+     ORDER BY created_at DESC`,
   );
 
   const broadcasts: BroadcastRow[] = rows.map((row: any) => ({
@@ -30,22 +30,20 @@ export default async function AdminBroadcastsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-3xl border-4 border-indigo-300 bg-gradient-to-br from-indigo-50 to-sky-50 p-6 shadow-lg">
-        <div className="mb-2 inline-block rounded-2xl border-4 border-indigo-200 bg-indigo-500/80 px-4 py-1 text-white">
-          <p className="text-sm font-black uppercase tracking-wide">
-            Admin Panel
-          </p>
+      <header className="rounded-3xl border border-[#B8DDF8]/60 bg-gradient-to-br from-white to-[#EFF8FE] p-6 soft-shadow">
+        <div className="heading-font mb-3 inline-flex rounded-full bg-[#E9EDF6] px-4 py-1 text-xs font-bold uppercase tracking-[0.22em] text-[#1F2A44]">
+          Admin panel
         </div>
-        <h1 className="text-3xl font-black text-indigo-900">
+        <h1 className="heading-font text-3xl font-extrabold text-[#7E1518]">
           Login Broadcasts
         </h1>
-        <p className="text-base font-semibold text-indigo-700">
+        <p className="mt-2 max-w-2xl text-base leading-7 text-[#5d4b4c]">
           Publish short changelog or status notes that appear on the login page.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <Link
             href="/dashboard/admin"
-            className="inline-flex items-center gap-2 rounded-full border-2 border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+            className="heading-font inline-flex items-center gap-2 rounded-full border border-[#1F2A44]/15 bg-white px-4 py-2 text-sm font-bold text-[#1F2A44] transition hover:bg-[#E9EDF6]"
           >
             Back to admin home
           </Link>

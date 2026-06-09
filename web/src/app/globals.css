@@ -3,42 +3,70 @@
 @import "react-pdf/dist/Page/TextLayer.css";
 
 :root {
-    /* Vibrant playful color palette */
-    --background: #fffbeb;
-    --foreground: #1e1b4b;
-    --bubble-1: #fcd34d; /* Sunny yellow */
-    --bubble-2: #fb7185; /* Coral pink */
-    --bubble-3: #3b82f6; /* Electric blue */
-    --bubble-4: #84cc16; /* Lime green */
-    --bubble-5: #f97316; /* Orange */
-    --card: rgba(255, 255, 255, 0.85);
-    --card-border: rgba(255, 255, 255, 0.95);
-    --accent: #7c3aed; /* Vibrant purple */
-    --accent-dark: #6d28d9; /* Darker purple */
-    --accent-secondary: #3b82f6; /* Electric blue */
-    --success: #10b981; /* Green */
-    --warning: #f59e0b; /* Amber */
-    --error: #ef4444; /* Red */
+    /* MWS Heart & Purpose UI Kit palette */
+    --mws-burgundy: #7e1518;
+    --mws-burgundy-soft: #f5e7e8;
+    --mws-white: #ffffff;
+    --mws-gold: #d6a13a;
+    --mws-gold-soft: #fbf2df;
+    --mws-charcoal: #241718;
+    --mws-rose: #b94a4e;
+    --mws-rose-soft: #f8eaeb;
+    --mws-sage: #6f8b6a;
+    --mws-sage-soft: #edf3eb;
+    --mws-navy: #1f2a44;
+    --mws-navy-soft: #e9edf6;
+    --mws-sky: #b8ddf8;
+    --mws-sky-soft: #eff8fe;
+    --mws-surface: #fffaf4;
+    --mws-border: #eadfda;
+
+    --background: var(--mws-surface);
+    --foreground: var(--mws-charcoal);
+    --bubble-1: var(--mws-gold-soft);
+    --bubble-2: var(--mws-burgundy-soft);
+    --bubble-3: var(--mws-sky-soft);
+    --bubble-4: var(--mws-sage-soft);
+    --bubble-5: var(--mws-gold);
+    --card: rgba(255, 255, 255, 0.9);
+    --card-border: var(--mws-border);
+    --accent: var(--mws-burgundy);
+    --accent-dark: #681114;
+    --accent-secondary: var(--mws-sky);
+    --success: var(--mws-sage);
+    --warning: var(--mws-gold);
+    --error: var(--mws-rose);
 }
 
 @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
     --font-sans:
-        "Nunito", "Baloo 2", "Comic Neue", var(--font-geist-sans), system-ui,
-        -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-mono: var(--font-geist-mono);
+        var(--font-body), "Nunito Sans", system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-heading:
+        var(--font-heading), "Plus Jakarta Sans", system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-quote: var(--font-quote), "Lora", Georgia, serif;
 }
 
 body {
-    background: radial-gradient(circle at 10% 20%, #fef3c7, var(--background))
-        fixed;
+    background:
+        radial-gradient(
+            circle at 12% 12%,
+            rgba(184, 221, 248, 0.45),
+            transparent 34vw
+        ),
+        radial-gradient(
+            circle at 88% 8%,
+            rgba(214, 161, 58, 0.22),
+            transparent 28vw
+        ),
+        linear-gradient(135deg, #fffaf4 0%, #ffffff 52%, #eff8fe 100%) fixed;
     color: var(--foreground);
     font-family:
-        "Nunito",
-        "Baloo 2",
-        "Comic Neue",
-        var(--font-geist-sans),
+        var(--font-body),
+        "Nunito Sans",
         system-ui,
         -apple-system,
         BlinkMacSystemFont,
@@ -47,10 +75,42 @@ body {
     min-height: 100vh;
     position: relative;
     overflow-x: hidden;
-    font-weight: 600;
+    font-weight: 500;
 }
 
-/* Playful floating bubble decorations */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.heading-font {
+    font-family:
+        var(--font-heading), "Plus Jakarta Sans", system-ui, sans-serif;
+}
+
+.body-font {
+    font-family: var(--font-body), "Nunito Sans", system-ui, sans-serif;
+}
+
+.quote-font {
+    font-family: var(--font-quote), "Lora", Georgia, serif;
+}
+
+.focus-ring:focus-visible {
+    outline: 3px solid rgba(214, 161, 58, 0.75);
+    outline-offset: 3px;
+}
+
+.soft-shadow {
+    box-shadow: 0 18px 45px rgba(36, 23, 24, 0.08);
+}
+
+.card-shadow {
+    box-shadow: 0 12px 30px rgba(36, 23, 24, 0.06);
+}
+
+/* Soft Reading Buddy background accents from the MWS kit */
 body::before,
 body::after {
     content: "";
@@ -60,19 +120,27 @@ body::after {
     border-radius: 50%;
     filter: blur(100px);
     z-index: -2;
-    opacity: 0.5;
-    animation: floatBubble 20s ease-in-out infinite;
+    opacity: 0.38;
+    animation: floatBubble 24s ease-in-out infinite;
 }
 
 body::before {
-    background: linear-gradient(135deg, var(--bubble-1), var(--bubble-2));
+    background: linear-gradient(
+        135deg,
+        var(--mws-gold-soft),
+        var(--mws-burgundy-soft)
+    );
     top: -10vw;
     left: -15vw;
     animation-delay: 0s;
 }
 
 body::after {
-    background: linear-gradient(135deg, var(--bubble-3), var(--bubble-4));
+    background: linear-gradient(
+        135deg,
+        var(--mws-sky-soft),
+        var(--mws-sage-soft)
+    );
     bottom: -15vw;
     right: -10vw;
     animation-delay: 10s;
@@ -156,8 +224,8 @@ body::after {
     border-radius: 1rem 0 0 1rem;
     background: linear-gradient(
         90deg,
-        rgba(124, 58, 237, 0.4),
-        rgba(124, 58, 237, 0)
+        rgba(126, 21, 24, 0.22),
+        rgba(126, 21, 24, 0)
     );
 }
 
@@ -166,8 +234,8 @@ body::after {
     border-radius: 0 1rem 1rem 0;
     background: linear-gradient(
         270deg,
-        rgba(124, 58, 237, 0.4),
-        rgba(124, 58, 237, 0)
+        rgba(126, 21, 24, 0.22),
+        rgba(126, 21, 24, 0)
     );
 }
 
@@ -487,8 +555,8 @@ input:focus,
 textarea:focus,
 select:focus {
     outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.2);
+    border-color: var(--mws-gold);
+    box-shadow: 0 0 0 4px rgba(214, 161, 58, 0.22);
     transform: scale(1.02);
     transition: all 0.2s ease;
 }

@@ -111,28 +111,28 @@ const roleQuickLinks: Record<UserRole | "DEFAULT", QuickLink[]> = {
 };
 
 const heroCopy: Record<UserRole | "DEFAULT", { title: string; body: string }> =
-{
-  STUDENT: {
-    title: "Welcome back to your reading list",
-    body: "Jump into your stories, earn badges, and explore new worlds picked for you.",
-  },
-  TEACHER: {
-    title: "Classroom insights at a glance",
-    body: "Keep tabs on reading progress, celebrate milestones, and share quizzes with your students.",
-  },
-  LIBRARIAN: {
-    title: "Keep the collection organized",
-    body: "Upload books, maintain metadata, and make sure every reader has something great to open.",
-  },
-  ADMIN: {
-    title: "Manage roles and visibility",
-    body: "Keep access up to date, monitor the system, and support every team.",
-  },
-  DEFAULT: {
-    title: "Welcome to your library workspace",
-    body: "Manage books, track reading progress, and build AI-powered quizzes in one place.",
-  },
-};
+  {
+    STUDENT: {
+      title: "Welcome back to your reading list",
+      body: "Jump into your stories, earn badges, and explore new worlds picked for you.",
+    },
+    TEACHER: {
+      title: "Classroom insights at a glance",
+      body: "Keep tabs on reading progress, celebrate milestones, and share quizzes with your students.",
+    },
+    LIBRARIAN: {
+      title: "Keep the collection organized",
+      body: "Upload books, maintain metadata, and make sure every reader has something great to open.",
+    },
+    ADMIN: {
+      title: "Manage roles and visibility",
+      body: "Keep access up to date, monitor the system, and support every team.",
+    },
+    DEFAULT: {
+      title: "Welcome to your library workspace",
+      body: "Manage books, track reading progress, and build AI-powered quizzes in one place.",
+    },
+  };
 
 export default async function DashboardHomePage() {
   // Get current user from NextAuth
@@ -226,12 +226,18 @@ export default async function DashboardHomePage() {
 
   return (
     <div className="space-y-8">
-      <section className="pop-in rounded-[32px] border border-white/60 bg-white/90 p-8 text-indigo-950 shadow-[0_30px_90px_rgba(147,118,255,0.25)]">
-        <div className="mb-3 inline-block rounded-full border border-rose-200 bg-gradient-to-r from-rose-200 to-amber-200 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-rose-700">
+      <section className="pop-in relative overflow-hidden rounded-[32px] border border-[#eadfda] bg-white/92 p-8 text-[#241718] soft-shadow">
+        <div className="absolute right-6 top-6 h-24 w-24 rounded-full bg-[#B8DDF8]/35 blur-2xl" />
+        <div className="absolute bottom-4 right-24 h-20 w-20 rounded-full bg-[#FBF2DF] blur-2xl" />
+        <div className="heading-font mb-3 inline-flex rounded-full bg-[#F5E7E8] px-4 py-1 text-xs font-bold uppercase tracking-[0.24em] text-[#7E1518]">
           Reading Buddy
         </div>
-        <h1 className="mt-2 text-4xl font-black">{copy.title}</h1>
-        <p className="mt-3 max-w-2xl text-lg text-indigo-500">{copy.body}</p>
+        <h1 className="heading-font mt-2 max-w-3xl text-4xl font-extrabold text-[#7E1518]">
+          {copy.title}
+        </h1>
+        <p className="mt-3 max-w-2xl text-lg leading-8 text-[#5d4b4c]">
+          {copy.body}
+        </p>
       </section>
 
       {/* Reading Journey Section - Available for ALL users */}
@@ -279,11 +285,14 @@ export default async function DashboardHomePage() {
                   />
                 )}
 
-              {!leaderboardData.studentLeaderboard?.data && !leaderboardData.staffLeaderboard?.data && (
-                <div className="flex h-full items-center justify-center rounded-[32px] border border-dashed border-indigo-200 bg-white/50 p-12 text-center">
-                  <p className="font-bold text-indigo-300">Leaderboard data currently unavailable</p>
-                </div>
-              )}
+              {!leaderboardData.studentLeaderboard?.data &&
+                !leaderboardData.staffLeaderboard?.data && (
+                  <div className="flex h-full items-center justify-center rounded-[32px] border border-dashed border-[#D6A13A]/60 bg-white/70 p-12 text-center">
+                    <p className="font-bold text-[#6f6061]">
+                      Leaderboard data currently unavailable
+                    </p>
+                  </div>
+                )}
             </div>
           )}
         </div>
@@ -300,96 +309,96 @@ export default async function DashboardHomePage() {
       {(role === "TEACHER" || role === "ADMIN") && teacherOverview && (
         <section className="space-y-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-indigo-400">
-              Your Teaching Journey
+            <p className="heading-font text-xs font-bold uppercase tracking-[0.24em] text-[#7a5311]">
+              Your teaching journey
             </p>
-            <h2 className="text-2xl font-black text-indigo-950">
+            <h2 className="heading-font text-2xl font-bold text-[#7E1518]">
               Keep classrooms on track
             </h2>
-            <p className="text-sm text-indigo-500">
+            <p className="text-sm leading-6 text-[#5d4b4c]">
               See class health, completions, and quick actions in one place.
             </p>
           </div>
           <div className="grid gap-4 lg:grid-cols-4">
-            <div className="rounded-3xl border border-white/70 bg-gradient-to-br from-indigo-50 to-sky-50 p-5 shadow-[0_20px_50px_rgba(99,102,241,0.15)]">
-              <p className="text-xs uppercase tracking-[0.2em] text-indigo-400">
+            <div className="rounded-3xl border border-[#B8DDF8]/55 bg-gradient-to-br from-white to-[#EFF8FE] p-5 card-shadow">
+              <p className="heading-font text-xs font-bold uppercase tracking-[0.18em] text-[#25638e]">
                 Class overview
               </p>
-              <h3 className="mt-2 text-xl font-black text-indigo-900">
+              <h3 className="heading-font mt-2 text-xl font-bold text-[#241718]">
                 {teacherOverview.classCount} classes
               </h3>
-              <p className="text-sm text-indigo-500">
+              <p className="text-sm leading-6 text-[#5d4b4c]">
                 {teacherOverview.studentCount} students total
               </p>
             </div>
 
-            <div className="rounded-3xl border border-white/70 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 shadow-[0_20px_50px_rgba(16,185,129,0.15)]">
-              <p className="text-xs uppercase tracking-[0.2em] text-emerald-500">
+            <div className="rounded-3xl border border-[#6F8B6A]/25 bg-[#EDF3EB]/70 p-5 card-shadow">
+              <p className="heading-font text-xs font-bold uppercase tracking-[0.18em] text-[#486142]">
                 Completion rate
               </p>
-              <h3 className="mt-2 text-xl font-black text-indigo-900">
+              <h3 className="heading-font mt-2 text-xl font-bold text-[#241718]">
                 {teacherOverview.completionRate}% on track
               </h3>
               <div className="mt-3 h-2 rounded-full bg-white/60">
                 <div
-                  className="h-2 rounded-full bg-gradient-to-r from-emerald-400 to-green-500"
+                  className="h-2 rounded-full bg-[#6F8B6A]"
                   style={{ width: `${teacherOverview.completionRate}%` }}
                 />
               </div>
-              <p className="mt-2 text-sm text-indigo-500">
+              <p className="mt-2 text-sm leading-6 text-[#5d4b4c]">
                 {teacherOverview.activeAssignments} active assignments
               </p>
             </div>
 
-            <div className="rounded-3xl border border-white/70 bg-gradient-to-br from-amber-50 to-rose-50 p-5 shadow-[0_20px_50px_rgba(251,191,36,0.15)]">
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-500">
+            <div className="rounded-3xl border border-[#D6A13A]/30 bg-[#FBF2DF]/55 p-5 card-shadow">
+              <p className="heading-font text-xs font-bold uppercase tracking-[0.18em] text-[#7a5311]">
                 Quick actions
               </p>
               <div className="mt-3 space-y-2">
                 <Link
                   href="/dashboard/teacher/classrooms"
-                  className="block rounded-xl bg-white/80 px-3 py-2 text-sm font-semibold text-indigo-900 shadow-sm transition hover:scale-[1.01]"
+                  className="heading-font block rounded-xl border border-[#eadfda] bg-white px-3 py-2 text-sm font-bold text-[#241718] transition hover:bg-[#fffaf4]"
                 >
                   Manage classrooms
                 </Link>
                 <Link
                   href="/dashboard/library"
-                  className="block rounded-xl bg-white/80 px-3 py-2 text-sm font-semibold text-indigo-900 shadow-sm transition hover:scale-[1.01]"
+                  className="heading-font block rounded-xl border border-[#eadfda] bg-white px-3 py-2 text-sm font-bold text-[#241718] transition hover:bg-[#fffaf4]"
                 >
                   Assign new books
                 </Link>
                 <Link
                   href="/dashboard/teacher"
-                  className="block rounded-xl bg-white/80 px-3 py-2 text-sm font-semibold text-indigo-900 shadow-sm transition hover:scale-[1.01]"
+                  className="heading-font block rounded-xl border border-[#eadfda] bg-white px-3 py-2 text-sm font-bold text-[#241718] transition hover:bg-[#fffaf4]"
                 >
                   Create assignments
                 </Link>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/70 bg-gradient-to-br from-purple-50 to-pink-50 p-5 shadow-[0_20px_50px_rgba(192,132,252,0.15)]">
-              <p className="text-xs uppercase tracking-[0.2em] text-purple-500">
+            <div className="rounded-3xl border border-[#B94A4E]/20 bg-[#F8EAEB]/70 p-5 card-shadow">
+              <p className="heading-font text-xs font-bold uppercase tracking-[0.18em] text-[#B94A4E]">
                 Recent activity
               </p>
-              <ul className="mt-2 space-y-2 text-sm font-semibold text-indigo-900">
+              <ul className="mt-2 space-y-2 text-sm text-[#241718]">
                 {teacherOverview.recentCompletions.length > 0 ? (
                   teacherOverview.recentCompletions.map((entry, idx) => (
                     <li
                       key={`${entry.student}-${idx}`}
-                      className="rounded-xl border border-white/70 bg-white/70 px-3 py-2"
+                      className="rounded-xl border border-[#eadfda] bg-white/75 px-3 py-2"
                     >
-                      <p className="text-indigo-900">
+                      <p className="text-[#241718]">
                         {entry.student} finished {entry.bookTitle}
                       </p>
                       {entry.completedAt && (
-                        <p className="text-xs text-indigo-500">
+                        <p className="text-xs text-[#6f6061]">
                           {new Date(entry.completedAt).toLocaleDateString()}
                         </p>
                       )}
                     </li>
                   ))
                 ) : (
-                  <li className="text-indigo-500">
+                  <li className="text-[#6f6061]">
                     Recent completions will show here.
                   </li>
                 )}
@@ -456,12 +465,12 @@ export default async function DashboardHomePage() {
           <Link
             key={`${card.href}-${card.title}`}
             href={card.href}
-            className="sticker-card rounded-3xl border border-white/70 bg-gradient-to-br from-blue-50 to-purple-50 p-6 text-indigo-900 shadow-lg transition hover:scale-105 hover:shadow-[0_20px_50px_rgba(147,118,255,0.25)]"
+            className="rounded-3xl border border-[#eadfda] bg-white/90 p-6 card-shadow transition hover:-translate-y-0.5 hover:border-[#D6A13A]/60"
           >
-            <h2 className="text-2xl font-black text-indigo-800">
+            <h2 className="heading-font text-2xl font-bold text-[#7E1518]">
               {card.title}
             </h2>
-            <p className="mt-2 text-base font-semibold text-indigo-500">
+            <p className="mt-2 text-base leading-7 text-[#5d4b4c]">
               {card.description}
             </p>
           </Link>
