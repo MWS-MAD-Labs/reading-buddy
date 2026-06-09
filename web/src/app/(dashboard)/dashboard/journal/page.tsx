@@ -5,6 +5,15 @@ import { getJournalEntries, getJournalStats } from "./journal-actions";
 import { JournalTimeline } from "@/components/dashboard/journal/JournalTimeline";
 import { JournalStats } from "@/components/dashboard/journal/JournalStats";
 import { CreateNoteButton } from "@/components/dashboard/journal/CreateNoteButton";
+import {
+  Badge,
+  buttonVariants,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
+import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +24,6 @@ export default async function JournalPage() {
     redirect("/login");
   }
 
-  // Get journal entries and stats
   const [entriesResult, stats] = await Promise.all([
     getJournalEntries({ limit: 50 }),
     getJournalStats(),
@@ -23,74 +31,92 @@ export default async function JournalPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <header className="space-y-2 rounded-[32px] border border-[#D6A13A]/30 bg-gradient-to-br from-white to-[#FBF2DF] p-6 soft-shadow">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="heading-font text-xs font-bold uppercase tracking-[0.24em] text-[#7a5311]">
-              My journal
-            </p>
-            <h1 className="heading-font text-3xl font-extrabold text-[#7E1518]">
-              Reading Journal
-            </h1>
-            <p className="mt-2 text-sm leading-6 text-[#5d4b4c]">
-              Track your reading journey, capture thoughts, and reflect on your
-              books.
-            </p>
-          </div>
-          <CreateNoteButton />
-        </div>
+      <header>
+        <Card variant="glow" padding="cozy">
+          <CardHeader className="mb-0 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <Badge variant="amber" size="sm">
+                My journal
+              </Badge>
+              <CardTitle className="mt-3 text-3xl text-[#7E1518]">
+                Reading Journal
+              </CardTitle>
+              <CardDescription>
+                Track your reading journey, capture thoughts, and reflect on
+                your books.
+              </CardDescription>
+            </div>
+            <CreateNoteButton />
+          </CardHeader>
+        </Card>
       </header>
 
-      {/* Stats Overview */}
       <JournalStats stats={stats} />
 
-      {/* Quick Actions */}
-      <section className="flex flex-wrap gap-3">
+      <section className="flex flex-wrap gap-3" aria-label="Journal shortcuts">
         <Link
           href="/dashboard/library"
-          className="heading-font inline-flex items-center gap-2 rounded-full border border-[#7E1518]/20 bg-white px-4 py-2 text-sm font-bold text-[#7E1518] transition hover:bg-[#F5E7E8]"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "no-underline",
+          )}
         >
-          📚 Browse Books
+          Browse Books
         </Link>
         <Link
           href="/dashboard/student"
-          className="heading-font inline-flex items-center gap-2 rounded-full border border-[#7E1518]/20 bg-white px-4 py-2 text-sm font-bold text-[#7E1518] transition hover:bg-[#F5E7E8]"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "no-underline",
+          )}
         >
-          📖 My Readings
+          My Readings
         </Link>
       </section>
 
-      {/* Timeline */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="heading-font text-xl font-bold text-[#7E1518]">
-            My Timeline
-          </h2>
-          <p className="text-sm text-[#6f6061]">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <Badge variant="neutral" size="sm">
+              Timeline
+            </Badge>
+            <h2 className="heading-font mt-2 text-xl font-bold text-[#7E1518]">
+              My Timeline
+            </h2>
+          </div>
+          <Badge variant="outline" size="sm">
             {stats.totalEntries}{" "}
             {stats.totalEntries === 1 ? "entry" : "entries"}
-          </p>
+          </Badge>
         </div>
 
         {entriesResult.entries.length > 0 ? (
           <JournalTimeline entries={entriesResult.entries} />
         ) : (
-          <div className="rounded-[28px] border border-dashed border-[#D6A13A]/60 bg-white/80 p-12 text-center card-shadow">
-            <div className="mx-auto mb-4 text-6xl">📓</div>
-            <h3 className="heading-font mb-2 text-lg font-bold text-[#7E1518]">
+          <Card
+            variant="playful"
+            padding="spacious"
+            className="border-dashed border-[#D6A13A]/60 text-center"
+          >
+            <Badge variant="amber" size="sm" className="mb-4">
+              Start here
+            </Badge>
+            <CardTitle className="text-lg text-[#7E1518]">
               Your journal is empty
-            </h3>
-            <p className="mb-6 text-sm leading-6 text-[#5d4b4c]">
+            </CardTitle>
+            <CardDescription className="mx-auto mb-6 max-w-md">
               Start reading books and taking notes to fill your reading journal!
-            </p>
+            </CardDescription>
             <Link
               href="/dashboard/library"
-              className="heading-font inline-flex items-center gap-2 rounded-full bg-[#7E1518] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#681114]"
+              className={cn(
+                buttonVariants({ variant: "primary", size: "md" }),
+                "no-underline",
+              )}
             >
-              📚 Explore Library
+              Explore Library
             </Link>
-          </div>
+          </Card>
         )}
       </section>
     </div>

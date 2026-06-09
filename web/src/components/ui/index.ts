@@ -8,3 +8,4 @@ export * from "./empty-state";
 export * from "./input";
 export * from "./search-bar";
 export * from "./skeleton";
+export * from "./star-rating";

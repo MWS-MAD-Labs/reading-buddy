@@ -14,6 +14,14 @@ import {
   RecentBadges,
 } from "@/components/dashboard/gamification";
 import { WeeklyChallengeCard } from "@/components/dashboard/student/WeeklyChallengeCard";
+import {
+  Badge as UiBadge,
+  buttonVariants,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
 import { getWeeklyChallenge } from "../weekly-challenge-actions";
 
 export const dynamic = "force-dynamic";
@@ -144,16 +152,18 @@ export default async function StudentDashboardPage() {
   return (
     <div className="space-y-8">
       {/* Header with XP */}
-      <header className="space-y-2 rounded-[32px] border border-[#D6A13A]/30 bg-gradient-to-br from-white to-[#FBF2DF] p-6 soft-shadow">
-        <p className="heading-font text-xs font-bold uppercase tracking-[0.24em] text-[#7a5311]">
-          Student zone
-        </p>
-        <h1 className="heading-font text-3xl font-extrabold text-[#7E1518]">
-          My Dashboard
-        </h1>
-        <p className="text-sm leading-6 text-[#5d4b4c]">
-          Track your reading progress and achievements.
-        </p>
+      <header>
+        <Card variant="glow" padding="cozy">
+          <UiBadge variant="amber" size="sm">
+            Student zone
+          </UiBadge>
+          <CardTitle className="mt-3 text-3xl text-[#7E1518]">
+            My Dashboard
+          </CardTitle>
+          <CardDescription>
+            Track your reading progress and achievements.
+          </CardDescription>
+        </Card>
       </header>
 
       {/* Gamification Section */}
@@ -192,96 +202,108 @@ export default async function StudentDashboardPage() {
             {assignments.map((assignment: any) => {
               const book = assignment.books;
               return (
-                <li
-                  key={assignment.book_id}
-                  className="rounded-[28px] border border-[#eadfda] bg-gradient-to-br from-white via-[#fffaf4] to-[#EFF8FE] p-5 text-[#241718] card-shadow"
-                >
-                  <div className="flex gap-4">
-                    {/* Book Cover */}
-                    {book?.cover_url && (
-                      <div className="flex-shrink-0">
-                        <img
-                          src={book.cover_url}
-                          alt={`Cover of ${book.title}`}
-                          className="h-32 w-24 rounded-lg object-cover shadow-md"
-                        />
-                      </div>
-                    )}
+                <li key={assignment.book_id}>
+                  <Card variant="playful" padding="snug">
+                    <div className="flex gap-4">
+                      {/* Book Cover */}
+                      {book?.cover_url && (
+                        <div className="flex-shrink-0">
+                          <img
+                            src={book.cover_url}
+                            alt={`Cover of ${book.title}`}
+                            className="h-32 w-24 rounded-lg object-cover shadow-md"
+                          />
+                        </div>
+                      )}
 
-                    {/* Book Info */}
-                    <div className="flex flex-1 flex-col gap-2">
-                      <p className="text-xs uppercase tracking-wide text-rose-400">
-                        {bookClassrooms.has(assignment.book_id) &&
-                        bookClassrooms.get(assignment.book_id)!.length > 0 ? (
-                          <>
-                            Assigned reading
-                            <span className="ml-2 font-normal">
-                              •{" "}
-                              {bookClassrooms
-                                .get(assignment.book_id)!
-                                .join(", ")}
-                            </span>
-                          </>
-                        ) : (
-                          "Personal reading"
-                        )}
-                      </p>
-                      <h2 className="text-xl font-black text-indigo-950">
-                        {book?.title ?? "Unknown title"}
-                      </h2>
-                      <p className="text-sm text-indigo-500">{book?.author}</p>
-                      <p className="text-xs text-indigo-400">
-                        Current page: {assignment.current_page ?? 1}
-                      </p>
-                      <Link
-                        href={`/dashboard/student/read/${assignment.book_id}?page=${assignment.current_page ?? 1}`}
-                        className="heading-font mt-3 inline-flex w-fit items-center gap-2 rounded-full bg-[#7E1518] px-5 py-2 text-sm font-bold text-white transition hover:bg-[#681114]"
-                      >
-                        Continue reading
-                      </Link>
+                      {/* Book Info */}
+                      <div className="flex flex-1 flex-col gap-2">
+                        <UiBadge variant="outline" size="sm" className="w-fit">
+                          {bookClassrooms.has(assignment.book_id) &&
+                          bookClassrooms.get(assignment.book_id)!.length > 0 ? (
+                            <>
+                              Assigned reading
+                              <span className="ml-1 font-normal normal-case tracking-normal">
+                                •{" "}
+                                {bookClassrooms
+                                  .get(assignment.book_id)!
+                                  .join(", ")}
+                              </span>
+                            </>
+                          ) : (
+                            "Personal reading"
+                          )}
+                        </UiBadge>
+                        <h2 className="heading-font text-xl font-bold text-[#7E1518]">
+                          {book?.title ?? "Unknown title"}
+                        </h2>
+                        <p className="text-sm leading-6 text-[#5d4b4c]">
+                          {book?.author}
+                        </p>
+                        <p className="text-xs text-[#6f6061]">
+                          Current page: {assignment.current_page ?? 1}
+                        </p>
+                        <Link
+                          href={`/dashboard/student/read/${assignment.book_id}?page=${assignment.current_page ?? 1}`}
+                          className={buttonVariants({
+                            size: "sm",
+                            className: "mt-3 w-fit",
+                          })}
+                        >
+                          Continue reading
+                        </Link>
+                      </div>
                     </div>
-                  </div>
+                  </Card>
                 </li>
               );
             })}
           </ul>
         ) : (
-          <div className="rounded-[28px] border border-dashed border-indigo-200 bg-white/80 p-8 text-center text-indigo-500">
+          <Card
+            variant="playful"
+            padding="cozy"
+            className="border-dashed border-[#D6A13A]/60 text-center text-[#7a5311]"
+          >
             No books in progress yet. Once you start reading, your books will
             show up here.
-          </div>
+          </Card>
         )}
       </section>
 
       {/* Classrooms Section */}
-      <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/85 p-6 text-indigo-950 shadow-[0_20px_60px_rgba(147,118,255,0.18)]">
-        <div className="flex items-center justify-between gap-2">
+      <Card className="space-y-3" padding="cozy">
+        <CardHeader className="mb-0 flex items-center justify-between gap-2">
           <div>
-            <h2 className="text-xl font-black">My Classrooms</h2>
-            <p className="text-sm text-indigo-500">
+            <CardTitle className="text-xl text-[#7E1518]">
+              My Classrooms
+            </CardTitle>
+            <CardDescription>
               Jump into your class to see assigned books and quizzes.
-            </p>
+            </CardDescription>
           </div>
-        </div>
+        </CardHeader>
         {classrooms.length ? (
           <ul className="space-y-3">
             {classrooms.map((classroom: any) => (
               <li
                 key={classroom.id}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-indigo-100 bg-white/80 p-4 text-indigo-900 shadow-[0_12px_30px_rgba(79,70,229,0.15)]"
+                className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#eadfda] bg-white p-4 text-[#241718]"
               >
                 <div>
-                  <p className="text-xs uppercase tracking-[0.25em] text-indigo-400">
+                  <UiBadge variant="amber" size="sm">
                     Classroom
+                  </UiBadge>
+                  <p className="heading-font text-base font-bold text-[#241718]">
+                    {classroom.name}
                   </p>
-                  <p className="text-base font-semibold">{classroom.name}</p>
-                  <p className="text-xs text-indigo-500">
+                  <p className="text-xs text-[#6f6061]">
                     Teacher: {classroom.teacher_name}
                   </p>
                 </div>
                 <Link
                   href={`/dashboard/student/classrooms/${classroom.id}`}
-                  className="rounded-full bg-gradient-to-r from-indigo-500 to-sky-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
+                  className={buttonVariants({ size: "sm" })}
                 >
                   Enter class
                 </Link>
@@ -289,15 +311,15 @@ export default async function StudentDashboardPage() {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-indigo-400">
+          <p className="text-sm text-[#6f6061]">
             You&apos;re not enrolled in any classrooms yet.
           </p>
         )}
-      </section>
+      </Card>
 
       {/* Badges Section */}
       {badgesWithProgress.length > 0 && (
-        <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/85 p-6 text-indigo-950 shadow-[0_20px_60px_rgba(147,118,255,0.18)]">
+        <Card className="space-y-3" padding="cozy">
           <BadgeGrid
             badges={badgesWithProgress}
             title="My Badges"
@@ -306,12 +328,12 @@ export default async function StudentDashboardPage() {
           <div className="flex justify-center pt-2">
             <Link
               href="/dashboard/student/badges"
-              className="text-sm font-medium text-indigo-500 hover:text-indigo-700"
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
             >
               View all badges
             </Link>
           </div>
-        </section>
+        </Card>
       )}
     </div>
   );
