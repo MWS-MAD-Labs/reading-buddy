@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type {
   BookAssignment,
   QuizAssignment,
 } from "@/app/(dashboard)/dashboard/teacher/teacher-analytics-actions";
+import {
+  Badge,
+  buttonVariants,
+  Card,
+  CardDescription,
+  CardTitle,
+} from "@/components/ui";
 
 type AssignmentTrackingDashboardProps = {
   bookAssignments: BookAssignment[];
@@ -19,39 +26,38 @@ export function AssignmentTrackingDashboard({
 
   if (bookAssignments.length === 0 && quizAssignments.length === 0) {
     return (
-      <div className="rounded-[28px] border-2 border-dashed border-indigo-200 bg-white/80 p-8 text-center">
-        <span className="text-4xl">📚</span>
-        <h3 className="mt-3 text-lg font-bold text-indigo-900">
-          No Assignments Yet
-        </h3>
-        <p className="mt-1 text-sm text-indigo-500">
-          Assign books and quizzes to your classes to see tracking here
-        </p>
-      </div>
+      <Card
+        variant="frosted"
+        padding="cozy"
+        className="border-dashed text-center shadow-none"
+      >
+        <CardTitle className="text-lg">No assignments yet</CardTitle>
+        <CardDescription>
+          Assign books and quizzes to your classes to see tracking here.
+        </CardDescription>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <TabButton
           active={activeTab === "books"}
           onClick={() => setActiveTab("books")}
           count={bookAssignments.length}
         >
-          📖 Book Assignments
+          Book assignments
         </TabButton>
         <TabButton
           active={activeTab === "quizzes"}
           onClick={() => setActiveTab("quizzes")}
           count={quizAssignments.length}
         >
-          🎯 Quiz Assignments
+          Quiz assignments
         </TabButton>
       </div>
 
-      {/* Content */}
       {activeTab === "books" ? (
         <BookAssignmentsList assignments={bookAssignments} />
       ) : (
@@ -61,40 +67,34 @@ export function AssignmentTrackingDashboard({
   );
 }
 
-// Tab button component
 function TabButton({
   children,
   active,
   onClick,
   count,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   active: boolean;
   onClick: () => void;
   count: number;
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition ${
-        active
-          ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
-          : "bg-white/60 text-indigo-600 hover:bg-white/80"
-      }`}
+      className={buttonVariants({
+        variant: active ? "primary" : "neutral",
+        size: "sm",
+      })}
     >
       {children}
-      <span
-        className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-          active ? "bg-white/20" : "bg-indigo-100"
-        }`}
-      >
+      <Badge variant={active ? "neutral" : "outline"} size="sm">
         {count}
-      </span>
+      </Badge>
     </button>
   );
 }
 
-// Book assignments list
 function BookAssignmentsList({
   assignments,
 }: {
@@ -102,59 +102,59 @@ function BookAssignmentsList({
 }) {
   if (assignments.length === 0) {
     return (
-      <div className="rounded-2xl bg-white/60 p-8 text-center text-indigo-500">
-        No book assignments found
-      </div>
+      <Card padding="cozy" className="border-dashed text-center shadow-none">
+        <CardDescription>No book assignments found.</CardDescription>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-3">
-      {assignments.map((assignment: any) => (
+      {assignments.map((assignment) => (
         <BookAssignmentCard key={assignment.bookId} assignment={assignment} />
       ))}
     </div>
   );
 }
 
-// Individual book assignment card
 function BookAssignmentCard({ assignment }: { assignment: BookAssignment }) {
-  const completionColor =
+  const completionVariant =
     assignment.completionRate >= 70
-      ? "text-green-600"
+      ? "lime"
       : assignment.completionRate >= 40
-        ? "text-amber-600"
-        : "text-red-600";
+        ? "amber"
+        : "bubble";
 
   return (
-    <div className="rounded-[20px] border border-white/70 bg-white/90 p-5 shadow-[0_10px_40px_rgba(0,0,0,0.06)]">
-      <div className="flex gap-4">
-        {/* Book Cover */}
+    <Card padding="snug" className="shadow-none">
+      <div className="flex flex-col gap-4 sm:flex-row">
         {assignment.bookCoverUrl && (
           <img
             src={assignment.bookCoverUrl}
             alt={assignment.bookTitle}
-            className="h-24 w-16 flex-shrink-0 rounded-lg object-cover shadow-md"
+            className="h-24 w-16 flex-shrink-0 rounded-xl object-cover shadow-[0_12px_26px_rgba(36,23,24,0.14)]"
           />
         )}
 
-        {/* Content */}
-        <div className="flex-1">
-          {/* Header */}
-          <div className="mb-3">
-            <h4 className="text-lg font-bold text-indigo-900">
-              {assignment.bookTitle}
-            </h4>
-            <p className="text-sm text-indigo-500">
-              by {assignment.bookAuthor}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              {assignment.assignedClasses.join(", ")}
-            </p>
+        <div className="min-w-0 flex-1 space-y-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0">
+              <h4 className="heading-font truncate text-lg font-bold text-[#241718]">
+                {assignment.bookTitle}
+              </h4>
+              <p className="text-sm text-[#6f6061]">
+                by {assignment.bookAuthor}
+              </p>
+              <p className="mt-1 text-xs font-medium text-[#8a7778]">
+                {assignment.assignedClasses.join(", ")}
+              </p>
+            </div>
+            <Badge variant={completionVariant} size="sm">
+              {assignment.completionRate}% complete
+            </Badge>
           </div>
 
-          {/* Stats Grid */}
-          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <MiniMetric label="Total" value={assignment.totalStudents} />
             <MiniMetric label="Started" value={assignment.studentsStarted} />
             <MiniMetric
@@ -162,39 +162,22 @@ function BookAssignmentCard({ assignment }: { assignment: BookAssignment }) {
               value={assignment.studentsCompleted}
             />
             <MiniMetric
-              label="Avg Progress"
+              label="Avg progress"
               value={`${assignment.averageProgress}%`}
             />
           </div>
 
-          {/* Progress Bar */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs font-semibold">
-              <span className="text-gray-600">Completion Rate</span>
-              <span className={completionColor}>
-                {assignment.completionRate}%
-              </span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  assignment.completionRate >= 70
-                    ? "bg-gradient-to-r from-green-400 to-emerald-400"
-                    : assignment.completionRate >= 40
-                      ? "bg-gradient-to-r from-amber-400 to-orange-400"
-                      : "bg-gradient-to-r from-red-400 to-pink-400"
-                }`}
-                style={{ width: `${assignment.completionRate}%` }}
-              />
-            </div>
-          </div>
+          <ProgressBar
+            label="Completion rate"
+            value={assignment.completionRate}
+            tone={completionVariant}
+          />
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
-// Quiz assignments list
 function QuizAssignmentsList({
   assignments,
 }: {
@@ -202,29 +185,28 @@ function QuizAssignmentsList({
 }) {
   if (assignments.length === 0) {
     return (
-      <div className="rounded-2xl bg-white/60 p-8 text-center text-indigo-500">
-        No quiz assignments found
-      </div>
+      <Card padding="cozy" className="border-dashed text-center shadow-none">
+        <CardDescription>No quiz assignments found.</CardDescription>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-3">
-      {assignments.map((assignment: any) => (
+      {assignments.map((assignment) => (
         <QuizAssignmentCard key={assignment.quizId} assignment={assignment} />
       ))}
     </div>
   );
 }
 
-// Individual quiz assignment card
 function QuizAssignmentCard({ assignment }: { assignment: QuizAssignment }) {
-  const scoreColor =
+  const scoreVariant =
     assignment.averageScore >= 80
-      ? "text-green-600"
+      ? "lime"
       : assignment.averageScore >= 60
-        ? "text-amber-600"
-        : "text-red-600";
+        ? "amber"
+        : "bubble";
   const participationRate =
     assignment.totalStudents > 0
       ? Math.round(
@@ -233,77 +215,83 @@ function QuizAssignmentCard({ assignment }: { assignment: QuizAssignment }) {
       : 0;
 
   return (
-    <div className="rounded-[20px] border border-white/70 bg-white/90 p-5 shadow-[0_10px_40px_rgba(0,0,0,0.06)]">
-      <div className="flex items-start justify-between gap-4">
-        {/* Content */}
-        <div className="flex-1">
-          <div className="mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🎯</span>
-              <div>
-                <h4 className="text-lg font-bold text-indigo-900">
-                  {assignment.quizTitle}
-                </h4>
-                <p className="text-sm text-indigo-500">
-                  {assignment.bookTitle}
-                </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  {assignment.assignedClasses.join(", ")}
-                </p>
-              </div>
-            </div>
+    <Card padding="snug" className="shadow-none">
+      <div className="space-y-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
+            <h4 className="heading-font truncate text-lg font-bold text-[#241718]">
+              {assignment.quizTitle}
+            </h4>
+            <p className="text-sm text-[#6f6061]">{assignment.bookTitle}</p>
+            <p className="mt-1 text-xs font-medium text-[#8a7778]">
+              {assignment.assignedClasses.join(", ")}
+            </p>
           </div>
-
-          {/* Stats Grid */}
-          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <MiniMetric label="Total" value={assignment.totalStudents} />
-            <MiniMetric
-              label="Attempted"
-              value={assignment.studentsAttempted}
-            />
-            <MiniMetric
-              label="Avg Score"
-              value={`${assignment.averageScore}%`}
-              valueColor={scoreColor}
-            />
-            <MiniMetric label="Pass Rate" value={`${assignment.passRate}%`} />
-          </div>
-
-          {/* Participation Bar */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs font-semibold">
-              <span className="text-gray-600">Participation</span>
-              <span className="text-indigo-600">{participationRate}%</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-indigo-400 to-purple-400 transition-all duration-500"
-                style={{ width: `${participationRate}%` }}
-              />
-            </div>
-          </div>
+          <Badge variant={scoreVariant} size="sm">
+            {assignment.averageScore}% avg
+          </Badge>
         </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <MiniMetric label="Total" value={assignment.totalStudents} />
+          <MiniMetric label="Attempted" value={assignment.studentsAttempted} />
+          <MiniMetric label="Avg score" value={`${assignment.averageScore}%`} />
+          <MiniMetric label="Pass rate" value={`${assignment.passRate}%`} />
+        </div>
+
+        <ProgressBar
+          label="Participation"
+          value={participationRate}
+          tone="sky"
+        />
       </div>
+    </Card>
+  );
+}
+
+function MiniMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | string;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#eadfda] bg-[#fffaf4] px-3 py-2">
+      <p className="text-xs font-medium text-[#6f6061]">{label}</p>
+      <p className="heading-font text-base font-bold text-[#241718]">{value}</p>
     </div>
   );
 }
 
-// Mini metric component
-function MiniMetric({
+function ProgressBar({
   label,
   value,
-  valueColor,
+  tone,
 }: {
   label: string;
-  value: number | string;
-  valueColor?: string;
+  value: number;
+  tone: "sky" | "lime" | "amber" | "bubble";
 }) {
+  const color = {
+    sky: "bg-[#25638e]",
+    lime: "bg-[#486142]",
+    amber: "bg-[#D6A13A]",
+    bubble: "bg-[#7E1518]",
+  }[tone];
+
   return (
-    <div>
-      <p className="text-xs font-medium text-gray-500">{label}</p>
-      <p className={`text-base font-bold ${valueColor ?? "text-gray-900"}`}>
-        {value}
-      </p>
+    <div className="space-y-1.5">
+      <div className="flex justify-between text-xs font-bold text-[#6f6061]">
+        <span>{label}</span>
+        <span>{value}%</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-[#F5E7E8]">
+        <div
+          className={`h-full rounded-full ${color} transition-all duration-500`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
     </div>
   );
 }

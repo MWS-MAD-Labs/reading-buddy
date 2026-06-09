@@ -25,6 +25,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
   Input,
   Label,
   Select,
@@ -62,28 +63,23 @@ const ACCESS_BADGES: Record<
 > = {
   KINDERGARTEN: {
     label: "K",
-    color:
-      "bg-gradient-to-r from-emerald-400 to-teal-400 text-white border-emerald-300",
+    color: "border-[#6F8B6A]/35 bg-[#EDF3EB] text-[#486142]",
   },
   LOWER_ELEMENTARY: {
     label: "LE",
-    color:
-      "bg-gradient-to-r from-sky-400 to-blue-400 text-white border-sky-300",
+    color: "border-[#B8DDF8]/70 bg-[#EFF8FE] text-[#25638e]",
   },
   UPPER_ELEMENTARY: {
     label: "UE",
-    color:
-      "bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-300",
+    color: "border-[#7E1518]/20 bg-[#F5E7E8] text-[#7E1518]",
   },
   JUNIOR_HIGH: {
     label: "JH",
-    color:
-      "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-300",
+    color: "border-[#D6A13A]/45 bg-[#FBF2DF] text-[#7a5311]",
   },
   TEACHERS_STAFF: {
     label: "TS",
-    color:
-      "bg-gradient-to-r from-amber-400 to-orange-400 text-white border-amber-300",
+    color: "border-[#eadfda] bg-white text-[#241718]",
   },
 };
 
@@ -97,7 +93,7 @@ const getContentStatusBadge = (book: ManagedBookRecord) => {
         title="EPUB files work natively"
         className="rounded-full"
       >
-        ✓ EPUB Ready
+        EPUB ready
       </Badge>
     );
   }
@@ -111,7 +107,7 @@ const getContentStatusBadge = (book: ManagedBookRecord) => {
         title={`Ready to read (${book.pageImagesCount} pages rendered)`}
         className="rounded-full"
       >
-        📷 Ready
+        Reader ready
       </Badge>
     );
   }
@@ -125,14 +121,14 @@ const getContentStatusBadge = (book: ManagedBookRecord) => {
         title="PDF uploads are processed automatically after upload."
         className="rounded-full"
       >
-        ⏳ Processing
+        Processing
       </Badge>
     );
   }
 
   return (
     <Badge variant="neutral" size="sm" className="rounded-full">
-      ⚠ Pending
+      Pending
     </Badge>
   );
 };
@@ -357,31 +353,29 @@ export const BookManager = ({
       <Card
         variant="frosted"
         padding="cozy"
-        className="space-y-6 border-4 border-white/70 text-indigo-950 shadow-[0_25px_90px_rgba(119,65,255,0.18)] backdrop-blur-xl"
+        className="space-y-6 border-4 border-white/70"
       >
         <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-rose-400">
-              Librarian tools
-            </p>
-            <CardTitle className="text-2xl font-black tracking-tight text-indigo-950">
+          <div className="space-y-2">
+            <Badge variant="bubble" size="sm">
+              Catalog tools
+            </Badge>
+            <CardTitle className="text-2xl tracking-tight">
               Library Catalog
             </CardTitle>
-            <p className="text-sm text-indigo-500">
-              Review, edit, or remove uploaded eBooks.
-            </p>
+            <CardDescription>
+              Review, edit, quiz, or remove uploaded eBooks.
+            </CardDescription>
           </div>
-          <div className="flex flex-col items-stretch gap-2 text-sm sm:flex-row sm:items-center sm:gap-3">
-            <Button
-              type="button"
-              onClick={onAddBookClick}
-              disabled={isAddPanelOpen}
-              variant="primary"
-              size="md"
-            >
-              {isAddPanelOpen ? "Adding eBook…" : "Add new eBook"}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            onClick={onAddBookClick}
+            disabled={isAddPanelOpen}
+            variant="primary"
+            size="md"
+          >
+            {isAddPanelOpen ? "Adding eBook…" : "Add new eBook"}
+          </Button>
         </CardHeader>
 
         {feedback ? (
@@ -394,7 +388,7 @@ export const BookManager = ({
           <Card
             variant="playful"
             padding="snug"
-            className="border-4 border-white/80 shadow-[0_16px_60px_rgba(124,58,237,0.14)]"
+            className="border border-[#eadfda]"
           >
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
@@ -517,16 +511,18 @@ export const BookManager = ({
               {/* Mobile Card View */}
               <div className="space-y-4 lg:hidden">
                 {filteredBooks.map((book: any) => (
-                  <div
+                  <Card
                     key={book.id}
-                    className="rounded-3xl border-4 border-blue-300 bg-white p-5 shadow-lg transition-all hover:shadow-xl"
+                    variant="frosted"
+                    padding="snug"
+                    className="transition hover:border-[#D6A13A]/60"
                   >
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div className="flex-1">
-                        <h3 className="mb-1 text-lg font-black text-purple-900">
+                        <h3 className="heading-font mb-1 text-lg font-bold text-[#241718]">
                           {book.title}
                         </h3>
-                        <p className="text-sm font-semibold text-purple-600">
+                        <p className="text-sm font-medium text-[#5d4b4c]">
                           {book.author}
                         </p>
                       </div>
@@ -534,35 +530,33 @@ export const BookManager = ({
 
                     <div className="mb-4 space-y-2 text-sm">
                       <div className="flex gap-2">
-                        <span className="font-black text-blue-600">ISBN:</span>
-                        <span className="text-purple-900">{book.isbn}</span>
+                        <span className="font-bold text-[#7E1518]">ISBN:</span>
+                        <span className="text-[#241718]">{book.isbn}</span>
                       </div>
                       <div className="flex gap-2">
-                        <span className="font-black text-blue-600">
+                        <span className="font-bold text-[#7E1518]">
                           Publisher:
                         </span>
-                        <span className="text-purple-900">
-                          {book.publisher}
-                        </span>
+                        <span className="text-[#241718]">{book.publisher}</span>
                       </div>
                       <div className="flex gap-2">
-                        <span className="font-black text-blue-600">Year:</span>
-                        <span className="text-purple-900">
+                        <span className="font-bold text-[#7E1518]">Year:</span>
+                        <span className="text-[#241718]">
                           {book.publicationYear}
                         </span>
                       </div>
                       <div className="flex gap-2">
-                        <span className="font-black text-blue-600">Genre:</span>
-                        <span className="text-purple-900">{book.genre}</span>
+                        <span className="font-bold text-[#7E1518]">Genre:</span>
+                        <span className="text-[#241718]">{book.genre}</span>
                       </div>
                       <div className="flex gap-2">
-                        <span className="font-black text-blue-600">
+                        <span className="font-bold text-[#7E1518]">
                           Language:
                         </span>
-                        <span className="text-purple-900">{book.language}</span>
+                        <span className="text-[#241718]">{book.language}</span>
                       </div>
                       <div className="flex gap-2">
-                        <span className="font-black text-blue-600">
+                        <span className="font-bold text-[#7E1518]">
                           Content:
                         </span>
                         {getContentStatusBadge(book)}
@@ -577,7 +571,7 @@ export const BookManager = ({
 
                       return (
                         <div className="mb-4">
-                          <p className="mb-2 text-sm font-black text-blue-600">
+                          <p className="mb-2 text-sm font-bold text-[#7E1518]">
                             Access Levels:
                           </p>
                           <div className="flex flex-wrap gap-2">
@@ -590,9 +584,9 @@ export const BookManager = ({
                                 <span
                                   key={`${book.id}-${level}`}
                                   className={clsx(
-                                    "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
+                                    "rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide",
                                     badge?.color ??
-                                      "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                      "border-[#eadfda] bg-white text-[#241718]",
                                   )}
                                 >
                                   {badge?.label ?? level.slice(0, 2)}
@@ -604,71 +598,74 @@ export const BookManager = ({
                       );
                     })()}
 
-                    <div className="flex flex-wrap gap-2">
-                      <button
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <Button
                         type="button"
                         onClick={() => setQuizManagementBook(book)}
-                        className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-purple-300 bg-purple-100 px-4 py-2 text-sm font-black text-purple-600 transition hover:bg-purple-200 active:scale-95"
+                        variant="neutral"
+                        size="sm"
                         aria-label="Manage quizzes"
                       >
-                        📝
-                      </button>
+                        Quizzes
+                      </Button>
 
-                      <button
+                      <Button
                         type="button"
                         onClick={() => handleEdit(book)}
-                        className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-indigo-300 bg-indigo-100 px-4 py-2 text-sm font-black text-indigo-600 transition hover:bg-indigo-200 active:scale-95"
+                        variant="outline"
+                        size="sm"
                         aria-label="Edit book"
                       >
-                        ✏️
-                      </button>
-                      <button
+                        Edit
+                      </Button>
+                      <Button
                         type="button"
                         onClick={() => handleDelete(book)}
                         disabled={isDeleting && deletePendingId === book.id}
-                        className="min-h-[44px] min-w-[44px] flex-1 rounded-2xl border-4 border-rose-300 bg-rose-100 px-4 py-2 text-sm font-black text-rose-600 transition hover:bg-rose-200 active:scale-95 disabled:opacity-40"
+                        variant="danger"
+                        size="sm"
                         aria-label="Delete book"
                       >
-                        🗑️
-                      </button>
+                        Delete
+                      </Button>
                     </div>
-                  </div>
+                  </Card>
                 ))}
               </div>
 
               {/* Desktop Table View */}
-              <div className="hidden overflow-x-auto rounded-3xl border-4 border-blue-300 bg-white shadow-xl lg:block">
-                <table className="min-w-full divide-y-4 divide-blue-200 text-sm text-purple-900">
-                  <thead className="bg-gradient-to-r from-blue-100 via-purple-100 to-pink-100">
+              <div className="hidden overflow-x-auto rounded-3xl border border-[#eadfda] bg-white lg:block">
+                <table className="min-w-full divide-y divide-[#eadfda] text-sm text-[#241718]">
+                  <thead className="bg-[#fffaf4]">
                     <tr>
-                      <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                      <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                         Title
                       </th>
-                      <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                      <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                         ISBN
                       </th>
-                      <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                      <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                         Author
                       </th>
-                      <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                      <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                         Publisher
                       </th>
-                      <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                      <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                         Year
                       </th>
-                      <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                      <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                         Genre
                       </th>
-                      <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                      <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                         Language
                       </th>
-                      <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                      <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                         Content
                       </th>
-                      <th className="px-4 py-3 text-left text-base font-black text-blue-600">
+                      <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                         Access
                       </th>
-                      <th className="px-4 py-3 text-right text-base font-black text-blue-600">
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                         Actions
                       </th>
                     </tr>
@@ -677,13 +674,13 @@ export const BookManager = ({
                     {filteredBooks.map((book: any) => (
                       <tr
                         key={book.id}
-                        className="border-b-2 border-blue-100 bg-transparent hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50"
+                        className="border-b border-[#eadfda] bg-transparent hover:bg-[#fffaf4]"
                       >
                         <td className="px-4 py-3">
-                          <div className="font-bold text-purple-900">
+                          <div className="heading-font font-bold text-[#241718]">
                             {book.title}
                           </div>
-                          <div className="text-xs font-semibold text-purple-600">
+                          <div className="text-xs font-medium text-[#5d4b4c]">
                             {book.author}
                           </div>
                         </td>
@@ -702,7 +699,7 @@ export const BookManager = ({
                               book.accessLevels,
                             );
                             if (!accessLevels.length) {
-                              return <span className="text-purple-300">—</span>;
+                              return <span className="text-[#9b898a]">—</span>;
                             }
 
                             return (
@@ -716,9 +713,9 @@ export const BookManager = ({
                                     <span
                                       key={`${book.id}-${level}`}
                                       className={clsx(
-                                        "rounded-2xl border-2 px-3 py-1 text-xs font-black uppercase tracking-wide shadow-sm",
+                                        "rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide",
                                         badge?.color ??
-                                          "bg-indigo-100 text-indigo-600 border-indigo-300",
+                                          "border-[#eadfda] bg-white text-[#241718]",
                                       )}
                                     >
                                       {badge?.label ?? level.slice(0, 2)}
@@ -746,7 +743,7 @@ export const BookManager = ({
                                   });
                                 }
                               }}
-                              className="h-10 w-10 rounded-full border border-indigo-200 bg-white/80 text-lg font-black text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+                              className="h-10 w-10 rounded-full border border-[#eadfda] bg-white text-lg font-bold text-[#7E1518] shadow-sm transition hover:border-[#D6A13A]/60 hover:bg-[#fffaf4]"
                               aria-haspopup="true"
                               aria-expanded={actionMenu?.id === book.id}
                               aria-label="Open actions"
@@ -776,7 +773,7 @@ export const BookManager = ({
           return createPortal(
             <div
               ref={menuRef}
-              className="fixed z-50 w-44 rounded-2xl border border-indigo-100 bg-white p-2 text-sm font-semibold text-indigo-800 shadow-xl animate-in fade-in zoom-in-95 duration-100"
+              className="fixed z-50 w-44 rounded-2xl border border-[#eadfda] bg-white p-2 text-sm font-semibold text-[#241718] shadow-xl animate-in fade-in zoom-in-95 duration-100"
               style={{
                 top: menuPosition.top,
                 left: menuPosition.left,
@@ -789,9 +786,8 @@ export const BookManager = ({
                     setActionMenu(null);
                     setQuizManagementBook(book);
                   }}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-[#fffaf4]"
                 >
-                  <span aria-hidden>📝</span>
                   <span>Quizzes</span>
                 </button>
 
@@ -801,13 +797,12 @@ export const BookManager = ({
                     setActionMenu(null);
                     handleEdit(book);
                   }}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-indigo-50"
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-[#fffaf4]"
                 >
-                  <span aria-hidden>✏️</span>
                   <span>Edit</span>
                 </button>
 
-                <div className="mx-2 my-1 border-t border-indigo-100" />
+                <div className="mx-2 my-1 border-t border-[#eadfda]" />
 
                 <button
                   type="button"
@@ -816,9 +811,8 @@ export const BookManager = ({
                     handleDelete(book);
                   }}
                   disabled={isDeleting && deletePendingId === book.id}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-[#B94A4E] transition hover:bg-[#F8EAEB] disabled:opacity-50"
                 >
-                  <span aria-hidden>🗑️</span>
                   <span>Delete</span>
                 </button>
               </div>
@@ -829,23 +823,25 @@ export const BookManager = ({
 
       {/* Quiz Management Modal */}
       {quizManagementBook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border-4 border-indigo-300 bg-white p-8 shadow-2xl">
-            <div className="mb-6 flex items-start justify-between">
-              <div>
-                <h3 className="text-2xl font-black text-indigo-900">
-                  Quiz Management
-                </h3>
-                <p className="text-lg font-semibold text-indigo-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241718]/45 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-4xl border border-white/80 bg-white p-6 shadow-[0_35px_120px_rgba(36,23,24,0.22)] md:p-8">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <Badge variant="bubble" size="sm">
+                  Quiz management
+                </Badge>
+                <h3 className="heading-font text-2xl font-bold text-[#241718]">
                   {quizManagementBook.title}
-                </p>
+                </h3>
               </div>
-              <button
+              <Button
+                type="button"
                 onClick={() => setQuizManagementBook(null)}
-                className="rounded-full border-2 border-gray-300 bg-white px-4 py-2 text-2xl font-bold text-gray-600 transition hover:bg-gray-100"
+                variant="neutral"
+                size="sm"
               >
-                ✕
-              </button>
+                Close
+              </Button>
             </div>
             <BookQuizManagement
               bookId={quizManagementBook.id}

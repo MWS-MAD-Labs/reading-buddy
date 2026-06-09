@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { queryWithContext } from "@/lib/db";
 import { BookManagementSection } from "@/components/dashboard/BookManagementSection";
 import type { ManagedBookRecord } from "@/components/dashboard/BookManager";
+import { LibrarianStatsCards } from "@/components/dashboard/librarian/LibrarianStatsCards";
+import { getLibrarianStats } from "./stats-actions";
 import type { AccessLevelValue } from "@/constants/accessLevels";
 import { normalizeAccessLevels } from "@/constants/accessLevels";
 import { requireRole } from "@/lib/auth/roleCheck";
@@ -26,6 +28,7 @@ export default async function LibrarianPage() {
   await requireRole(["ADMIN", "LIBRARIAN"]);
 
   const user = await getCurrentUser();
+  const statsResult = user.userId ? await getLibrarianStats(user.userId) : null;
 
   // Get all books with their access levels
   const booksResult = await queryWithContext(
@@ -99,40 +102,74 @@ export default async function LibrarianPage() {
 
   return (
     <div className="space-y-8">
-      {/* Quick Actions */}
-      <Card variant="glow" padding="snug" className="border-4 border-white/70">
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-lg">Quick Actions</CardTitle>
-            <CardDescription>
-              Jump into the librarian tasks you need most.
+      <Card
+        variant="glow"
+        padding="spacious"
+        className="border-4 border-white/70"
+      >
+        <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl space-y-3">
+            <Badge variant="bubble" size="sm">
+              Librarian workspace
+            </Badge>
+            <CardTitle className="text-3xl md:text-4xl">
+              Curate the school library
+            </CardTitle>
+            <CardDescription className="max-w-2xl">
+              Manage catalog metadata, reader access, quiz assets, badges, and
+              student review moderation from one refreshed workspace.
             </CardDescription>
           </div>
-          <Badge variant="neutral" className="text-[10px]">
-            Librarian tools
-          </Badge>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/dashboard/admin/badges"
+              className={cn(
+                buttonVariants({ variant: "secondary", size: "md" }),
+                "no-underline",
+              )}
+            >
+              Manage Book Badges
+            </Link>
+            <Link
+              href="/dashboard/librarian/reviews"
+              className={cn(
+                buttonVariants({ variant: "neutral", size: "md" }),
+                "no-underline",
+              )}
+            >
+              Moderate Reviews
+            </Link>
+          </div>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          <Link
-            href="/dashboard/admin/badges"
-            className={cn(
-              buttonVariants({ variant: "secondary", size: "md" }),
-              "no-underline",
-            )}
-          >
-            <span>Manage Book Badges</span>
-          </Link>
-          <Link
-            href="/dashboard/librarian/reviews"
-            className={cn(
-              buttonVariants({ variant: "secondary", size: "md" }),
-              "no-underline",
-            )}
-          >
-            <span>📝 Moderate Reviews</span>
-          </Link>
+        <CardContent className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-[#eadfda] bg-white/80 p-4">
+            <p className="heading-font text-2xl font-bold text-[#7E1518]">
+              {managedBooks.length}
+            </p>
+            <p className="text-sm font-medium text-[#5d4b4c]">
+              Books in catalog
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[#eadfda] bg-white/80 p-4">
+            <p className="heading-font text-2xl font-bold text-[#6F8B6A]">
+              {genreOptions.length}
+            </p>
+            <p className="text-sm font-medium text-[#5d4b4c]">Active genres</p>
+          </div>
+          <div className="rounded-2xl border border-[#eadfda] bg-white/80 p-4">
+            <p className="heading-font text-2xl font-bold text-[#D6A13A]">
+              {languageOptions.length}
+            </p>
+            <p className="text-sm font-medium text-[#5d4b4c]">
+              Languages represented
+            </p>
+          </div>
         </CardContent>
       </Card>
+
+      {statsResult?.success && statsResult.data ? (
+        <LibrarianStatsCards stats={statsResult.data} />
+      ) : null}
 
       <BookManagementSection
         books={managedBooks}

@@ -7,6 +7,14 @@ import { ClassAnalyticsOverview } from "@/components/dashboard/teacher/ClassAnal
 import { AssignmentTrackingDashboard } from "@/components/dashboard/teacher/AssignmentTrackingDashboard";
 import { StudentPerformanceHeatmap } from "@/components/dashboard/teacher/StudentPerformanceHeatmap";
 import {
+  Badge,
+  buttonVariants,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
+import {
   getTeacherClassAnalytics,
   getTeacherBookAssignments,
   getTeacherQuizAssignments,
@@ -14,8 +22,15 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const cardClass =
-  "space-y-4 rounded-[28px] border border-[#eadfda] bg-white/90 p-6 text-[#241718] card-shadow backdrop-blur-xl";
+type ClassroomRow = {
+  id: number;
+  name: string;
+};
+
+type TeacherRow = {
+  id: string;
+  full_name: string | null;
+};
 
 export default async function TeacherDashboardPage() {
   const { user, role } = await requireRole(["TEACHER", "ADMIN"]);
@@ -31,7 +46,7 @@ export default async function TeacherDashboardPage() {
   );
 
   const classrooms = await Promise.all(
-    classroomsResult.rows.map(async (c: any) => {
+    classroomsResult.rows.map(async (c: ClassroomRow) => {
       const countResult = await queryWithContext(
         userId,
         `SELECT COUNT(*) as count FROM class_students WHERE class_id = $1`,
@@ -53,7 +68,7 @@ export default async function TeacherDashboardPage() {
     [],
   );
 
-  const allTeachers = allTeachersResult.rows.map((t: any) => ({
+  const allTeachers = allTeachersResult.rows.map((t: TeacherRow) => ({
     id: t.id,
     full_name: t.full_name ?? "",
   }));
@@ -67,100 +82,113 @@ export default async function TeacherDashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <header className="space-y-2 rounded-[32px] border border-[#B94A4E]/20 bg-gradient-to-br from-white to-[#F8EAEB] p-6 soft-shadow">
-        <p className="heading-font text-xs font-bold uppercase tracking-[0.24em] text-[#B94A4E]">
-          Teacher dashboard
-        </p>
-        <h1 className="heading-font text-3xl font-extrabold text-[#7E1518]">
-          Welcome Back!
-        </h1>
-        <p className="text-sm leading-6 text-[#5d4b4c]">
-          Monitor your classes and student progress
-        </p>
-      </header>
-
-      {/* Class Analytics Overview */}
-      <section className={cardClass}>
-        <div className="mb-4">
-          <h2 className="text-xl font-black text-indigo-950">
-            Class Analytics
-          </h2>
-          <p className="text-sm text-indigo-500">
-            Overview of your classes' performance
-          </p>
+      <Card variant="glow" padding="cozy">
+        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+          <CardHeader className="mb-0 max-w-2xl">
+            <Badge variant="bubble">Teacher dashboard</Badge>
+            <h1 className="heading-font text-3xl font-bold leading-tight text-[#241718] md:text-4xl">
+              Welcome back
+            </h1>
+            <CardDescription>
+              Monitor classroom reading momentum, assignments, quizzes, and
+              student progress from one focused workspace.
+            </CardDescription>
+          </CardHeader>
+          <div className="grid grid-cols-2 gap-3 sm:flex">
+            <div className="rounded-2xl border border-[#eadfda] bg-white/75 px-4 py-3 text-center">
+              <p className="heading-font text-2xl font-bold text-[#7E1518]">
+                {classrooms.length}
+              </p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#6f6061]">
+                Classes
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[#eadfda] bg-white/75 px-4 py-3 text-center">
+              <p className="heading-font text-2xl font-bold text-[#486142]">
+                {classrooms.reduce(
+                  (sum, classroom) => sum + classroom.student_count,
+                  0,
+                )}
+              </p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#6f6061]">
+                Students
+              </p>
+            </div>
+          </div>
         </div>
+      </Card>
+
+      <Card variant="frosted" padding="cozy">
+        <CardHeader>
+          <Badge variant="sky">Analytics</Badge>
+          <CardTitle>Class analytics</CardTitle>
+          <CardDescription>
+            A quick read on class performance, engagement, and progress.
+          </CardDescription>
+        </CardHeader>
         <ClassAnalyticsOverview analytics={classAnalytics} />
-      </section>
+      </Card>
 
-      {/* Assignment Tracking */}
-      <section className={cardClass}>
-        <div className="mb-4">
-          <h2 className="text-xl font-black text-indigo-950">
-            Assignment Tracking
-          </h2>
-          <p className="text-sm text-indigo-500">
-            Monitor reading and quiz progress across your classes
-          </p>
-        </div>
+      <Card variant="frosted" padding="cozy">
+        <CardHeader>
+          <Badge variant="lime">Assignments</Badge>
+          <CardTitle>Assignment tracking</CardTitle>
+          <CardDescription>
+            Monitor reading and quiz progress across your classes.
+          </CardDescription>
+        </CardHeader>
         <AssignmentTrackingDashboard
           bookAssignments={bookAssignments}
           quizAssignments={quizAssignments}
         />
-      </section>
+      </Card>
 
-      {/* Student Performance Heatmap */}
-      <section className={cardClass}>
-        <div className="mb-4">
-          <h2 className="text-xl font-black text-indigo-950">
-            Performance Overview
-          </h2>
-          <p className="text-sm text-indigo-500">
-            Quick glance at class engagement and activity
-          </p>
-        </div>
+      <Card variant="frosted" padding="cozy">
+        <CardHeader>
+          <Badge variant="amber">Performance</Badge>
+          <CardTitle>Performance overview</CardTitle>
+          <CardDescription>
+            Spot class engagement and activity patterns at a glance.
+          </CardDescription>
+        </CardHeader>
         <StudentPerformanceHeatmap analytics={classAnalytics} />
-      </section>
+      </Card>
 
       {role === "ADMIN" && (
-        <div className="rounded-[28px] border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-4">
-          <div className="flex items-center justify-between">
+        <Card variant="playful" padding="snug">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-bold text-purple-900">
+              <CardTitle className="text-lg md:text-xl">
                 Looking for all classrooms?
-              </p>
-              <p className="text-xs text-purple-600">
-                View detailed stats and manage all classrooms in the system
-              </p>
+              </CardTitle>
+              <CardDescription className="text-sm">
+                View detailed stats and manage every classroom in the system.
+              </CardDescription>
             </div>
             <Link
               href="/dashboard/teacher/classrooms"
-              className="rounded-full bg-purple-500 px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-purple-600"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
             >
               View all classrooms
             </Link>
           </div>
-        </div>
+        </Card>
       )}
 
-      <section className={cardClass}>
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-rose-400">
-            Teacher Lounge
-          </p>
-          <h2 className="text-2xl font-black text-indigo-950">
-            Classroom Management
-          </h2>
-          <p className="text-sm text-indigo-500">
+      <Card variant="frosted" padding="cozy">
+        <CardHeader>
+          <Badge variant="bubble">Teacher lounge</Badge>
+          <CardTitle>Classroom management</CardTitle>
+          <CardDescription>
             Create classes and manage your students.
-          </p>
-        </div>
+          </CardDescription>
+        </CardHeader>
         <ClassroomManager
           classrooms={classrooms}
           allTeachers={allTeachers}
           userRole={role as "TEACHER" | "ADMIN"}
         />
-      </section>
+      </Card>
     </div>
   );
 }

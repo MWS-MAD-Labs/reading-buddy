@@ -50,11 +50,11 @@ export const BookManagementSection = ({
         isAddPanelOpen={showUploader}
       />
       {showUploader ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-indigo-950/40 px-4 py-8 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241718]/45 px-4 py-8 backdrop-blur-sm">
           <div
             role="dialog"
             aria-modal="true"
-            className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[40px] border border-white/70 bg-gradient-to-br from-white via-pink-50 to-amber-50 p-1 shadow-[0_35px_120px_rgba(255,128,167,0.35)]"
+            className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[32px] border border-white/80 bg-white p-1 shadow-[0_35px_120px_rgba(36,23,24,0.22)]"
           >
             <BookUploadForm
               genreOptions={genreOptions}
@@ -66,11 +66,11 @@ export const BookManagementSection = ({
         </div>
       ) : null}
       {editingBook ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-indigo-950/40 px-4 py-8 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241718]/45 px-4 py-8 backdrop-blur-sm">
           <div
             role="dialog"
             aria-modal="true"
-            className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[40px] border border-white/70 bg-gradient-to-br from-white via-pink-50 to-amber-50 p-1 shadow-[0_35px_120px_rgba(255,128,167,0.35)]"
+            className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[32px] border border-white/80 bg-white p-1 shadow-[0_35px_120px_rgba(36,23,24,0.22)]"
           >
             <BookEditForm
               book={editingBook}

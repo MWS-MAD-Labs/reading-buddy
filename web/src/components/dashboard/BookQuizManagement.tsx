@@ -4,6 +4,17 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  FieldHelper,
+  Input,
+  Label,
+} from "@/components/ui";
+import { buttonVariants } from "@/components/ui";
+import { cn } from "@/lib/cn";
+import {
   publishQuiz,
   unpublishQuiz,
   archiveQuiz,
@@ -175,105 +186,120 @@ export const BookQuizManagement = ({
   const getStatusBadge = (status: string, isPublished: boolean) => {
     if (isPublished) {
       return (
-        <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700">
-          ✓ Published
-        </span>
+        <Badge variant="lime" size="sm">
+          Published
+        </Badge>
       );
     }
     if (status === "archived") {
       return (
-        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700">
-          📦 Archived
-        </span>
+        <Badge variant="neutral" size="sm">
+          Archived
+        </Badge>
       );
     }
     return (
-      <span className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-bold text-yellow-700">
-        ✎ Draft
-      </span>
+      <Badge variant="amber" size="sm">
+        Draft
+      </Badge>
     );
   };
 
   if (loading) {
     return (
-      <div className="p-4 text-center text-sm text-gray-500">
+      <Card
+        variant="frosted"
+        padding="snug"
+        className="text-center text-sm text-[#5d4b4c]"
+      >
         Loading quizzes...
-      </div>
+      </Card>
     );
   }
 
   return (
-    <div className="space-y-4 rounded-2xl border-4 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4">
-      <div className="flex items-center justify-between">
-        <h4 className="text-lg font-black text-indigo-900">
-          📝 Quizzes for {bookTitle}
-        </h4>
-        <button
+    <Card
+      variant="playful"
+      padding="snug"
+      className="space-y-4 border border-[#eadfda]"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h4 className="heading-font text-lg font-bold text-[#241718]">
+            Quizzes for {bookTitle}
+          </h4>
+          <p className="text-sm text-[#5d4b4c]">
+            Create, publish, archive, or preview reader quizzes.
+          </p>
+        </div>
+        <Button
+          type="button"
           onClick={() => setShowCreateForm(!showCreateForm)}
-          className="rounded-lg border-2 border-purple-300 bg-purple-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-purple-600"
+          variant={showCreateForm ? "neutral" : "primary"}
+          size="sm"
         >
-          {showCreateForm ? "✕ Cancel" : "➕ Create Quiz"}
-        </button>
+          {showCreateForm ? "Cancel" : "Create Quiz"}
+        </Button>
       </div>
 
-      {error && (
-        <div className="rounded-lg border-2 border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-600">
-          ⚠️ {error}
-        </div>
-      )}
+      {error && <Alert variant="error">{error}</Alert>}
 
       {/* Create Quiz Form */}
       {showCreateForm && (
-        <div className="space-y-3 rounded-xl border-2 border-purple-300 bg-white p-4">
+        <Card
+          variant="frosted"
+          padding="snug"
+          className="space-y-4 border border-[#eadfda]"
+        >
           <div className="grid grid-cols-2 gap-2">
             <button
+              type="button"
               onClick={() => setQuizType("classroom")}
-              className={`rounded-lg border-2 px-3 py-2 text-sm font-bold ${
-                quizType === "classroom"
-                  ? "border-blue-400 bg-blue-100 text-blue-900"
-                  : "border-gray-300 bg-white text-gray-600"
-              }`}
+              className={cn(
+                buttonVariants({
+                  variant: quizType === "classroom" ? "primary" : "neutral",
+                  size: "sm",
+                }),
+                "w-full",
+              )}
             >
-              🏫 Classroom
+              Classroom
             </button>
             <button
+              type="button"
               onClick={() => setQuizType("checkpoint")}
-              className={`rounded-lg border-2 px-3 py-2 text-sm font-bold ${
-                quizType === "checkpoint"
-                  ? "border-green-400 bg-green-100 text-green-900"
-                  : "border-gray-300 bg-white text-gray-600"
-              }`}
+              className={cn(
+                buttonVariants({
+                  variant: quizType === "checkpoint" ? "secondary" : "neutral",
+                  size: "sm",
+                }),
+                "w-full",
+              )}
             >
-              🎯 Checkpoint
+              Checkpoint
             </button>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-bold text-gray-700">
-              Questions
-            </label>
-            <input
+            <Label>Questions</Label>
+            <Input
               type="number"
               min={3}
               max={15}
               value={questionCount}
               onChange={(e) => setQuestionCount(Number(e.target.value))}
-              className="w-full rounded-lg border-2 border-gray-300 px-3 py-2 text-sm"
             />
           </div>
 
           {quizType === "checkpoint" && (
             <div>
-              <label className="mb-1 block text-xs font-bold text-gray-700">
-                Checkpoint Page
-              </label>
-              <input
+              <Label>Checkpoint Page</Label>
+              <Input
                 type="number"
                 min={1}
                 max={bookPageCount || 100}
                 value={checkpointPage}
                 onChange={(e) => setCheckpointPage(Number(e.target.value))}
-                className="w-full rounded-lg border-2 border-gray-300 px-3 py-2 text-sm"
               />
             </div>
           )}
@@ -284,124 +310,101 @@ export const BookQuizManagement = ({
               id={`pageRange-${bookId}`}
               checked={usePageRange}
               onChange={(e) => setUsePageRange(e.target.checked)}
-              className="h-4 w-4"
+              className="h-4 w-4 rounded border-[#eadfda] text-[#7E1518]"
             />
-            <label
-              htmlFor={`pageRange-${bookId}`}
-              className="text-xs font-bold text-gray-700"
-            >
-              Use Page Range
-            </label>
+            <Label htmlFor={`pageRange-${bookId}`} className="text-sm">
+              Use page range
+            </Label>
           </div>
 
           {usePageRange && (
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="mb-1 block text-xs font-bold text-gray-700">
-                  From
-                </label>
-                <input
+                <Label>From</Label>
+                <Input
                   type="number"
                   min={1}
                   max={bookPageCount || 100}
                   value={pageRangeStart}
                   onChange={(e) => setPageRangeStart(Number(e.target.value))}
-                  className="w-full rounded-lg border-2 border-gray-300 px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-bold text-gray-700">
-                  To
-                </label>
-                <input
+                <Label>To</Label>
+                <Input
                   type="number"
                   min={pageRangeStart}
                   max={bookPageCount || 100}
                   value={pageRangeEnd}
                   onChange={(e) => setPageRangeEnd(Number(e.target.value))}
-                  className="w-full rounded-lg border-2 border-gray-300 px-3 py-2 text-sm"
                 />
               </div>
             </div>
           )}
 
-          <button
+          <Button
+            type="button"
             onClick={handleCreateQuiz}
-            disabled={creating}
-            className={`w-full rounded-lg border-2 px-4 py-3 text-sm font-bold text-white transition disabled:opacity-50 ${
-              creating
-                ? "animate-pulse border-purple-400 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500"
-                : "border-purple-400 bg-purple-500 hover:bg-purple-600"
-            }`}
-            style={
-              creating
-                ? {
-                    animation:
-                      "pulse 1.5s ease-in-out infinite, gradient 2s ease-in-out infinite",
-                    backgroundSize: "200% 100%",
-                  }
-                : undefined
-            }
+            loading={creating}
+            fullWidth
           >
-            {creating ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                <span className="animate-pulse">✨ Creating Quiz...</span>
-              </span>
-            ) : (
-              "🎲 Create Quiz"
-            )}
-          </button>
+            Create Quiz
+          </Button>
 
           {!hasExtractedText && (
-            <div className="space-y-2 rounded-lg border-2 border-orange-300 bg-orange-50 p-3">
-              <p className="text-sm font-bold text-orange-700">
-                ⚠️ Text not extracted
-              </p>
-              <p className="text-xs text-orange-600">
-                Extract text from the book PDF to generate better, more accurate
-                quizzes based on actual content.
-              </p>
-              <button
-                onClick={handleExtractForQuiz}
-                disabled={extracting}
-                className="w-full rounded-lg border-2 border-orange-400 bg-orange-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-orange-600 disabled:opacity-50"
-              >
-                {extracting ? "⏳ Extracting..." : "📝 Extract Text Now"}
-              </button>
-            </div>
+            <Alert variant="warning" title="Text not extracted">
+              <div className="space-y-3">
+                <p>
+                  Extract text from the book file to generate more accurate
+                  quizzes based on actual content.
+                </p>
+                <Button
+                  type="button"
+                  onClick={handleExtractForQuiz}
+                  loading={extracting}
+                  variant="neutral"
+                  size="sm"
+                  fullWidth
+                >
+                  Extract Text Now
+                </Button>
+              </div>
+            </Alert>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Quiz List */}
       {quizzes.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 bg-white p-6 text-center">
-          <p className="text-sm font-semibold text-gray-400">
-            No quizzes yet for this book
+        <Card
+          variant="frosted"
+          padding="cozy"
+          className="border-dashed text-center"
+        >
+          <p className="text-sm font-semibold text-[#5d4b4c]">
+            No quizzes yet for this book.
           </p>
-        </div>
+        </Card>
       ) : (
         <div className="space-y-2">
-          {quizzes.map((quiz: any) => (
-            <div
+          {quizzes.map((quiz) => (
+            <Card
               key={quiz.id}
-              className="rounded-lg border-2 border-indigo-200 bg-white p-3 shadow-sm"
+              variant="frosted"
+              padding="snug"
+              className="border border-[#eadfda]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">
-                      {quiz.quiz_type === "checkpoint" ? "🎯" : "🏫"}
-                    </span>
-                    <span className="text-sm font-bold text-gray-900">
+                    <span className="heading-font text-sm font-bold text-[#241718]">
                       {quiz.quiz_type === "checkpoint"
                         ? "Checkpoint Quiz"
                         : "Classroom Quiz"}
                     </span>
                     {getStatusBadge(quiz.status, quiz.is_published)}
                   </div>
-                  <div className="text-xs font-semibold text-gray-600">
+                  <div className="text-xs font-semibold text-[#5d4b4c]">
                     {quiz.question_count} questions •
                     {quiz.checkpoint_page
                       ? ` Checkpoint at page ${quiz.checkpoint_page}`
@@ -410,28 +413,34 @@ export const BookQuizManagement = ({
                         : " Full book"}
                   </div>
                   {quiz.attempt_count > 0 && (
-                    <div className="text-xs text-gray-500">
-                      📊 {quiz.attempt_count} attempts
+                    <FieldHelper>
+                      {quiz.attempt_count} attempts
                       {quiz.average_score && ` • Avg: ${quiz.average_score}%`}
-                    </div>
+                    </FieldHelper>
                   )}
                 </div>
 
                 <div className="flex flex-wrap gap-1">
                   <Link
                     href={`/dashboard/student/quiz/${quiz.id}`}
-                    className="rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100"
+                    className={cn(
+                      buttonVariants({ variant: "neutral", size: "sm" }),
+                      "min-h-8 px-3 py-1 text-xs no-underline",
+                    )}
                   >
-                    👁️
+                    Preview
                   </Link>
 
                   {quiz.status === "draft" && (
                     <button
                       onClick={() => handlePublish(quiz.id)}
                       disabled={actionLoading === quiz.id}
-                      className="rounded border border-green-300 bg-green-50 px-2 py-1 text-xs font-bold text-green-700 hover:bg-green-100 disabled:opacity-50"
+                      className={cn(
+                        buttonVariants({ variant: "secondary", size: "sm" }),
+                        "min-h-8 px-3 py-1 text-xs",
+                      )}
                     >
-                      ✓
+                      Publish
                     </button>
                   )}
 
@@ -439,9 +448,12 @@ export const BookQuizManagement = ({
                     <button
                       onClick={() => handleUnpublish(quiz.id)}
                       disabled={actionLoading === quiz.id}
-                      className="rounded border border-yellow-300 bg-yellow-50 px-2 py-1 text-xs font-bold text-yellow-700 hover:bg-yellow-100 disabled:opacity-50"
+                      className={cn(
+                        buttonVariants({ variant: "outline", size: "sm" }),
+                        "min-h-8 px-3 py-1 text-xs",
+                      )}
                     >
-                      ✎
+                      Unpublish
                     </button>
                   )}
 
@@ -449,9 +461,12 @@ export const BookQuizManagement = ({
                     <button
                       onClick={() => handleArchive(quiz.id)}
                       disabled={actionLoading === quiz.id}
-                      className="rounded border border-gray-300 bg-gray-50 px-2 py-1 text-xs font-bold text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                      className={cn(
+                        buttonVariants({ variant: "neutral", size: "sm" }),
+                        "min-h-8 px-3 py-1 text-xs",
+                      )}
                     >
-                      📦
+                      Archive
                     </button>
                   )}
 
@@ -459,17 +474,20 @@ export const BookQuizManagement = ({
                     <button
                       onClick={() => handleDelete(quiz.id)}
                       disabled={actionLoading === quiz.id}
-                      className="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                      className={cn(
+                        buttonVariants({ variant: "danger", size: "sm" }),
+                        "min-h-8 px-3 py-1 text-xs",
+                      )}
                     >
-                      🗑️
+                      Delete
                     </button>
                   )}
                 </div>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 };
