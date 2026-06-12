@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   forwardRef,
   useCallback,
@@ -151,6 +152,11 @@ export const EpubFlipReader = forwardRef<
 
     const { preferences, updatePreferences, resetPreferences, isLoaded } =
       useReadingPreferences();
+    const preferencesRef = useRef(preferences);
+
+    useEffect(() => {
+      preferencesRef.current = preferences;
+    }, [preferences]);
 
     const themeClasses = getPreferenceClasses(preferences);
     const readerTheme = useMemo(
@@ -588,7 +594,7 @@ export const EpubFlipReader = forwardRef<
           renditionRef.current = rendition;
           rendition.on("relocated", handleRelocated);
 
-          applyReaderTheme(rendition, preferences);
+          applyReaderTheme(rendition, preferencesRef.current);
 
           await rendition.started;
 
@@ -1050,9 +1056,12 @@ export const EpubFlipReader = forwardRef<
             >
               <div className="mb-4 flex items-start gap-3">
                 {coverImageUrl ? (
-                  <img
+                  <Image
                     src={coverImageUrl}
                     alt={`Cover of ${title}`}
+                    width={56}
+                    height={80}
+                    unoptimized
                     className="h-20 w-14 rounded-xl object-cover shadow-md"
                   />
                 ) : null}
