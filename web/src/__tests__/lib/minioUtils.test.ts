@@ -94,6 +94,39 @@ describe("getObjectKeyFromPublicUrl", () => {
 
     expect(key).toBe("books/internal.epub");
   });
+
+  it("should parse stored URLs without requiring MinIO environment variables", () => {
+    const envKeys = [
+      "MINIO_ENDPOINT",
+      "MINIO_PUBLIC_ENDPOINT",
+      "MINIO_INTERNAL_ENDPOINT",
+      "MINIO_ACCESS_KEY",
+      "MINIO_SECRET_KEY",
+      "MINIO_BUCKET_NAME",
+    ] as const;
+    const previousEnv = Object.fromEntries(
+      envKeys.map((key) => [key, process.env[key]]),
+    );
+
+    envKeys.forEach((key) => {
+      delete process.env[key];
+    });
+
+    const key = getObjectKeyFromPublicUrl(
+      "https://cdn.example.com/books/10/original.epub",
+    );
+
+    envKeys.forEach((key) => {
+      const value = previousEnv[key];
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    });
+
+    expect(key).toBe("books/10/original.epub");
+  });
 });
 
 describe("buildBookAssetsPrefix", () => {
