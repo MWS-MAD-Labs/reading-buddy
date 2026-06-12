@@ -3,12 +3,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { queryWithContext } from "@/lib/db";
 import { ReaderWithRatingPrompt } from "@/components/dashboard/ReaderWithRatingPrompt";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardDescription, CardHeader } from "@/components/ui/card";
 import { buildPublicPrefixUrl } from "@/lib/minioUtils";
 
 export const dynamic = "force-dynamic";
@@ -90,9 +85,9 @@ export default async function StudentReadPage({
           <Badge variant="sky" size="sm" className="w-fit">
             Now reading
           </Badge>
-          <CardTitle className="mt-3 text-3xl text-[#7E1518] md:text-4xl">
+          <h1 className="heading-font mt-3 text-3xl font-bold leading-tight text-[#7E1518] md:text-4xl">
             {book.title}
-          </CardTitle>
+          </h1>
           <CardDescription className="font-semibold">
             by {book.author}
           </CardDescription>
