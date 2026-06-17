@@ -312,7 +312,7 @@ export function UnifiedBookReader({
               size="sm"
               onClick={() => setIsNotesPanelOpen(true)}
             >
-              📝 Notes
+              ✍️ Add Entry
             </Button>
             {showFinishButton && onComplete && (
               <Button
@@ -328,7 +328,7 @@ export function UnifiedBookReader({
           </div>
         </Card>
 
-        {/* Notes Panel */}
+        {/* Journal Panel */}
         <ReaderNotesPanel
           bookId={bookId}
           currentPage={currentPage}
@@ -381,7 +381,7 @@ export function UnifiedBookReader({
               size="sm"
               onClick={() => setIsNotesPanelOpen(true)}
             >
-              📝 Notes
+              ✍️ Add Entry
             </Button>
             {showFinishButton && onComplete && (
               <Button
@@ -397,7 +397,7 @@ export function UnifiedBookReader({
           </div>
         </Card>
 
-        {/* Notes Panel */}
+        {/* Journal Panel */}
         <ReaderNotesPanel
           bookId={bookId}
           currentPage={currentPage}

@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getJournalEntries, getJournalStats } from "./journal-actions";
 import { JournalTimeline } from "@/components/dashboard/journal/JournalTimeline";
 import { JournalStats } from "@/components/dashboard/journal/JournalStats";
-import { CreateNoteButton } from "@/components/dashboard/journal/CreateNoteButton";
+import { JournalEntryComposer } from "@/components/dashboard/journal/JournalEntryComposer";
 import {
   Badge,
   buttonVariants,
@@ -46,7 +46,13 @@ export default async function JournalPage() {
                 your books.
               </CardDescription>
             </div>
-            <CreateNoteButton />
+            <JournalEntryComposer
+              triggerLabel="New Reflection"
+              title="New General Reflection"
+              description="Write a journal reflection that is not tied to one specific book. To save a note, quote, or question for a book, open that book and use the reader journal panel."
+              mode="reflection"
+              triggerVariant="primary"
+            />
           </CardHeader>
         </Card>
       </header>
