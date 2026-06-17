@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ClassAnalytics } from "@/app/(dashboard)/dashboard/teacher/teacher-analytics-actions";
+import { Badge, Card, CardDescription, CardTitle } from "@/components/ui";
 
 type StudentPerformanceHeatmapProps = {
   analytics: ClassAnalytics[];
@@ -10,25 +11,28 @@ export function StudentPerformanceHeatmap({
 }: StudentPerformanceHeatmapProps) {
   if (analytics.length === 0) {
     return (
-      <div className="rounded-[28px] border-2 border-dashed border-indigo-200 bg-white/80 p-8 text-center">
-        <span className="text-4xl">📊</span>
-        <h3 className="mt-3 text-lg font-bold text-indigo-900">No Data Yet</h3>
-        <p className="mt-1 text-sm text-indigo-500">
-          Create classes and enroll students to see performance data
-        </p>
-      </div>
+      <Card
+        variant="frosted"
+        padding="cozy"
+        className="border-dashed text-center shadow-none"
+      >
+        <CardTitle className="text-lg">No data yet</CardTitle>
+        <CardDescription>
+          Create classes and enroll students to see performance data.
+        </CardDescription>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-            Class Performance Overview
-          </p>
-          <p className="text-xs text-gray-400">
-            Quick view of engagement and activity levels
+          <h3 className="heading-font text-sm font-bold uppercase tracking-wide text-[#7E1518]">
+            Class performance overview
+          </h3>
+          <p className="text-sm text-[#6f6061]">
+            Quick view of engagement and activity levels.
           </p>
         </div>
         <PerformanceLegend />
@@ -43,30 +47,24 @@ export function StudentPerformanceHeatmap({
   );
 }
 
-// Performance legend
 function PerformanceLegend() {
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="text-gray-500">Performance:</span>
-      <div className="flex items-center gap-1">
-        <div className="h-3 w-3 rounded-sm bg-red-400" />
-        <span className="text-gray-600">Low</span>
-      </div>
-      <div className="flex items-center gap-1">
-        <div className="h-3 w-3 rounded-sm bg-amber-400" />
-        <span className="text-gray-600">Medium</span>
-      </div>
-      <div className="flex items-center gap-1">
-        <div className="h-3 w-3 rounded-sm bg-green-400" />
-        <span className="text-gray-600">High</span>
-      </div>
+    <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#6f6061]">
+      <span>Performance:</span>
+      <Badge variant="bubble" size="sm">
+        Low
+      </Badge>
+      <Badge variant="amber" size="sm">
+        Medium
+      </Badge>
+      <Badge variant="lime" size="sm">
+        High
+      </Badge>
     </div>
   );
 }
 
-// Individual class heatmap card
 function ClassHeatmapCard({ analytics }: { analytics: ClassAnalytics }) {
-  // Calculate performance metrics (0-100 scale)
   const engagementScore =
     analytics.totalStudents > 0
       ? (analytics.activeStudents / analytics.totalStudents) * 100
@@ -88,100 +86,74 @@ function ClassHeatmapCard({ analytics }: { analytics: ClassAnalytics }) {
       : 0;
 
   const metrics = [
-    { label: "Engagement", score: engagementScore, icon: "👥" },
-    { label: "XP Growth", score: xpScore, icon: "⚡" },
-    { label: "Quizzes", score: completionScore, icon: "🎯" },
-    { label: "Reading", score: activityScore, icon: "📖" },
+    { label: "Engagement", score: engagementScore },
+    { label: "XP growth", score: xpScore },
+    { label: "Quizzes", score: completionScore },
+    { label: "Reading", score: activityScore },
   ];
 
   const overallScore =
     (engagementScore + xpScore + completionScore + activityScore) / 4;
-  const getOverallColor = () => {
-    if (overallScore >= 70)
-      return { bg: "from-green-400 to-emerald-400", text: "text-green-700" };
-    if (overallScore >= 40)
-      return { bg: "from-amber-400 to-orange-400", text: "text-amber-700" };
-    return { bg: "from-red-400 to-pink-400", text: "text-red-700" };
-  };
-
-  const colors = getOverallColor();
+  const overallVariant =
+    overallScore >= 70 ? "lime" : overallScore >= 40 ? "amber" : "bubble";
 
   return (
     <Link
       href={`/dashboard/teacher/classrooms/${analytics.classId}`}
-      className="group block rounded-[20px] border border-white/70 bg-white/90 p-4 shadow-[0_10px_40px_rgba(0,0,0,0.06)] transition hover:scale-[1.02] hover:shadow-[0_15px_50px_rgba(0,0,0,0.1)]"
+      className="group block rounded-[24px] border border-[#eadfda] bg-white/90 p-4 transition hover:-translate-y-0.5 hover:shadow-[0_18px_44px_rgba(36,23,24,0.1)]"
     >
-      {/* Header */}
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex-1">
-          <h4 className="text-base font-bold text-indigo-900 group-hover:text-indigo-600">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h4 className="heading-font truncate text-base font-bold text-[#241718] group-hover:text-[#7E1518]">
             {analytics.className}
           </h4>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-[#6f6061]">
             {analytics.totalStudents}{" "}
             {analytics.totalStudents === 1 ? "student" : "students"} •{" "}
             {analytics.activeStudents} active
           </p>
         </div>
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${colors.bg} font-bold text-white shadow-md`}
-        >
+        <Badge variant={overallVariant} size="sm">
           {Math.round(overallScore)}
-        </div>
+        </Badge>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-2 gap-2">
-        {metrics.map((metric: any) => (
+        {metrics.map((metric) => (
           <MetricCell key={metric.label} {...metric} />
         ))}
       </div>
 
-      {/* View Details */}
-      <div className="mt-3 text-xs font-semibold text-indigo-500 group-hover:text-indigo-600">
+      <div className="mt-3 text-xs font-bold text-[#7E1518] group-hover:underline">
         View details →
       </div>
     </Link>
   );
 }
 
-// Individual metric cell
-function MetricCell({
-  label,
-  score,
-  icon,
-}: {
-  label: string;
-  score: number;
-  icon: string;
-}) {
-  const getColor = () => {
-    if (score >= 70) return "bg-green-400";
-    if (score >= 40) return "bg-amber-400";
-    return "bg-red-400";
-  };
-
-  const getTextColor = () => {
-    if (score >= 70) return "text-green-700";
-    if (score >= 40) return "text-amber-700";
-    return "text-red-700";
-  };
+function MetricCell({ label, score }: { label: string; score: number }) {
+  const tone =
+    score >= 70
+      ? "bg-[#486142]"
+      : score >= 40
+        ? "bg-[#D6A13A]"
+        : "bg-[#7E1518]";
+  const badgeVariant = score >= 70 ? "lime" : score >= 40 ? "amber" : "bubble";
 
   return (
-    <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-2">
-      <div className="mb-1 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-600">{icon}</span>
-        <span className={`text-xs font-bold ${getTextColor()}`}>
+    <div className="rounded-2xl border border-[#eadfda] bg-[#fffaf4] p-2.5">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <p className="truncate text-[11px] font-bold text-[#6f6061]">{label}</p>
+        <Badge variant={badgeVariant} size="sm">
           {Math.round(score)}
-        </span>
+        </Badge>
       </div>
-      <div className="mb-1 h-1.5 overflow-hidden rounded-full bg-white">
+      <div className="h-1.5 overflow-hidden rounded-full bg-white">
         <div
-          className={`h-full rounded-full ${getColor()} transition-all duration-500`}
+          className={`h-full rounded-full ${tone} transition-all duration-500`}
           style={{ width: `${score}%` }}
         />
       </div>
-      <p className="text-[10px] font-medium text-gray-500">{label}</p>
     </div>
   );
 }

@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { BroadcastManager } from "@/components/dashboard/BroadcastManager";
+import {
+  Badge,
+  buttonVariants,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { query } from "@/lib/db";
 import type { LoginBroadcast } from "@/lib/broadcasts";
+import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +23,7 @@ export default async function AdminBroadcastsPage() {
   const { rows } = await query(
     `SELECT id, title, body, tone, link_label, link_url, created_at, is_active
      FROM login_broadcasts
-     ORDER BY created_at DESC`
+     ORDER BY created_at DESC`,
   );
 
   const broadcasts: BroadcastRow[] = rows.map((row: any) => ({
@@ -30,27 +39,28 @@ export default async function AdminBroadcastsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-3xl border-4 border-indigo-300 bg-gradient-to-br from-indigo-50 to-sky-50 p-6 shadow-lg">
-        <div className="mb-2 inline-block rounded-2xl border-4 border-indigo-200 bg-indigo-500/80 px-4 py-1 text-white">
-          <p className="text-sm font-black uppercase tracking-wide">
-            Admin Panel
-          </p>
-        </div>
-        <h1 className="text-3xl font-black text-indigo-900">
-          Login Broadcasts
-        </h1>
-        <p className="text-base font-semibold text-indigo-700">
-          Publish short changelog or status notes that appear on the login page.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
+      <Card variant="glow" padding="cozy">
+        <CardHeader className="mb-5">
+          <Badge variant="neutral" className="w-fit">
+            Admin panel
+          </Badge>
+          <CardTitle className="text-3xl text-[#7E1518] md:text-4xl">
+            Login Broadcasts
+          </CardTitle>
+          <CardDescription className="max-w-2xl">
+            Publish short changelog or status notes that appear on the login
+            page.
+          </CardDescription>
+        </CardHeader>
+        <div className="flex flex-wrap gap-3">
           <Link
             href="/dashboard/admin"
-            className="inline-flex items-center gap-2 rounded-full border-2 border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+            className={cn(buttonVariants({ variant: "neutral", size: "sm" }))}
           >
             Back to admin home
           </Link>
         </div>
-      </header>
+      </Card>
 
       <BroadcastManager broadcasts={broadcasts} />
     </div>

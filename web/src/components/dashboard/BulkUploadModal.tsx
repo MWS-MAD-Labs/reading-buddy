@@ -7,6 +7,7 @@ import {
   ArrowDownTrayIcon,
   DocumentArrowUpIcon,
 } from "@heroicons/react/24/outline";
+import { Alert, Button, Card, Label } from "@/components/ui";
 
 type BulkUploadModalProps = {
   onClose: () => void;
@@ -113,29 +114,29 @@ admin1@school.com,password123,Admin User,ADMIN,`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl overflow-hidden rounded-3xl border-4 border-violet-300 bg-white shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b-2 border-violet-100 bg-gradient-to-r from-violet-50 to-purple-50 px-6 py-4">
-          <h2 className="text-2xl font-black text-violet-900">
+      <div className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-[#eadfda] bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#eadfda] bg-[#fffaf4] px-6 py-4">
+          <h2 className="heading-font text-2xl font-bold text-[#241718]">
             Bulk Upload Users
           </h2>
-          <button
+          <Button
+            type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-violet-500 transition-colors hover:bg-violet-100 hover:text-violet-700"
+            variant="ghost"
+            size="sm"
+            className="min-h-10 px-3"
             aria-label="Close"
+            icon={<XMarkIcon className="h-5 w-5" />}
           >
-            <XMarkIcon className="h-6 w-6" />
-          </button>
+            Close
+          </Button>
         </div>
 
         {/* Content */}
         <div className="space-y-6 p-6">
           {/* Instructions */}
-          <div className="rounded-2xl border-2 border-blue-200 bg-blue-50 p-5">
-            <h3 className="mb-2 text-sm font-black text-blue-900">
-              📋 Instructions
-            </h3>
-            <ul className="space-y-1 text-xs font-semibold text-blue-700">
+          <Alert variant="info" title="Instructions">
+            <ul className="space-y-1 text-xs font-semibold">
               <li>• Download the sample CSV template below</li>
               <li>
                 • Fill in user information (email, password, full_name, role,
@@ -152,23 +153,23 @@ admin1@school.com,password123,Admin User,ADMIN,`;
               </li>
               <li>• Upload the completed CSV file</li>
             </ul>
-          </div>
+          </Alert>
 
           {/* Download Sample Button */}
-          <button
+          <Button
+            type="button"
             onClick={downloadSampleCSV}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-indigo-300 bg-indigo-100 px-6 py-3 text-sm font-bold text-indigo-700 transition-all hover:bg-indigo-200 active:scale-95"
+            variant="neutral"
+            fullWidth
+            icon={<ArrowDownTrayIcon className="h-5 w-5" />}
           >
-            <ArrowDownTrayIcon className="h-5 w-5" />
             Download Sample CSV Template
-          </button>
+          </Button>
 
           {/* File Upload Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm font-bold text-violet-900">
-                Upload CSV File
-              </label>
+              <Label>Upload CSV File</Label>
               <div className="relative">
                 <input
                   ref={fileInputRef}
@@ -180,7 +181,7 @@ admin1@school.com,password123,Admin User,ADMIN,`;
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-violet-300 bg-violet-50 px-6 py-8 text-sm font-bold text-violet-700 transition-all hover:border-violet-400 hover:bg-violet-100"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#eadfda] bg-[#fffaf4] px-6 py-8 text-sm font-bold text-[#7E1518] transition hover:border-[#D6A13A] hover:bg-[#FBF2DF]"
                 >
                   <DocumentArrowUpIcon className="h-8 w-8" />
                   <span>{file ? file.name : "Click to select CSV file"}</span>
@@ -190,58 +191,58 @@ admin1@school.com,password123,Admin User,ADMIN,`;
 
             {/* Upload Results */}
             {uploadResults && (
-              <div className="space-y-3 rounded-2xl border-2 border-violet-200 bg-violet-50 p-4">
+              <Card variant="frosted" padding="snug" className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">✅</span>
-                    <span className="text-sm font-bold text-emerald-700">
+                    <span className="text-sm font-bold text-[#486142]">
                       Success: {uploadResults.success} user(s)
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">❌</span>
-                    <span className="text-sm font-bold text-rose-700">
+                    <span className="text-sm font-bold text-[#B94A4E]">
                       Failed: {uploadResults.failed} user(s)
                     </span>
                   </div>
                 </div>
 
                 {uploadResults.errors.length > 0 && (
-                  <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-rose-200 bg-white p-3">
-                    <p className="mb-2 text-xs font-black uppercase text-rose-700">
+                  <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-[#B94A4E]/25 bg-white p-3">
+                    <p className="mb-2 text-xs font-black uppercase text-[#B94A4E]">
                       Error Details:
                     </p>
                     {uploadResults.errors.map((error, idx) => (
                       <p
                         key={idx}
-                        className="text-xs font-medium text-rose-600"
+                        className="text-xs font-medium text-[#B94A4E]"
                       >
                         • {error.email}: {error.error}
                       </p>
                     ))}
                   </div>
                 )}
-              </div>
+              </Card>
             )}
 
             {/* Actions */}
             <div className="flex gap-3 pt-2">
-              <button
+              <Button
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="flex-1 rounded-full border-2 border-violet-300 bg-white px-6 py-3 text-sm font-bold text-violet-700 transition-all hover:bg-violet-50 active:scale-95 disabled:opacity-50"
+                variant="neutral"
+                className="flex-1"
               >
                 {uploadResults ? "Close" : "Cancel"}
-              </button>
+              </Button>
               {!uploadResults && (
-                <button
+                <Button
                   type="submit"
-                  disabled={isSubmitting || !file}
-                  className="flex-1 rounded-full border-2 border-blue-400 bg-blue-500 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-blue-600 hover:shadow-lg active:scale-95 disabled:opacity-50"
+                  loading={isSubmitting}
+                  disabled={!file}
+                  className="flex-1"
                 >
-                  {isSubmitting ? "Uploading..." : "Upload and Process"}
-                </button>
+                  Upload and Process
+                </Button>
               )}
             </div>
           </form>

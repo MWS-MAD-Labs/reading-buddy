@@ -1,97 +1,107 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import type { JournalEntry } from "@/app/(dashboard)/dashboard/journal/journal-actions";
+import { Badge, Button, Card, CardDescription } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { JournalEntryCard } from "./JournalEntryCard";
 
 interface JournalTimelineProps {
-    entries: JournalEntry[];
+  entries: JournalEntry[];
 }
 
-// Group entries by date
-function groupEntriesByDate(entries: JournalEntry[]): Map<string, JournalEntry[]> {
-    const groups = new Map<string, JournalEntry[]>();
+function groupEntriesByDate(
+  entries: JournalEntry[],
+): Map<string, JournalEntry[]> {
+  const groups = new Map<string, JournalEntry[]>();
 
-    entries.forEach((entry) => {
-        const date = new Date(entry.created_at).toLocaleDateString("en-US", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-        });
-
-        if (!groups.has(date)) {
-            groups.set(date, []);
-        }
-        groups.get(date)!.push(entry);
+  entries.forEach((entry) => {
+    const date = new Date(entry.created_at).toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
 
-    return groups;
+    if (!groups.has(date)) {
+      groups.set(date, []);
+    }
+    groups.get(date)!.push(entry);
+  });
+
+  return groups;
 }
 
 export function JournalTimeline({ entries }: JournalTimelineProps) {
-    const [filter, setFilter] = useState<string>("all");
+  const [filter, setFilter] = useState<string>("all");
 
-    const filteredEntries =
-        filter === "all"
-            ? entries
-            : entries.filter((e) => e.entry_type === filter);
+  const filteredEntries =
+    filter === "all" ? entries : entries.filter((e) => e.entry_type === filter);
 
-    const groupedEntries = groupEntriesByDate(filteredEntries);
+  const groupedEntries = groupEntriesByDate(filteredEntries);
 
-    return (
-        <div className="space-y-4">
-            {/* Filter Tabs */}
-            <div className="flex flex-wrap gap-2">
-                {[
-                    { value: "all", label: "All", icon: "📋" },
-                    { value: "note", label: "Notes", icon: "📝" },
-                    { value: "reading_session", label: "Sessions", icon: "📖" },
-                    { value: "quote", label: "Quotes", icon: "💬" },
-                    { value: "achievement", label: "Achievements", icon: "🏆" },
-                ].map((tab) => (
-                    <button
-                        key={tab.value}
-                        onClick={() => setFilter(tab.value)}
-                        className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition ${filter === tab.value
-                                ? "bg-gradient-to-r from-indigo-500 to-sky-400 text-white shadow-md"
-                                : "bg-white/80 text-indigo-700 hover:bg-indigo-50"
-                            }`}
-                    >
-                        <span>{tab.icon}</span>
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+  const tabs = [
+    { value: "all", label: "All" },
+    { value: "note", label: "Notes" },
+    { value: "reading_session", label: "Sessions" },
+    { value: "quote", label: "Quotes" },
+    { value: "achievement", label: "Achievements" },
+  ];
 
-            {/* Timeline */}
-            <div className="space-y-6">
-                {Array.from(groupedEntries.entries()).map(([date, dayEntries]) => (
-                    <div key={date} className="relative">
-                        {/* Date Header */}
-                        <div className="sticky top-0 z-10 mb-3 flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-400 text-lg shadow-md">
-                                📅
-                            </div>
-                            <h3 className="text-lg font-bold text-indigo-950">{date}</h3>
-                        </div>
-
-                        {/* Entries for this date */}
-                        <div className="ml-5 border-l-2 border-indigo-100 pl-8 space-y-4">
-                            {dayEntries.map((entry) => (
-                                <JournalEntryCard key={entry.id} entry={entry} />
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {filteredEntries.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-indigo-200 bg-white/60 p-8 text-center">
-                    <p className="text-indigo-500">No entries match this filter.</p>
-                </div>
+  return (
+    <div className="max-w-7xl space-y-4">
+      <Card
+        variant="frosted"
+        padding="snug"
+        className="flex max-w-6xl flex-wrap gap-2"
+      >
+        {tabs.map((tab) => (
+          <Button
+            key={tab.value}
+            type="button"
+            variant={filter === tab.value ? "primary" : "ghost"}
+            size="sm"
+            onClick={() => setFilter(tab.value)}
+            className={cn(
+              "transition duration-200 hover:-translate-y-0.5",
+              filter !== tab.value && "border-[#eadfda] bg-white",
             )}
-        </div>
-    );
+          >
+            {tab.label}
+          </Button>
+        ))}
+      </Card>
+
+      <div className="space-y-6">
+        {Array.from(groupedEntries.entries()).map(([date, dayEntries]) => (
+          <div key={date} className="relative">
+            <div className="sticky top-0 z-10 mb-3 flex max-w-6xl items-center gap-3 rounded-full bg-[#fffaf4]/90 py-2 backdrop-blur-sm">
+              <Badge variant="amber" size="sm">
+                Date
+              </Badge>
+              <h3 className="heading-font text-lg font-bold text-[#7E1518]">
+                {date}
+              </h3>
+            </div>
+
+            <div className="ml-5 max-w-6xl space-y-4 border-l-2 border-[#eadfda] pl-8">
+              {dayEntries.map((entry) => (
+                <JournalEntryCard key={entry.id} entry={entry} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {filteredEntries.length === 0 && (
+        <Card
+          variant="playful"
+          padding="cozy"
+          className="border-dashed border-[#D6A13A]/60 text-center"
+        >
+          <CardDescription>No entries match this filter.</CardDescription>
+        </Card>
+      )}
+    </div>
+  );
 }

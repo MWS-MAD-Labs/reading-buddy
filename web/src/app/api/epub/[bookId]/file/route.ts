@@ -43,7 +43,8 @@ async function fetchEpubFromUrl(
     }
 
     const headers = new Headers({
-      "Content-Type": response.headers.get("Content-Type") || "application/epub+zip",
+      "Content-Type":
+        response.headers.get("Content-Type") || "application/epub+zip",
       "Content-Disposition": `inline; filename="${filename || "book"}.epub"`,
       "Cache-Control": "private, max-age=3600",
     });
@@ -67,7 +68,11 @@ async function fetchEpubFromUrl(
   }
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+) {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   try {
@@ -125,10 +130,9 @@ export async function GET(
   const filename = buildFilename(book.title, bookId);
 
   if (objectKey) {
-    const minioClient = getMinioClient();
-    const bucketName = getMinioBucketName();
-
     try {
+      const minioClient = getMinioClient();
+      const bucketName = getMinioBucketName();
       const epubStream = (await withTimeout(
         minioClient.getObject(bucketName, objectKey) as Promise<Readable>,
         MINIO_CLIENT_TIMEOUT_MS,
@@ -169,14 +173,36 @@ export async function GET(
     }
   }
 
-  const normalizedUrl = normalizeMinioUrl(book.original_file_url);
+  let normalizedUrl: string | null = null;
+  try {
+    normalizedUrl = normalizeMinioUrl(book.original_file_url);
+  } catch (error) {
+    console.warn("[EPUB Route] Failed to normalize EPUB URL", {
+      bookId,
+      error,
+    });
+  }
+
+  let rebuiltPublicUrl: string | null = null;
+  if (objectKey) {
+    try {
+      rebuiltPublicUrl = buildPublicObjectUrl(objectKey);
+    } catch (error) {
+      console.warn("[EPUB Route] Failed to rebuild EPUB public URL", {
+        bookId,
+        objectKey,
+        error,
+      });
+    }
+  }
+
   const fallbackUrls = [
     { url: book.original_file_url, label: "stored-url" },
     ...(normalizedUrl && normalizedUrl !== book.original_file_url
       ? [{ url: normalizedUrl, label: "normalized-url" }]
       : []),
-    ...(objectKey
-      ? [{ url: buildPublicObjectUrl(objectKey), label: "rebuilt-public-url" }]
+    ...(rebuiltPublicUrl
+      ? [{ url: rebuiltPublicUrl, label: "rebuilt-public-url" }]
       : []),
   ].filter((candidate, index, all) => {
     return all.findIndex((item) => item.url === candidate.url) === index;

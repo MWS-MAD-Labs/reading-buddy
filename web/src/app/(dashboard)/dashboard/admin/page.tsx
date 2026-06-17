@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { AdminUserTable } from "@/components/dashboard/AdminUserTable";
+import {
+  Badge,
+  buttonVariants,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { query } from "@/lib/db";
+import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 
@@ -34,37 +43,49 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-3xl border-4 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 p-6 shadow-lg">
-        <div className="mb-2 inline-block rounded-2xl border-4 border-purple-300 bg-purple-400 px-4 py-1">
-          <p className="text-sm font-black uppercase tracking-wide text-purple-900">
-            Admin Panel
-          </p>
+      <Card variant="glow" padding="cozy">
+        <CardHeader className="mb-5">
+          <Badge variant="neutral" className="w-fit">
+            Admin panel
+          </Badge>
+          <CardTitle className="text-3xl text-[#7E1518] md:text-4xl">
+            User Management
+          </CardTitle>
+          <CardDescription className="max-w-2xl">
+            Manage users, roles, access levels, badges, and login messages for
+            the entire Reading Buddy system.
+          </CardDescription>
+        </CardHeader>
+        <div className="mb-5 flex flex-wrap gap-2">
+          <Badge variant="bubble">{users.length} users</Badge>
+          <Badge variant="sky">
+            {new Set(users.map((user) => user.role)).size} roles active
+          </Badge>
+          <Badge variant="lime">
+            {users.filter((user) => user.role === "STUDENT").length} students
+          </Badge>
         </div>
-        <h1 className="text-3xl font-black text-violet-900">User Management</h1>
-        <p className="text-base font-semibold text-violet-700">
-          Manage users, roles, and access levels for the entire system.
-        </p>
-        <div className="mt-4 flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Link
             href="/dashboard/admin/badges"
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105"
+            className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
           >
             Manage Badges
           </Link>
           <Link
             href="/dashboard/admin/broadcasts"
-            className="inline-flex items-center gap-2 rounded-full border-2 border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+            className={cn(buttonVariants({ variant: "neutral", size: "sm" }))}
           >
             Login Messages
           </Link>
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 rounded-full border-2 border-purple-200 bg-white px-4 py-2 text-sm font-bold text-purple-700 shadow-sm transition hover:bg-purple-50"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
-            📊 System Overview
+            System Overview
           </Link>
         </div>
-      </header>
+      </Card>
 
       <AdminUserTable users={users} />
     </div>

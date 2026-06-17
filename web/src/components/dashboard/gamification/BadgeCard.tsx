@@ -1,6 +1,8 @@
 "use client";
 
-import type { Badge, BadgeTier, BadgeCategory } from "@/types/database";
+import Image from "next/image";
+import { Award } from "lucide-react";
+import type { Badge, BadgeTier } from "@/types/database";
 
 interface BadgeCardProps {
   badge: Badge;
@@ -18,39 +20,30 @@ const tierColors: Record<
   { bg: string; border: string; text: string }
 > = {
   bronze: {
-    bg: "bg-gradient-to-br from-amber-100 to-orange-100",
-    border: "border-amber-300",
-    text: "text-amber-700",
+    bg: "bg-[#FBF2DF]/65",
+    border: "border-[#D6A13A]/35",
+    text: "text-[#7a5311]",
   },
   silver: {
-    bg: "bg-gradient-to-br from-gray-100 to-slate-200",
-    border: "border-gray-400",
-    text: "text-gray-700",
+    bg: "bg-[#EFF8FE]/75",
+    border: "border-[#B8DDF8]/60",
+    text: "text-[#25638e]",
   },
   gold: {
-    bg: "bg-gradient-to-br from-yellow-100 to-amber-200",
-    border: "border-yellow-500",
-    text: "text-yellow-700",
+    bg: "bg-[#FBF2DF]/85",
+    border: "border-[#D6A13A]/55",
+    text: "text-[#7a5311]",
   },
   platinum: {
-    bg: "bg-gradient-to-br from-cyan-100 to-blue-200",
-    border: "border-cyan-500",
-    text: "text-cyan-700",
+    bg: "bg-[#EDF3EB]/80",
+    border: "border-[#6F8B6A]/30",
+    text: "text-[#486142]",
   },
   special: {
-    bg: "bg-gradient-to-br from-purple-100 to-pink-200",
-    border: "border-purple-500",
-    text: "text-purple-700",
+    bg: "bg-[#F8EAEB]/80",
+    border: "border-[#B94A4E]/30",
+    text: "text-[#B94A4E]",
   },
-};
-
-const categoryIcons: Record<BadgeCategory, string> = {
-  reading: "📖",
-  quiz: "📝",
-  streak: "🔥",
-  milestone: "🏆",
-  special: "⭐",
-  general: "🎯",
 };
 
 const tierLabels: Record<BadgeTier, string> = {
@@ -72,9 +65,7 @@ export function BadgeCard({
   size = "md",
 }: BadgeCardProps) {
   const tier = badge.tier || "bronze";
-  const category = badge.category || "general";
   const colors = tierColors[tier];
-  const icon = categoryIcons[category];
 
   const sizeClasses = {
     sm: "p-3",
@@ -83,72 +74,71 @@ export function BadgeCard({
   };
 
   const iconSizes = {
-    sm: "h-10 w-10 text-xl",
-    md: "h-14 w-14 text-2xl",
-    lg: "h-16 w-16 text-3xl",
+    sm: "h-10 w-10",
+    md: "h-14 w-14",
+    lg: "h-16 w-16",
   };
 
   return (
     <div
-      className={`relative rounded-2xl border-2 ${colors.border} ${colors.bg} ${sizeClasses[size]} ${
-        !earned ? "opacity-60 grayscale" : ""
-      } transition-all hover:scale-[1.02]`}
+      className={`relative rounded-2xl border ${colors.border} ${colors.bg} ${sizeClasses[size]} card-shadow ${
+        !earned ? "opacity-70 grayscale" : ""
+      } transition-all hover:-translate-y-0.5`}
     >
-      {/* Tier label */}
       <div className="absolute -top-2 left-3">
         <span
-          className={`rounded-full ${colors.border} border bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${colors.text}`}
+          className={`heading-font rounded-full border ${colors.border} bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] ${colors.text}`}
         >
           {tierLabels[tier]}
         </span>
       </div>
 
       <div className="mt-2 flex items-start gap-3">
-        {/* Badge Icon */}
         <div
-          className={`flex ${iconSizes[size]} flex-shrink-0 items-center justify-center rounded-full bg-white shadow-md`}
+          className={`flex ${iconSizes[size]} flex-shrink-0 items-center justify-center rounded-full bg-white shadow-inner`}
         >
           {badge.icon_url ? (
-            <img
+            <Image
               src={badge.icon_url}
               alt={badge.name}
+              width={56}
+              height={56}
               className="h-full w-full rounded-full object-cover"
             />
           ) : (
-            <span>{icon}</span>
+            <Award className={`h-6 w-6 ${colors.text}`} />
           )}
         </div>
 
-        {/* Badge Info */}
-        <div className="flex-1 space-y-1">
-          <h3 className={`font-bold ${colors.text}`}>
+        <div className="min-w-0 flex-1 space-y-1">
+          <h3 className={`heading-font font-bold ${colors.text}`}>
             {badge.name}
-            {earned && <span className="ml-1 text-green-500">✓</span>}
+            {earned && <span className="ml-1 text-[#6F8B6A]">✓</span>}
           </h3>
-          <p className="text-xs text-gray-600">{badge.description}</p>
+          <p className="text-xs leading-5 text-[#5d4b4c]">
+            {badge.description}
+          </p>
 
-          {/* XP Reward */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-indigo-500">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="heading-font text-xs font-bold text-[#7E1518]">
               +{badge.xp_reward} XP
             </span>
             {earnedAt && (
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-[#6f6061]">
                 Earned {new Date(earnedAt).toLocaleDateString()}
               </span>
             )}
           </div>
 
-          {/* Progress bar (if not earned and progress tracking available) */}
           {!earned && showProgress && progress > 0 && (
             <div className="mt-2 space-y-1">
-              <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/80">
                 <div
-                  className="h-full rounded-full bg-indigo-400 transition-all"
+                  className="h-full rounded-full bg-[#7E1518] transition-all"
                   style={{ width: `${Math.min(progress, 100)}%` }}
                 />
               </div>
-              <p className="text-[10px] text-gray-500">
+              <p className="text-[10px] text-[#6f6061]">
                 {currentValue} / {targetValue}
               </p>
             </div>
@@ -181,7 +171,6 @@ export function BadgeGrid({
   maxDisplay = 6,
   className = "",
 }: BadgeGridProps) {
-  // Sort: earned first, then by progress
   const sortedBadges = [...badges].sort((a, b) => {
     if (a.earned && !b.earned) return -1;
     if (!a.earned && b.earned) return 1;
@@ -192,21 +181,23 @@ export function BadgeGrid({
     ? sortedBadges
     : sortedBadges.slice(0, maxDisplay);
   const hiddenCount = badges.length - displayBadges.length;
-  const earnedCount = badges.filter((b: any) => b.earned).length;
+  const earnedCount = badges.filter((b) => b.earned).length;
 
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-black text-indigo-950">{title}</h2>
-          <p className="text-sm text-indigo-500">
+          <h2 className="heading-font text-xl font-bold text-[#7E1518]">
+            {title}
+          </h2>
+          <p className="text-sm leading-6 text-[#5d4b4c]">
             {earnedCount} of {badges.length} badges earned
           </p>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {displayBadges.map((item: any) => (
+        {displayBadges.map((item) => (
           <BadgeCard
             key={item.badge.id}
             badge={item.badge}
@@ -220,7 +211,7 @@ export function BadgeGrid({
       </div>
 
       {hiddenCount > 0 && (
-        <p className="text-center text-sm text-indigo-400">
+        <p className="text-center text-sm text-[#6f6061]">
           +{hiddenCount} more badges to discover
         </p>
       )}
@@ -250,42 +241,40 @@ export function RecentBadges({
 
   return (
     <div
-      className={`rounded-[28px] border border-white/70 bg-gradient-to-br from-green-50 to-emerald-50 p-6 shadow-[0_15px_40px_rgba(16,185,129,0.15)] ${className}`}
+      className={`rounded-[28px] border border-[#6F8B6A]/25 bg-[#EDF3EB]/75 p-6 card-shadow ${className}`}
     >
-      <div className="mb-4 flex items-center gap-2">
-        <span className="text-2xl">🎉</span>
-        <h3 className="font-bold text-emerald-700">Recent Badges</h3>
+      <div className="mb-4">
+        <h3 className="heading-font font-bold text-[#486142]">Recent Badges</h3>
       </div>
 
       <div className="space-y-3">
-        {recentBadges.map((item: any) => (
+        {recentBadges.map((item) => (
           <div
             key={item.badge.id}
-            className="flex items-center gap-3 rounded-xl bg-white/80 p-3"
+            className="flex items-center gap-3 rounded-xl border border-[#eadfda] bg-white/85 p-3"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-lg">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF3EB] text-lg">
               {item.badge.icon_url ? (
-                <img
+                <Image
                   src={item.badge.icon_url}
                   alt={item.badge.name}
+                  width={40}
+                  height={40}
                   className="h-full w-full rounded-full object-cover"
                 />
               ) : (
-                categoryIcons[
-                  (item.badge.category ||
-                    "general") as keyof typeof categoryIcons
-                ]
+                <Award className="h-5 w-5 text-[#6F8B6A]" />
               )}
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-emerald-800">
+              <p className="heading-font text-sm font-bold text-[#241718]">
                 {item.badge.name}
               </p>
-              <p className="text-xs text-emerald-600">
+              <p className="text-xs text-[#6f6061]">
                 {new Date(item.earnedAt).toLocaleDateString()}
               </p>
             </div>
-            <span className="text-xs font-medium text-emerald-500">
+            <span className="heading-font text-xs font-bold text-[#7E1518]">
               +{item.badge.xp_reward} XP
             </span>
           </div>

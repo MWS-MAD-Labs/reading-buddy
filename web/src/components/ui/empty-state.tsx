@@ -11,46 +11,52 @@ interface EmptyStateProps {
     label: string;
     onClick: () => void;
   };
-  variant?: "default" | "books" | "students" | "results" | "notifications" | "error";
+  variant?:
+    | "default"
+    | "books"
+    | "students"
+    | "results"
+    | "notifications"
+    | "error";
   className?: string;
 }
 
 const variantStyles = {
   default: {
-    bg: "from-purple-50 to-pink-50",
-    icon: "text-purple-400",
-    title: "text-indigo-900",
-    description: "text-indigo-600",
+    bg: "from-[#fffaf4] to-[#F5E7E8]",
+    icon: "text-[#7E1518]",
+    title: "text-[#7E1518]",
+    description: "text-[#5d4b4c]",
   },
   books: {
-    bg: "from-blue-50 to-cyan-50",
-    icon: "text-blue-400",
-    title: "text-blue-900",
-    description: "text-blue-600",
+    bg: "from-[#EFF8FE] to-white",
+    icon: "text-[#25638e]",
+    title: "text-[#7E1518]",
+    description: "text-[#5d4b4c]",
   },
   students: {
-    bg: "from-emerald-50 to-teal-50",
-    icon: "text-emerald-400",
-    title: "text-emerald-900",
-    description: "text-emerald-600",
+    bg: "from-[#EDF3EB] to-white",
+    icon: "text-[#486142]",
+    title: "text-[#7E1518]",
+    description: "text-[#5d4b4c]",
   },
   results: {
-    bg: "from-amber-50 to-orange-50",
-    icon: "text-amber-400",
-    title: "text-amber-900",
-    description: "text-amber-600",
+    bg: "from-[#FBF2DF] to-white",
+    icon: "text-[#D6A13A]",
+    title: "text-[#7E1518]",
+    description: "text-[#5d4b4c]",
   },
   notifications: {
-    bg: "from-indigo-50 to-purple-50",
-    icon: "text-indigo-400",
-    title: "text-indigo-900",
-    description: "text-indigo-600",
+    bg: "from-[#EFF8FE] to-[#F5E7E8]",
+    icon: "text-[#1F2A44]",
+    title: "text-[#7E1518]",
+    description: "text-[#5d4b4c]",
   },
   error: {
-    bg: "from-rose-50 to-pink-50",
-    icon: "text-rose-400",
-    title: "text-rose-900",
-    description: "text-rose-600",
+    bg: "from-[#F8EAEB] to-white",
+    icon: "text-[#B94A4E]",
+    title: "text-[#B94A4E]",
+    description: "text-[#5d4b4c]",
   },
 };
 
@@ -146,7 +152,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex min-h-[400px] items-center justify-center rounded-[28px] border-4 border-purple-200 p-8",
+        "flex min-h-[400px] items-center justify-center rounded-[28px] border border-dashed border-[#D6A13A]/70 p-8 card-shadow",
         `bg-gradient-to-br ${styles.bg}`,
         className,
       )}
@@ -172,7 +178,9 @@ export function EmptyState({
         </div>
 
         {/* Title */}
-        <h3 className={cn("mb-2 text-2xl font-black", styles.title)}>
+        <h3
+          className={cn("heading-font mb-2 text-2xl font-bold", styles.title)}
+        >
           {title}
         </h3>
 
@@ -213,7 +221,11 @@ export function NoBooksEmptyState({ onAddBook }: { onAddBook?: () => void }) {
   );
 }
 
-export function NoStudentsEmptyState({ onAddStudent }: { onAddStudent?: () => void }) {
+export function NoStudentsEmptyState({
+  onAddStudent,
+}: {
+  onAddStudent?: () => void;
+}) {
   return (
     <EmptyState
       variant="students"

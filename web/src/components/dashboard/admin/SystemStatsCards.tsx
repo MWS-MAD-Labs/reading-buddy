@@ -1,141 +1,130 @@
+import type { ReactNode } from "react";
 import type { SystemStats } from "@/app/(dashboard)/dashboard/admin/actions";
-import { Card, CardContent, Badge } from "@/components/ui";
-import { cn } from "@/lib/cn";
+import { Badge } from "@/components/ui";
+
+type StatTone = "burgundy" | "sky" | "sage" | "gold" | "rose";
 
 type StatCardProps = {
   title: string;
   value: number | string;
-  icon: string;
   subtitle?: string;
   trend?: {
     value: number;
     label: string;
   };
-  color: "purple" | "blue" | "emerald" | "amber" | "rose";
+  tone: StatTone;
   details?: Array<{ label: string; value: number | string }>;
 };
 
-const colorStyles = {
-  purple: {
-    gradient: "from-purple-500 to-pink-500",
-    bg: "from-purple-50 to-pink-50",
-    border: "border-purple-200",
-    text: "text-purple-900",
-    badge: "bg-purple-100 text-purple-800 border-purple-200",
+const toneStyles: Record<
+  StatTone,
+  { card: string; eyebrow: string; value: string; fill: string }
+> = {
+  burgundy: {
+    card: "border-[#7E1518]/15 bg-[#F5E7E8]/70",
+    eyebrow: "text-[#7E1518]",
+    value: "text-[#7E1518]",
+    fill: "bg-[#7E1518]",
   },
-  blue: {
-    gradient: "from-blue-500 to-cyan-500",
-    bg: "from-blue-50 to-cyan-50",
-    border: "border-blue-200",
-    text: "text-blue-900",
-    badge: "bg-blue-100 text-blue-800 border-blue-200",
+  sky: {
+    card: "border-[#B8DDF8]/60 bg-[#EFF8FE]/80",
+    eyebrow: "text-[#25638e]",
+    value: "text-[#1F2A44]",
+    fill: "bg-[#B8DDF8]",
   },
-  emerald: {
-    gradient: "from-emerald-500 to-teal-500",
-    bg: "from-emerald-50 to-teal-50",
-    border: "border-emerald-200",
-    text: "text-emerald-900",
-    badge: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  sage: {
+    card: "border-[#6F8B6A]/25 bg-[#EDF3EB]/80",
+    eyebrow: "text-[#486142]",
+    value: "text-[#6F8B6A]",
+    fill: "bg-[#6F8B6A]",
   },
-  amber: {
-    gradient: "from-amber-500 to-orange-500",
-    bg: "from-amber-50 to-orange-50",
-    border: "border-amber-200",
-    text: "text-amber-900",
-    badge: "bg-amber-100 text-amber-800 border-amber-200",
+  gold: {
+    card: "border-[#D6A13A]/35 bg-[#FBF2DF]/80",
+    eyebrow: "text-[#7a5311]",
+    value: "text-[#D6A13A]",
+    fill: "bg-[#D6A13A]",
   },
   rose: {
-    gradient: "from-rose-500 to-pink-500",
-    bg: "from-rose-50 to-pink-50",
-    border: "border-rose-200",
-    text: "text-rose-900",
-    badge: "bg-rose-100 text-rose-800 border-rose-200",
+    card: "border-[#B94A4E]/25 bg-[#F8EAEB]/80",
+    eyebrow: "text-[#B94A4E]",
+    value: "text-[#B94A4E]",
+    fill: "bg-[#B94A4E]",
   },
 };
 
 function StatCard({
   title,
   value,
-  icon,
   subtitle,
   trend,
-  color,
+  tone,
   details,
 }: StatCardProps) {
-  const styles = colorStyles[color];
+  const styles = toneStyles[tone];
 
   return (
-    <Card
-      variant="frosted"
-      padding="cozy"
-      className={cn(
-        "relative overflow-hidden border-4 transition-all hover:scale-[1.02] hover:shadow-2xl",
-        styles.border,
-      )}
+    <div
+      className={`relative overflow-hidden rounded-[28px] border p-6 card-shadow ${styles.card}`}
     >
-      {/* Background gradient */}
       <div
-        className={cn(
-          "absolute inset-0 -z-10 bg-gradient-to-br opacity-30",
-          styles.bg,
-        )}
+        className={`absolute right-5 top-5 h-10 w-1 rounded-full ${styles.fill}`}
       />
-
-      <CardContent className="space-y-3">
-        {/* Header with icon */}
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-black uppercase tracking-wide text-indigo-600">
-              {title}
-            </p>
-            <div className="flex items-baseline gap-2">
-              <h3 className={cn("text-4xl font-black", styles.text)}>
-                {value}
-              </h3>
-              {trend && (
-                <Badge
-                  variant={trend.value >= 0 ? "lime" : "outline"}
-                  size="sm"
-                  className="gap-1"
-                >
-                  {trend.value >= 0 ? "↑" : "↓"}{" "}
-                  {Math.abs(trend.value)}%
-                </Badge>
-              )}
-            </div>
-            {subtitle && (
-              <p className="text-sm font-semibold text-indigo-600">
-                {subtitle}
-              </p>
-            )}
-          </div>
-          <div
-            className={cn(
-              "flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br text-3xl shadow-lg",
-              styles.gradient,
-            )}
+      <div className="space-y-3 pr-6">
+        <p
+          className={`heading-font text-xs font-bold uppercase tracking-[0.18em] ${styles.eyebrow}`}
+        >
+          {title}
+        </p>
+        <div className="flex items-baseline gap-2">
+          <h3
+            className={`heading-font text-4xl font-extrabold ${styles.value}`}
           >
-            {icon}
-          </div>
+            {value}
+          </h3>
+          {trend && (
+            <Badge variant={trend.value >= 0 ? "lime" : "outline"} size="sm">
+              {trend.value >= 0 ? "↑" : "↓"} {Math.abs(trend.value)}%
+            </Badge>
+          )}
         </div>
+        {subtitle && (
+          <p className="text-sm leading-6 text-[#5d4b4c]">{subtitle}</p>
+        )}
 
-        {/* Details breakdown */}
         {details && details.length > 0 && (
-          <div className="mt-3 grid grid-cols-2 gap-2 border-t-2 border-indigo-100 pt-3">
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[#eadfda] pt-3">
             {details.map((detail, index) => (
               <div key={index} className="space-y-0.5">
-                <p className="text-xs font-semibold text-indigo-500">
-                  {detail.label}
-                </p>
-                <p className="text-lg font-black text-indigo-900">
+                <p className="text-xs text-[#6f6061]">{detail.label}</p>
+                <p className="heading-font text-lg font-bold text-[#241718]">
                   {detail.value}
                 </p>
               </div>
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
+  );
+}
+
+type SectionHeaderProps = {
+  title: string;
+  description: string;
+  action?: ReactNode;
+};
+
+function SectionHeader({ title, description, action }: SectionHeaderProps) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <h2 className="heading-font text-xl font-bold text-[#7E1518]">
+          {title}
+        </h2>
+        <p className="text-sm leading-6 text-[#5d4b4c]">{description}</p>
+      </div>
+      {action}
+    </div>
   );
 }
 
@@ -146,41 +135,32 @@ type SystemStatsCardsProps = {
 export function SystemStatsCards({ stats }: SystemStatsCardsProps) {
   const { userCounts, bookStats, activeReaders, aiUsage } = stats;
 
-  // Calculate most popular format
   const formatEntries = Object.entries(bookStats.byFormat);
   const mostPopularFormat =
     formatEntries.length > 0
-      ? formatEntries.reduce((max, curr) =>
-          curr[1] > max[1] ? curr : max,
-        )[0].toUpperCase()
+      ? formatEntries
+          .reduce((max, curr) => (curr[1] > max[1] ? curr : max))[0]
+          .toUpperCase()
       : "N/A";
 
   return (
     <div className="space-y-4">
-      {/* Section header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-black text-indigo-900">
-            System Overview
-          </h2>
-          <p className="text-sm font-semibold text-indigo-600">
-            Real-time statistics across the platform
-          </p>
-        </div>
-        <Badge variant="bubble" size="sm">
-          Live Data
-        </Badge>
-      </div>
+      <SectionHeader
+        title="System Overview"
+        description="Real-time statistics across the platform"
+        action={
+          <Badge variant="bubble" size="sm">
+            Live data
+          </Badge>
+        }
+      />
 
-      {/* Stats grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Total Users */}
         <StatCard
           title="Total Users"
           value={userCounts.total}
-          icon="👥"
           subtitle="Registered accounts"
-          color="purple"
+          tone="burgundy"
           details={[
             { label: "Students", value: userCounts.students },
             { label: "Teachers", value: userCounts.teachers },
@@ -189,13 +169,11 @@ export function SystemStatsCards({ stats }: SystemStatsCardsProps) {
           ]}
         />
 
-        {/* Total Books */}
         <StatCard
           title="Book Library"
           value={bookStats.total}
-          icon="📚"
           subtitle={`Most common: ${mostPopularFormat}`}
-          color="blue"
+          tone="sky"
           details={[
             { label: "PDF", value: bookStats.byFormat.pdf },
             { label: "EPUB", value: bookStats.byFormat.epub },
@@ -207,26 +185,22 @@ export function SystemStatsCards({ stats }: SystemStatsCardsProps) {
           ]}
         />
 
-        {/* Active Readers */}
         <StatCard
           title="Active Readers"
           value={activeReaders.count}
-          icon="📖"
           subtitle="Read in last 7 days"
-          color="emerald"
+          tone="sage"
           trend={{
             value: activeReaders.percentageChange,
             label: "vs previous week",
           }}
         />
 
-        {/* AI Usage */}
         <StatCard
           title="AI Generated"
           value={aiUsage.quizzesGenerated}
-          icon="✨"
           subtitle={`Provider: ${aiUsage.currentProvider === "cloud" ? "Cloud (Gemini)" : "Local (RAG)"}`}
-          color="amber"
+          tone="gold"
           details={[
             { label: "Quizzes (this month)", value: aiUsage.quizzesGenerated },
             {

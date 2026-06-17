@@ -1,10 +1,18 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { deleteClassroom } from '@/app/(dashboard)/dashboard/teacher/actions';
-import { TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
+import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { deleteClassroom } from "@/app/(dashboard)/dashboard/teacher/actions";
+import {
+  Badge,
+  Button,
+  buttonVariants,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
 
 type Classroom = {
   id: number;
@@ -21,14 +29,17 @@ type AllClassroomsTableProps = {
   currentUserId: string;
 };
 
-export const AllClassroomsTable = ({ classrooms, currentUserId }: AllClassroomsTableProps) => {
+export const AllClassroomsTable = ({
+  classrooms,
+  currentUserId,
+}: AllClassroomsTableProps) => {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const handleDelete = async (classroom: Classroom) => {
     if (
       !confirm(
-        `Are you sure you want to delete "${classroom.name}"? This will remove all students, books, and quiz assignments. This action cannot be undone.`
+        `Are you sure you want to delete "${classroom.name}"? This will remove all students, books, and quiz assignments. This action cannot be undone.`,
       )
     ) {
       return;
@@ -39,7 +50,8 @@ export const AllClassroomsTable = ({ classrooms, currentUserId }: AllClassroomsT
       await deleteClassroom(classroom.id);
       router.refresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to delete classroom.';
+      const message =
+        error instanceof Error ? error.message : "Unable to delete classroom.";
       alert(message);
     } finally {
       setDeletingId(null);
@@ -47,105 +59,109 @@ export const AllClassroomsTable = ({ classrooms, currentUserId }: AllClassroomsT
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
 
   return (
-    <section className="space-y-4 rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_25px_70px_rgba(147,118,255,0.2)]">
-      <div>
-        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1">
-          <span className="text-lg">📊</span>
-          <p className="text-xs font-black uppercase tracking-wide text-indigo-600">
-            All Classrooms
-          </p>
-        </div>
-        <h2 className="text-2xl font-black text-indigo-950">All Classrooms Overview</h2>
-        <p className="text-sm font-medium text-indigo-500">
-          Complete list of all classrooms in the system.
-        </p>
-      </div>
+    <Card variant="frosted" padding="cozy" className="space-y-4">
+      <CardHeader>
+        <Badge variant="sky">All classrooms</Badge>
+        <CardTitle>All classrooms overview</CardTitle>
+        <CardDescription>
+          Complete list of classrooms in the system.
+        </CardDescription>
+      </CardHeader>
 
-      <div className="overflow-hidden rounded-3xl border border-white/70 bg-white/85 shadow-[inset_0_10px_40px_rgba(79,70,229,0.08)]">
+      <div className="overflow-hidden rounded-3xl border border-[#eadfda] bg-white/85">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-indigo-50 text-sm text-indigo-900">
-            <thead className="bg-gradient-to-r from-indigo-50 to-pink-50">
+          <table className="min-w-full divide-y divide-[#eadfda] text-sm text-[#241718]">
+            <thead className="bg-[#fffaf4]">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-indigo-500">
-                  Class Name
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
+                  Class name
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-indigo-500">
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                   Teacher
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-indigo-500">
+                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                   Students
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-indigo-500">
+                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                   Books
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-wide text-indigo-500">
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                   Created
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-black uppercase tracking-wide text-indigo-500">
+                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-[#7E1518]">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-indigo-50">
+            <tbody className="divide-y divide-[#eadfda]">
               {classrooms.length > 0 ? (
-                classrooms.map((classroom: any) => {
+                classrooms.map((classroom) => {
                   const isMyClass = classroom.teacher_id === currentUserId;
                   return (
                     <tr
                       key={classroom.id}
-                      className={`hover:bg-indigo-50/60 ${isMyClass ? 'bg-indigo-50/30' : ''}`}
+                      className={isMyClass ? "bg-[#F5E7E8]/45" : undefined}
                     >
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-indigo-900">{classroom.name}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="heading-font font-bold text-[#241718]">
+                            {classroom.name}
+                          </p>
                           {isMyClass && (
-                            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-bold text-indigo-600">
+                            <Badge variant="outline" size="sm">
                               Mine
-                            </span>
+                            </Badge>
                           )}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-indigo-700">{classroom.teacher_name}</p>
+                        <p className="font-medium text-[#5d4b4c]">
+                          {classroom.teacher_name}
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center justify-center rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-700">
+                        <Badge variant="sky" size="sm">
                           {classroom.student_count}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center justify-center rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-700">
+                        <Badge variant="amber" size="sm">
                           {classroom.book_count}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="text-xs text-indigo-500">{formatDate(classroom.created_at)}</p>
+                        <p className="text-xs font-medium text-[#6f6061]">
+                          {formatDate(classroom.created_at)}
+                        </p>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-2">
                           <Link
                             href={`/dashboard/teacher/classrooms/${classroom.id}`}
-                            className="rounded-full bg-indigo-500 p-2 text-white transition-all hover:bg-indigo-600 hover:shadow-md active:scale-95"
-                            title="Manage classroom"
+                            className={buttonVariants({
+                              variant: "outline",
+                              size: "sm",
+                            })}
                           >
-                            <PencilIcon className="h-4 w-4" />
+                            Manage
                           </Link>
-                          <button
+                          <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
                             onClick={() => handleDelete(classroom)}
-                            disabled={deletingId === classroom.id}
-                            className="rounded-full bg-rose-500 p-2 text-white transition-all hover:bg-rose-600 hover:shadow-md active:scale-95 disabled:opacity-50"
-                            title="Delete classroom"
+                            loading={deletingId === classroom.id}
                           >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
+                            Delete
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -153,7 +169,10 @@ export const AllClassroomsTable = ({ classrooms, currentUserId }: AllClassroomsT
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-indigo-400">
+                  <td
+                    colSpan={6}
+                    className="px-4 py-12 text-center text-[#6f6061]"
+                  >
                     No classrooms found.
                   </td>
                 </tr>
@@ -163,13 +182,14 @@ export const AllClassroomsTable = ({ classrooms, currentUserId }: AllClassroomsT
         </div>
 
         {classrooms.length > 0 && (
-          <div className="border-t border-indigo-100 bg-indigo-50/50 px-4 py-3">
-            <p className="text-xs font-semibold text-indigo-600">
-              Total: {classrooms.length} classroom{classrooms.length !== 1 ? 's' : ''}
+          <div className="border-t border-[#eadfda] bg-[#fffaf4] px-4 py-3">
+            <p className="text-xs font-bold text-[#7E1518]">
+              Total: {classrooms.length} classroom
+              {classrooms.length !== 1 ? "s" : ""}
             </p>
           </div>
         )}
       </div>
-    </section>
+    </Card>
   );
 };

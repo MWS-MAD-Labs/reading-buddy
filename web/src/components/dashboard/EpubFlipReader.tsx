@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   forwardRef,
   useCallback,
@@ -31,6 +32,9 @@ import {
   getPreferenceClasses,
 } from "./reader/ReadingSettings";
 import { FullscreenReaderOverlay } from "./reader/FullscreenReaderOverlay";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 import "@/styles/reader-fonts.css";
 import "@/styles/reader-theme.css";
@@ -148,6 +152,11 @@ export const EpubFlipReader = forwardRef<
 
     const { preferences, updatePreferences, resetPreferences, isLoaded } =
       useReadingPreferences();
+    const preferencesRef = useRef(preferences);
+
+    useEffect(() => {
+      preferencesRef.current = preferences;
+    }, [preferences]);
 
     const themeClasses = getPreferenceClasses(preferences);
     const readerTheme = useMemo(
@@ -246,12 +255,9 @@ export const EpubFlipReader = forwardRef<
       ];
     }, []);
 
-    const captureVisiblePageStructure = useCallback(
-      (_direction: "next" | "prev"): FlipOverlayBar[] => {
-        return buildFallbackOverlayBars();
-      },
-      [buildFallbackOverlayBars],
-    );
+    const captureVisiblePageStructure = useCallback((): FlipOverlayBar[] => {
+      return buildFallbackOverlayBars();
+    }, [buildFallbackOverlayBars]);
 
     const resetFlipAnimation = useCallback(() => {
       const stage = flipStageRef.current;
@@ -335,7 +341,7 @@ export const EpubFlipReader = forwardRef<
           return;
         }
 
-        const bars = captureVisiblePageStructure(direction);
+        const bars = captureVisiblePageStructure();
 
         isFlipAnimatingRef.current = true;
         lastNavDirectionRef.current = direction;
@@ -588,7 +594,7 @@ export const EpubFlipReader = forwardRef<
           renditionRef.current = rendition;
           rendition.on("relocated", handleRelocated);
 
-          applyReaderTheme(rendition, preferences);
+          applyReaderTheme(rendition, preferencesRef.current);
 
           await rendition.started;
 
@@ -954,11 +960,13 @@ export const EpubFlipReader = forwardRef<
         className={clsx(
           isFullscreen
             ? "fixed inset-0 z-[9999] flex flex-col overflow-hidden"
-            : "space-y-4 py-6",
+            : "space-y-4",
           themeClasses,
         )}
         style={{
-          backgroundColor: readerTheme.background,
+          backgroundColor: isFullscreen
+            ? readerTheme.background
+            : "transparent",
           color: readerTheme.foreground,
         }}
       >
@@ -972,52 +980,63 @@ export const EpubFlipReader = forwardRef<
         />
 
         {!isFullscreen && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-indigo-100 bg-white/80 p-3 shadow-sm">
+          <Card
+            variant="frosted"
+            padding="snug"
+            className="flex flex-wrap items-center justify-between gap-3"
+          >
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-indigo-900">
+              <p className="heading-font truncate text-base font-bold text-[#241718]">
                 {title}
               </p>
-              <p className="truncate text-xs text-indigo-500">{author}</p>
+              <p className="truncate text-sm font-medium text-[#5d4b4c]">
+                {author}
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 type="button"
+                variant="neutral"
+                size="sm"
                 onClick={() => void handlePrev()}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50"
               >
-                ◀ Prev
-              </button>
-              <button
+                ← Prev
+              </Button>
+              <Button
                 type="button"
+                variant="neutral"
+                size="sm"
                 onClick={() => void handleNext()}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50"
               >
-                Next ▶
-              </button>
-              <button
+                Next →
+              </Button>
+              <Button
                 type="button"
+                variant={showToc ? "secondary" : "outline"}
+                size="sm"
                 onClick={() => setShowToc((open) => !open)}
-                className="rounded-lg border border-emerald-300 bg-emerald-100 px-2 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200"
               >
                 ☰ TOC
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setShowSettings(true)}
-                className="rounded-lg border border-violet-300 bg-violet-100 px-2 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-200"
               >
                 ⚙️ Aa
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => void toggleFullscreen()}
-                className="rounded-lg border border-indigo-300 bg-indigo-100 px-2 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-200"
               >
                 ⛶ Full
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         )}
 
         <div
@@ -1031,15 +1050,18 @@ export const EpubFlipReader = forwardRef<
           {showToc && (
             <aside
               className={clsx(
-                "w-full max-w-xs shrink-0 overflow-y-auto rounded-3xl border border-indigo-100 bg-white/90 p-4 shadow-xl",
+                "w-full max-w-xs shrink-0 overflow-y-auto rounded-[28px] border border-[#eadfda] bg-white/95 p-4 shadow-xl",
                 isFullscreen ? "max-h-full" : "max-h-[720px]",
               )}
             >
               <div className="mb-4 flex items-start gap-3">
                 {coverImageUrl ? (
-                  <img
+                  <Image
                     src={coverImageUrl}
                     alt={`Cover of ${title}`}
+                    width={56}
+                    height={80}
+                    unoptimized
                     className="h-20 w-14 rounded-xl object-cover shadow-md"
                   />
                 ) : null}
@@ -1067,7 +1089,7 @@ export const EpubFlipReader = forwardRef<
 
           <div
             className={clsx(
-              "relative flex-1 overflow-hidden rounded-[2rem] border shadow-2xl",
+              "relative flex-1 overflow-hidden rounded-[28px] border card-shadow",
               isFullscreen ? "min-h-0" : "min-h-[720px]",
             )}
             style={{
@@ -1186,31 +1208,30 @@ export const EpubFlipReader = forwardRef<
         />
 
         {!isFullscreen && totalPages > 0 && (
-          <div className="rounded-2xl border-2 border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-4 py-3">
+          <Card variant="frosted" padding="snug" className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-indigo-600">
-                Page{" "}
-                <span className="font-semibold text-indigo-900">
-                  {currentPage}
-                </span>{" "}
-                of {totalPages}
+              <p className="heading-font text-sm font-bold text-[#7E1518]">
+                Page {currentPage}{" "}
+                <span className="text-[#5d4b4c]">of {totalPages}</span>
               </p>
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
-                <p className="text-xs font-semibold text-emerald-700">
-                  EPUB Paginated Mode
-                </p>
-              </div>
+              <Badge
+                variant="lime"
+                size="sm"
+                className="normal-case tracking-normal"
+              >
+                <span className="h-2 w-2 animate-pulse rounded-full bg-[#6F8B6A]" />
+                EPUB paginated mode
+              </Badge>
             </div>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-indigo-100">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[#F5E7E8]">
               <div
-                className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-300"
+                className="h-full rounded-full bg-[#6F8B6A] transition-all duration-300"
                 style={{
                   width: `${Math.max(0, currentPage / Math.max(totalPages, 1)) * 100}%`,
                 }}
               />
             </div>
-          </div>
+          </Card>
         )}
       </div>
     );

@@ -1,19 +1,32 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { updateUserData } from '@/app/(dashboard)/dashboard/admin/actions';
-import { ACCESS_LEVEL_OPTIONS } from '@/constants/accessLevels';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { useState } from "react";
+import { updateUserData } from "@/app/(dashboard)/dashboard/admin/actions";
+import { ACCESS_LEVEL_OPTIONS } from "@/constants/accessLevels";
+import { XMarkIcon } from "@heroicons/react/24/outline";
+import {
+  Alert,
+  Button,
+  FieldHelper,
+  Input,
+  Label,
+  Select,
+} from "@/components/ui";
 
 type UserRecord = {
   id: string;
   full_name: string | null;
   email: string | null;
-  role: 'STUDENT' | 'TEACHER' | 'LIBRARIAN' | 'ADMIN';
+  role: "STUDENT" | "TEACHER" | "LIBRARIAN" | "ADMIN";
   access_level: string | null;
 };
 
-const ROLES: UserRecord['role'][] = ['STUDENT', 'TEACHER', 'LIBRARIAN', 'ADMIN'];
+const ROLES: UserRecord["role"][] = [
+  "STUDENT",
+  "TEACHER",
+  "LIBRARIAN",
+  "ADMIN",
+];
 
 type EditUserModalProps = {
   user: UserRecord;
@@ -22,10 +35,15 @@ type EditUserModalProps = {
   onError: (message: string) => void;
 };
 
-export const EditUserModal = ({ user, onClose, onSuccess, onError }: EditUserModalProps) => {
-  const [fullName, setFullName] = useState(user.full_name || '');
-  const [role, setRole] = useState<UserRecord['role']>(user.role);
-  const [accessLevel, setAccessLevel] = useState(user.access_level || '');
+export const EditUserModal = ({
+  user,
+  onClose,
+  onSuccess,
+  onError,
+}: EditUserModalProps) => {
+  const [fullName, setFullName] = useState(user.full_name || "");
+  const [role, setRole] = useState<UserRecord["role"]>(user.role);
+  const [accessLevel, setAccessLevel] = useState(user.access_level || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,11 +55,11 @@ export const EditUserModal = ({ user, onClose, onSuccess, onError }: EditUserMod
         userId: user.id,
         fullName: fullName.trim() || null,
         role,
-        accessLevel: role === 'STUDENT' ? accessLevel || null : null,
+        accessLevel: role === "STUDENT" ? accessLevel || null : null,
       });
       onSuccess(`User "${fullName || user.email}" updated successfully!`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unable to update user.';
+      const msg = err instanceof Error ? err.message : "Unable to update user.";
       onError(msg);
     } finally {
       setIsSubmitting(false);
@@ -50,117 +68,109 @@ export const EditUserModal = ({ user, onClose, onSuccess, onError }: EditUserMod
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg overflow-hidden rounded-3xl border-4 border-violet-300 bg-white shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b-2 border-violet-100 bg-gradient-to-r from-violet-50 to-purple-50 px-6 py-4">
-          <h2 className="text-2xl font-black text-violet-900">Edit User</h2>
-          <button
+      <div className="w-full max-w-lg overflow-hidden rounded-[28px] border border-[#eadfda] bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#eadfda] bg-[#fffaf4] px-6 py-4">
+          <h2 className="heading-font text-2xl font-bold text-[#241718]">
+            Edit User
+          </h2>
+          <Button
+            type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-violet-500 transition-colors hover:bg-violet-100 hover:text-violet-700"
+            variant="ghost"
+            size="sm"
+            className="min-h-10 px-3"
             aria-label="Close"
+            icon={<XMarkIcon className="h-5 w-5" />}
           >
-            <XMarkIcon className="h-6 w-6" />
-          </button>
+            Close
+          </Button>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5 p-6">
           {/* Email (Read-only) */}
           <div>
-            <label className="mb-2 block text-sm font-bold text-violet-900">Email</label>
-            <input
+            <Label>Email</Label>
+            <Input
               type="text"
-              value={user.email || 'No email'}
+              value={user.email || "No email"}
               disabled
-              className="w-full rounded-2xl border-2 border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-600"
+              className="bg-[#f7f2ef] text-[#6f6061]"
             />
-            <p className="mt-1 text-xs font-semibold text-violet-500">Email cannot be changed</p>
+            <FieldHelper>Email cannot be changed</FieldHelper>
           </div>
 
           {/* Full Name */}
           <div>
-            <label htmlFor="fullName" className="mb-2 block text-sm font-bold text-violet-900">
-              Full Name
-            </label>
-            <input
+            <Label htmlFor="fullName">Full Name</Label>
+            <Input
               type="text"
               id="fullName"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Enter full name"
-              className="w-full rounded-2xl border-2 border-violet-200 bg-white px-4 py-3 text-sm font-medium text-violet-900 outline-none transition-all focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
             />
           </div>
 
           {/* Role */}
           <div>
-            <label htmlFor="role" className="mb-2 block text-sm font-bold text-violet-900">
-              Role
-            </label>
-            <select
+            <Label htmlFor="role">Role</Label>
+            <Select
               id="role"
               value={role}
-              onChange={(e) => setRole(e.target.value as UserRecord['role'])}
-              className="w-full rounded-2xl border-2 border-violet-200 bg-white px-4 py-3 text-sm font-bold text-violet-900 outline-none transition-all focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+              onChange={(e) => setRole(e.target.value as UserRecord["role"])}
             >
-              {ROLES.map((r: any) => (
+              {ROLES.map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Access Level (only for students) */}
-          {role === 'STUDENT' && (
+          {role === "STUDENT" && (
             <div>
-              <label htmlFor="accessLevel" className="mb-2 block text-sm font-bold text-violet-900">
-                Access Level
-              </label>
-              <select
+              <Label htmlFor="accessLevel">Access Level</Label>
+              <Select
                 id="accessLevel"
                 value={accessLevel}
                 onChange={(e) => setAccessLevel(e.target.value)}
-                className="w-full rounded-2xl border-2 border-violet-200 bg-white px-4 py-3 text-sm font-bold text-violet-900 outline-none transition-all focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
               >
                 <option value="">Not Set</option>
-                {ACCESS_LEVEL_OPTIONS.map((option: any) => (
+                {ACCESS_LEVEL_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
-              </select>
-              <p className="mt-1 text-xs font-semibold text-violet-500">
+              </Select>
+              <FieldHelper>
                 Staff roles always have access to all content
-              </p>
+              </FieldHelper>
             </div>
           )}
 
-          {role !== 'STUDENT' && (
-            <div className="rounded-2xl border-2 border-blue-200 bg-blue-50 p-4">
-              <p className="text-xs font-bold text-blue-700">
-                ℹ️ Staff roles (Teacher, Librarian, Admin) automatically have access to all content.
-              </p>
-            </div>
+          {role !== "STUDENT" && (
+            <Alert variant="info">
+              Staff roles (Teacher, Librarian, Admin) automatically have access
+              to all content.
+            </Alert>
           )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
-            <button
+            <Button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="flex-1 rounded-full border-2 border-violet-300 bg-white px-6 py-3 text-sm font-bold text-violet-700 transition-all hover:bg-violet-50 active:scale-95 disabled:opacity-50"
+              variant="neutral"
+              className="flex-1"
             >
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-1 rounded-full border-2 border-violet-400 bg-violet-500 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-violet-600 hover:shadow-lg active:scale-95 disabled:opacity-50"
-            >
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </button>
+            </Button>
+            <Button type="submit" loading={isSubmitting} className="flex-1">
+              Save Changes
+            </Button>
           </div>
         </form>
       </div>

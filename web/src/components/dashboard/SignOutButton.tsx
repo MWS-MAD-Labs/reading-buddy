@@ -16,9 +16,9 @@ export const SignOutButton = () => {
       type="button"
       onClick={handleSignOut}
       disabled={isLoading}
-      className="btn-3d btn-squish rounded-2xl border-4 border-red-300 bg-gradient-to-r from-red-400 to-pink-400 px-6 py-3 text-base font-black text-white shadow-lg transition hover:from-red-500 hover:to-pink-500 disabled:pointer-events-none disabled:opacity-50"
+      className="heading-font btn-squish focus-ring rounded-full border border-[#B94A4E]/20 bg-[#F8EAEB] px-5 py-2.5 text-sm font-bold text-[#B94A4E] transition hover:bg-[#f1d9db] disabled:pointer-events-none disabled:opacity-50"
     >
-      {isLoading ? "👋 Signing out…" : "🚪 Sign Out"}
+      {isLoading ? "Signing out…" : "Sign out"}
     </button>
   );
 };

@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { queryWithContext } from "@/lib/db";
 import { ReaderWithRatingPrompt } from "@/components/dashboard/ReaderWithRatingPrompt";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardDescription, CardHeader } from "@/components/ui/card";
 import { buildPublicPrefixUrl } from "@/lib/minioUtils";
 
 export const dynamic = "force-dynamic";
@@ -77,16 +79,20 @@ export default async function StudentReadPage({
   const initialCfi = requestedPage ? null : (progress?.epub_cfi ?? null);
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-2xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 p-3 shadow">
-        <div className="mb-1 inline-block rounded-lg border-2 border-cyan-300 bg-cyan-400 px-3 py-0.5">
-          <p className="text-xs font-black uppercase tracking-wide text-cyan-900">
-            Now Reading
-          </p>
-        </div>
-        <h1 className="text-2xl font-black text-blue-900">{book.title}</h1>
-        <p className="text-sm font-bold text-blue-700">by {book.author}</p>
-      </div>
+    <div className="space-y-6">
+      <Card variant="glow" padding="snug">
+        <CardHeader className="mb-0">
+          <Badge variant="sky" size="sm" className="w-fit">
+            Now reading
+          </Badge>
+          <h1 className="heading-font mt-3 text-3xl font-bold leading-tight text-[#7E1518] md:text-4xl">
+            {book.title}
+          </h1>
+          <CardDescription className="font-semibold">
+            by {book.author}
+          </CardDescription>
+        </CardHeader>
+      </Card>
       <ReaderWithRatingPrompt
         bookId={book.id}
         bookTitle={book.title}

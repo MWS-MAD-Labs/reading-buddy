@@ -16,6 +16,10 @@ import {
 } from "@/app/(dashboard)/dashboard/student/actions";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/cn";
 import { ReaderNotesPanel } from "./reader/ReaderNotesPanel";
 
 // Dynamically import readers to reduce initial bundle
@@ -277,39 +281,52 @@ export function UnifiedBookReader({
         />
 
         {/* Reader Actions Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-white/80 p-3">
-          <div className="flex items-center gap-2 text-sm text-indigo-600">
-            <span className="font-medium">📍 Page {currentPage}</span>
-            {totalPageCount && (
-              <span className="text-indigo-400">of {totalPageCount}</span>
-            )}
-            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-              📚 EPUB Mode
+        <Card
+          variant="frosted"
+          padding="snug"
+          className="flex flex-wrap items-center justify-between gap-3"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="heading-font text-sm font-bold text-[#7E1518]">
+              📍 Page {currentPage}
             </span>
+            {totalPageCount && (
+              <span className="text-sm font-medium text-[#5d4b4c]">
+                of {totalPageCount}
+              </span>
+            )}
+            <Badge variant="lime" size="sm">
+              EPUB mode
+            </Badge>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/dashboard/journal/${bookId}`}
-              className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
             >
               📓 Book Journal
             </Link>
-            <button
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
               onClick={() => setIsNotesPanelOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
             >
               📝 Notes
-            </button>
+            </Button>
             {showFinishButton && onComplete && (
-              <button
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
                 onClick={onComplete}
-                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105 animate-pulse"
+                className="animate-pulse"
               >
                 ✅ Finish Reading
-              </button>
+              </Button>
             )}
           </div>
-        </div>
+        </Card>
 
         {/* Notes Panel */}
         <ReaderNotesPanel
@@ -335,37 +352,50 @@ export function UnifiedBookReader({
         />
 
         {/* Reader Actions Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-white/80 p-3">
-          <div className="flex items-center gap-2 text-sm text-indigo-600">
-            <span className="font-medium">📍 Page {currentPage}</span>
-            <span className="text-indigo-400">of {pageImages.count}</span>
-            <span className="ml-2 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
-              📖 Picture Book
+        <Card
+          variant="frosted"
+          padding="snug"
+          className="flex flex-wrap items-center justify-between gap-3"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="heading-font text-sm font-bold text-[#7E1518]">
+              📍 Page {currentPage}
             </span>
+            <span className="text-sm font-medium text-[#5d4b4c]">
+              of {pageImages.count}
+            </span>
+            <Badge variant="amber" size="sm">
+              Picture book
+            </Badge>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/dashboard/journal/${bookId}`}
-              className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
             >
               📓 Book Journal
             </Link>
-            <button
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
               onClick={() => setIsNotesPanelOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
             >
               📝 Notes
-            </button>
+            </Button>
             {showFinishButton && onComplete && (
-              <button
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
                 onClick={onComplete}
-                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 text-sm font-bold text-white shadow-md transition hover:scale-105 animate-pulse"
+                className="animate-pulse"
               >
                 ✅ Finish Reading
-              </button>
+              </Button>
             )}
           </div>
-        </div>
+        </Card>
 
         {/* Notes Panel */}
         <ReaderNotesPanel

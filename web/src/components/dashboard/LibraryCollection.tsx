@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { Star } from "lucide-react";
 import { BookDetailsModal } from "./BookDetailsModal";
 
+const filterLabelClass =
+  "heading-font text-xs font-bold uppercase tracking-[0.18em] text-[#7E1518]";
+const filterControlClass =
+  "focus-ring min-h-[44px] rounded-2xl border border-[#eadfda] bg-white px-4 py-3 text-base font-medium text-[#241718] outline-none transition-all placeholder:text-[#9b898a] focus:border-[#D6A13A] md:py-2";
+
 export type LibraryBook = {
   id: number;
   title: string;
@@ -130,11 +135,9 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
 
   return (
     <section className="space-y-4 md:space-y-6">
-      <div className="grid gap-4 rounded-2xl border-4 border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50 p-4 shadow-lg md:grid-cols-2 md:p-5 lg:grid-cols-3">
+      <div className="grid gap-4 rounded-[28px] border border-[#eadfda] bg-white/90 p-4 card-shadow md:grid-cols-2 md:p-5 lg:grid-cols-3">
         <label className="flex flex-col gap-2 md:col-span-2 lg:col-span-3">
-          <span className="text-sm font-black uppercase tracking-wide text-purple-600">
-            🔍 Search
-          </span>
+          <span className={filterLabelClass}>Search</span>
           <input
             type="search"
             placeholder="Title, author, publisher..."
@@ -142,17 +145,15 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               setSearchTerm(event.target.value)
             }
-            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
+            className={filterControlClass}
           />
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-black uppercase tracking-wide text-purple-600">
-            ✍️ Author
-          </span>
+          <span className={filterLabelClass}>Author</span>
           <select
             value={authorFilter}
             onChange={(event) => setAuthorFilter(event.target.value)}
-            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
+            className={filterControlClass}
           >
             <option value="ALL">All authors</option>
             {authorOptions.map((option: any) => (
@@ -163,13 +164,11 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
           </select>
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-black uppercase tracking-wide text-purple-600">
-            🏢 Publisher
-          </span>
+          <span className={filterLabelClass}>Publisher</span>
           <select
             value={publisherFilter}
             onChange={(event) => setPublisherFilter(event.target.value)}
-            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
+            className={filterControlClass}
           >
             <option value="ALL">All publishers</option>
             {publisherOptions.map((option: any) => (
@@ -180,13 +179,11 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
           </select>
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-black uppercase tracking-wide text-purple-600">
-            🎭 Genre
-          </span>
+          <span className={filterLabelClass}>Genre</span>
           <select
             value={genreFilter}
             onChange={(event) => setGenreFilter(event.target.value)}
-            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
+            className={filterControlClass}
           >
             <option value="ALL">All genres</option>
             {genreOptions.map((option: any) => (
@@ -197,13 +194,11 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
           </select>
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-black uppercase tracking-wide text-purple-600">
-            🌍 Language
-          </span>
+          <span className={filterLabelClass}>Language</span>
           <select
             value={languageFilter}
             onChange={(event) => setLanguageFilter(event.target.value)}
-            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
+            className={filterControlClass}
           >
             <option value="ALL">All languages</option>
             {languageOptions.map((option: any) => (
@@ -214,13 +209,11 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
           </select>
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-black uppercase tracking-wide text-purple-600">
-            📅 Year
-          </span>
+          <span className={filterLabelClass}>Year</span>
           <select
             value={yearFilter}
             onChange={(event) => setYearFilter(event.target.value)}
-            className="min-h-[44px] rounded-2xl border-4 border-purple-300 bg-white px-4 py-3 text-base font-semibold text-purple-900 outline-none transition-all md:py-2"
+            className={filterControlClass}
           >
             <option value="ALL">All years</option>
             {yearOptions.map((option: any) => (
@@ -238,10 +231,10 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
             <li key={book.id} className="flex justify-center">
               <button
                 onClick={() => setSelectedBookId(book.id)}
-                className="group block w-full max-w-xs text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+                className="group block w-full max-w-xs text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D6A13A] focus-visible:ring-offset-2"
               >
-                <div className="h-full rounded-2xl border-2 border-purple-300 bg-white p-3 shadow-md transition-all hover:border-purple-400 hover:shadow-lg">
-                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-purple-50 shadow-inner">
+                <div className="h-full rounded-[24px] border border-[#eadfda] bg-white p-3 card-shadow transition-all hover:border-[#D6A13A]/70 hover:-translate-y-0.5">
+                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-[#fffaf4] shadow-inner">
                     {book.coverUrl ? (
                       <Image
                         src={book.coverUrl}
@@ -251,29 +244,29 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
                         sizes="(max-width: 768px) 100vw, 33vw"
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center text-sm font-semibold text-purple-400">
+                      <div className="flex h-full items-center justify-center text-sm font-medium text-[#9b898a]">
                         No cover
                       </div>
                     )}
                   </div>
                   <div className="mt-3 space-y-1">
-                    <h2 className="line-clamp-2 text-lg font-black text-purple-900">
+                    <h2 className="heading-font line-clamp-2 text-lg font-bold text-[#7E1518]">
                       {book.title}
                       {book.publicationYear ? (
-                        <span className="ml-1 text-sm font-semibold text-purple-500">
+                        <span className="ml-1 text-sm font-medium text-[#7a5311]">
                           ({book.publicationYear})
                         </span>
                       ) : null}
                     </h2>
-                    <p className="text-sm font-bold text-purple-600">
+                    <p className="text-sm font-medium text-[#5d4b4c]">
                       by {book.author}
                     </p>
 
                     {/* Rating badge */}
                     {book.averageRating && book.averageRating > 0 ? (
                       <div className="flex items-center gap-1 pt-1">
-                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                        <span className="text-sm font-bold text-amber-600">
+                        <Star className="h-4 w-4 fill-[#D6A13A] text-[#D6A13A]" />
+                        <span className="heading-font text-sm font-bold text-[#7a5311]">
                           {book.averageRating.toFixed(1)}
                         </span>
                         <span className="text-xs text-gray-400">
@@ -281,7 +274,9 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
                         </span>
                       </div>
                     ) : (
-                      <p className="pt-1 text-xs text-gray-400">No ratings yet</p>
+                      <p className="pt-1 text-xs text-gray-400">
+                        No ratings yet
+                      </p>
                     )}
                   </div>
                 </div>
@@ -290,11 +285,11 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
           ))}
         </ul>
       ) : (
-        <div className="rounded-3xl border-4 border-dashed border-yellow-300 bg-yellow-50 p-8 text-center shadow-lg">
+        <div className="rounded-3xl border border-dashed border-[#D6A13A]/70 bg-[#FBF2DF]/60 p-8 text-center card-shadow">
           <div className="mb-3 text-5xl">
             {books.length === 0 ? "📚" : "🔍"}
           </div>
-          <p className="text-lg font-bold text-yellow-700">
+          <p className="heading-font text-lg font-bold text-[#7a5311]">
             {books.length === 0
               ? "No books yet! Librarians can add the first book from the Librarian dashboard."
               : "No books match your filters. Try adjusting your search!"}

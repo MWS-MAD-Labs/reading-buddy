@@ -12,22 +12,93 @@ import {
 } from "@/app/(dashboard)/dashboard/teacher/actions";
 import { DiscussionStream } from "@/components/dashboard/DiscussionStream";
 import { getClassroomMessages } from "@/app/(dashboard)/dashboard/student/classrooms/[classId]/classroom-stream-actions";
-import { MessageSquare, LayoutDashboard, ClipboardList } from "lucide-react";
+import {
+  Badge,
+  buttonVariants,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 const tableWrapperClass =
-  "overflow-x-auto rounded-3xl border border-white/70 bg-white/85 shadow-[inset_0_10px_40px_rgba(79,70,229,0.08)]";
+  "overflow-x-auto rounded-3xl border border-[#eadfda] bg-white/85";
 const tableClass =
-  "min-w-full divide-y divide-indigo-50 text-sm text-indigo-900";
-const headClass =
-  "bg-gradient-to-r from-indigo-50 to-pink-50 text-xs uppercase tracking-wide text-indigo-500";
+  "min-w-full divide-y divide-[#eadfda] text-sm text-[#241718]";
+const headClass = "bg-[#fffaf4] text-xs uppercase tracking-wide text-[#7E1518]";
 const cellClass = "px-4 py-3";
+
+type View = "overview" | "quizzes" | "discussion";
+
+type ClassroomRow = {
+  id: number;
+  name: string;
+  teacher_id: string;
+};
+
+type ProfileNameRow = {
+  full_name: string | null;
+};
+
+type RosterRow = {
+  student_id: string;
+  full_name: string | null;
+};
+
+type ReadingRow = {
+  student_id: string;
+  current_page: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  full_name: string | null;
+  title: string | null;
+  page_count: number | null;
+};
+
+type QuizAttemptRow = {
+  score: number;
+  submitted_at: string | null;
+  full_name: string | null;
+  book_title: string | null;
+};
+
+type StudentDirectoryRow = {
+  id: string;
+  full_name: string | null;
+};
+
+type AssignmentRow = {
+  student_id: string | null;
+};
+
+type AssignedBookRow = {
+  book_id: number;
+  assigned_at: string | null;
+  title: string | null;
+  author: string | null;
+  cover_url: string | null;
+};
+
+type BookRow = {
+  id: number;
+  title: string;
+  author: string | null;
+  cover_url: string | null;
+};
+
+type ClassQuizAssignment = {
+  book_id: number;
+};
 
 const formatDate = (value: string | null) => {
   if (!value) return "—";
   return new Date(value).toLocaleDateString();
 };
+
+const tabClass = (active: boolean) =>
+  buttonVariants({ variant: active ? "primary" : "neutral", size: "sm" });
 
 export default async function ManageClassroomPage({
   params,
@@ -39,7 +110,12 @@ export default async function ManageClassroomPage({
   const { classId: classIdParam } = await params;
   const { view: viewParam } = await searchParams;
   const classId = Number.parseInt(classIdParam, 10);
-  const view = viewParam === "discussion" ? "discussion" : viewParam === "quizzes" ? "quizzes" : "overview";
+  const view: View =
+    viewParam === "discussion"
+      ? "discussion"
+      : viewParam === "quizzes"
+        ? "quizzes"
+        : "overview";
 
   if (Number.isNaN(classId)) {
     notFound();
@@ -51,7 +127,7 @@ export default async function ManageClassroomPage({
 
   const classroomResult = await query(
     `SELECT id, name, teacher_id FROM classes WHERE id = $1`,
-    [classId]
+    [classId],
   );
 
   if (classroomResult.rows.length === 0) {
@@ -59,29 +135,30 @@ export default async function ManageClassroomPage({
     notFound();
   }
 
-  const classroom = classroomResult.rows[0];
+  const classroom = classroomResult.rows[0] as ClassroomRow;
 
   const teacherProfileResult = await query(
     `SELECT full_name FROM profiles WHERE id = $1`,
-    [classroom.teacher_id]
+    [classroom.teacher_id],
   );
 
-  const teacherProfile = teacherProfileResult.rows[0] || null;
+  const teacherProfile =
+    (teacherProfileResult.rows[0] as ProfileNameRow | undefined) || null;
 
   const rosterResult = await query(
     `SELECT cs.student_id, p.full_name
      FROM class_students cs
      LEFT JOIN profiles p ON cs.student_id = p.id
      WHERE cs.class_id = $1`,
-    [classId]
+    [classId],
   );
 
-  const classStudents = rosterResult.rows.map((row: any) => ({
+  const classStudents = (rosterResult.rows as RosterRow[]).map((row) => ({
     id: row.student_id,
     full_name: row.full_name ?? "Unknown student",
   }));
 
-  const rosterStudentIds = classStudents.map((student: any) => student.id);
+  const rosterStudentIds = classStudents.map((student) => student.id);
 
   let readings: {
     student_id: string;
@@ -89,12 +166,12 @@ export default async function ManageClassroomPage({
     started_at: string | null;
     completed_at: string | null;
     profiles: { full_name: string | null } | null;
-    books: { title: string; page_count: number | null } | null;
+    books: { title: string | null; page_count: number | null } | null;
   }[] = [];
 
   if (rosterStudentIds.length > 0) {
     const readingsResult = await query(
-      `SELECT 
+      `SELECT
         sb.student_id,
         sb.current_page,
         sb.started_at,
@@ -108,10 +185,10 @@ export default async function ManageClassroomPage({
        WHERE sb.student_id = ANY($1)
        ORDER BY sb.started_at DESC NULLS LAST
        LIMIT 10`,
-      [rosterStudentIds]
+      [rosterStudentIds],
     );
 
-    readings = readingsResult.rows.map((row: any) => ({
+    readings = (readingsResult.rows as ReadingRow[]).map((row) => ({
       student_id: row.student_id,
       current_page: row.current_page,
       started_at: row.started_at,
@@ -130,7 +207,7 @@ export default async function ManageClassroomPage({
 
   if (rosterStudentIds.length > 0) {
     const quizAttemptsResult = await query(
-      `SELECT 
+      `SELECT
         qa.score,
         qa.submitted_at,
         p.full_name,
@@ -142,10 +219,10 @@ export default async function ManageClassroomPage({
        WHERE qa.student_id = ANY($1)
        ORDER BY qa.submitted_at DESC
        LIMIT 10`,
-      [rosterStudentIds]
+      [rosterStudentIds],
     );
 
-    quizAttempts = quizAttemptsResult.rows.map((row: any) => ({
+    quizAttempts = (quizAttemptsResult.rows as QuizAttemptRow[]).map((row) => ({
       score: row.score,
       submitted_at: row.submitted_at,
       profiles: { full_name: row.full_name },
@@ -154,36 +231,35 @@ export default async function ManageClassroomPage({
   }
 
   const studentDirectoryResult = await query(
-    `SELECT id, full_name FROM profiles WHERE role = 'STUDENT'`
+    `SELECT id, full_name FROM profiles WHERE role = 'STUDENT'`,
   );
 
-  const studentDirectory = studentDirectoryResult.rows;
+  const studentDirectory = studentDirectoryResult.rows as StudentDirectoryRow[];
 
   const allAssignmentsResult = await query(
-    `SELECT student_id FROM class_students`
+    `SELECT student_id FROM class_students`,
   );
 
-  const allAssignments = allAssignmentsResult.rows;
+  const allAssignments = allAssignmentsResult.rows as AssignmentRow[];
 
   const assignedIds = new Set(
     allAssignments
-      .map((entry: any) => entry.student_id)
+      .map((entry) => entry.student_id)
       .filter((id): id is string => Boolean(id)),
   );
   const rosterIdSet = new Set(rosterStudentIds);
 
   const availableStudents = studentDirectory
     .filter(
-      (student: any) =>
-        rosterIdSet.has(student.id) || !assignedIds.has(student.id),
+      (student) => rosterIdSet.has(student.id) || !assignedIds.has(student.id),
     )
-    .map((student: any) => ({
+    .map((student) => ({
       id: student.id,
       full_name: student.full_name ?? "",
     }));
 
   const assignedBooksResult = await query(
-    `SELECT 
+    `SELECT
       cb.book_id,
       cb.assigned_at,
       b.id,
@@ -194,12 +270,12 @@ export default async function ManageClassroomPage({
      LEFT JOIN books b ON cb.book_id = b.id
      WHERE cb.class_id = $1
      ORDER BY cb.assigned_at DESC`,
-    [classId]
+    [classId],
   );
 
-  const assignedBookRows = assignedBooksResult.rows;
+  const assignedBookRows = assignedBooksResult.rows as AssignedBookRow[];
 
-  const assignedBooks = assignedBookRows.map((row: any) => ({
+  const assignedBooks = assignedBookRows.map((row) => ({
     book_id: row.book_id,
     title: row.title ?? "Untitled",
     author: row.author ?? null,
@@ -208,108 +284,79 @@ export default async function ManageClassroomPage({
   }));
 
   const allBooksResult = await query(
-    `SELECT id, title, author, cover_url FROM books`
+    `SELECT id, title, author, cover_url FROM books`,
   );
 
-  const allBooksData = allBooksResult.rows;
+  const allBooksData = allBooksResult.rows as BookRow[];
 
   const availableBooks = allBooksData
     .filter(
-      (book: any) =>
-        !assignedBooks.some((assigned) => assigned.book_id === book.id),
+      (book) => !assignedBooks.some((assigned) => assigned.book_id === book.id),
     )
-    .map((book: any) => ({
+    .map((book) => ({
       id: book.id,
       title: book.title,
       author: book.author ?? null,
       cover_url: book.cover_url ?? null,
     }));
 
-  // Get discussion messages if in discussion view
-  const messages = view === "discussion" ? await getClassroomMessages(classId) : [];
+  const messages =
+    view === "discussion" ? await getClassroomMessages(classId) : [];
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_25px_70px_rgba(147,118,255,0.2)]">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-indigo-400">
-              Manage Classroom
-            </p>
-            <h1 className="text-3xl font-black text-indigo-950">
+    <div className="space-y-8">
+      <Card variant="glow" padding="cozy">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <CardHeader className="mb-0">
+            <Badge variant="bubble">Manage classroom</Badge>
+            <h1 className="heading-font mt-2 text-3xl font-bold leading-tight text-[#241718] md:text-4xl">
               {classroom.name}
             </h1>
-            <p className="text-sm font-medium text-indigo-500">
+            <CardDescription>
               Mentor: {teacherProfile?.full_name ?? "Unknown teacher"}
-            </p>
-          </div>
+            </CardDescription>
+          </CardHeader>
           <Link
             href="/dashboard/teacher"
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-rose-400 to-orange-400 px-5 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(255,173,109,0.45)] transition hover:opacity-90"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
           >
-            &larr; Back to dashboard
+            Back to dashboard
           </Link>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="mt-8 flex gap-2 border-b border-indigo-100 pb-1">
+        <div className="mt-6 flex flex-wrap gap-2 border-t border-[#eadfda] pt-5">
           <Link
             href={`/dashboard/teacher/classrooms/${classId}`}
-            className={`
-              flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors rounded-t-lg
-              ${view === 'overview'
-                ? 'text-indigo-600 border-b-2 border-indigo-500 bg-indigo-50/50'
-                : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-50'
-              }
-            `}
+            className={tabClass(view === "overview")}
           >
-            <LayoutDashboard className="h-4 w-4" />
             Overview
           </Link>
           <Link
             href={`/dashboard/teacher/classrooms/${classId}?view=quizzes`}
-            className={`
-              flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors rounded-t-lg
-              ${view === 'quizzes'
-                ? 'text-indigo-600 border-b-2 border-indigo-500 bg-indigo-50/50'
-                : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-50'
-              }
-            `}
+            className={tabClass(view === "quizzes")}
           >
-            <ClipboardList className="h-4 w-4" />
             Quizzes
           </Link>
           <Link
             href={`/dashboard/teacher/classrooms/${classId}?view=discussion`}
-            className={`
-              flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors rounded-t-lg
-              ${view === 'discussion'
-                ? 'text-indigo-600 border-b-2 border-indigo-500 bg-indigo-50/50'
-                : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-50'
-              }
-            `}
+            className={tabClass(view === "discussion")}
           >
-            <MessageSquare className="h-4 w-4" />
             Discussion
           </Link>
         </div>
-      </section>
+      </Card>
 
       {view === "overview" && (
         <div className="space-y-8 animate-in fade-in duration-500">
           <section className="grid gap-6 lg:grid-cols-2">
-            <div className="space-y-4 rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(79,70,229,0.18)]">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-rose-400">
-                  Student Progress
-                </p>
-                <h2 className="text-xl font-black text-indigo-950">
-                  Reading updates
-                </h2>
-                <p className="text-sm text-indigo-500">
+            <Card variant="frosted" padding="cozy">
+              <CardHeader>
+                <Badge variant="sky">Student progress</Badge>
+                <CardTitle>Reading updates</CardTitle>
+                <CardDescription>
                   Latest progress from this classroom only.
-                </p>
-              </div>
+                </CardDescription>
+              </CardHeader>
               <div className={tableWrapperClass}>
                 <table className={tableClass}>
                   <thead className={headClass}>
@@ -320,17 +367,18 @@ export default async function ManageClassroomPage({
                       <th className={cellClass}>Updated</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-indigo-50">
+                  <tbody className="divide-y divide-[#eadfda]">
                     {readings.length > 0 ? (
-                      readings.map((entry: any) => (
+                      readings.map((entry) => (
                         <tr
                           key={`${entry.student_id}-${entry.books?.title ?? "book"}`}
-                          className="hover:bg-indigo-50/60"
                         >
                           <td className={cellClass}>
                             {entry.profiles?.full_name ?? "Unknown student"}
                           </td>
-                          <td className={cellClass}>{entry.books?.title ?? "—"}</td>
+                          <td className={cellClass}>
+                            {entry.books?.title ?? "—"}
+                          </td>
                           <td className={cellClass}>
                             {entry.current_page ?? 0} /{" "}
                             {entry.books?.page_count ?? "—"}
@@ -344,7 +392,7 @@ export default async function ManageClassroomPage({
                       <tr>
                         <td
                           colSpan={4}
-                          className={`${cellClass} text-center text-indigo-400`}
+                          className={`${cellClass} text-center text-[#6f6061]`}
                         >
                           No updates yet.
                         </td>
@@ -353,20 +401,16 @@ export default async function ManageClassroomPage({
                   </tbody>
                 </table>
               </div>
-            </div>
+            </Card>
 
-            <div className="space-y-4 rounded-[28px] border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(16,185,129,0.18)]">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-sky-400">
-                  Quiz tracker
-                </p>
-                <h2 className="text-xl font-black text-indigo-950">
-                  Recent quiz attempts
-                </h2>
-                <p className="text-sm text-indigo-500">
+            <Card variant="frosted" padding="cozy">
+              <CardHeader>
+                <Badge variant="amber">Quiz tracker</Badge>
+                <CardTitle>Recent quiz attempts</CardTitle>
+                <CardDescription>
                   See how this class is performing.
-                </p>
-              </div>
+                </CardDescription>
+              </CardHeader>
               <div className={tableWrapperClass}>
                 <table className={tableClass}>
                   <thead className={headClass}>
@@ -377,10 +421,10 @@ export default async function ManageClassroomPage({
                       <th className={cellClass}>Date</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-indigo-50">
+                  <tbody className="divide-y divide-[#eadfda]">
                     {quizAttempts.length > 0 ? (
                       quizAttempts.map((attempt, index) => (
-                        <tr key={index} className="hover:bg-indigo-50/60">
+                        <tr key={index}>
                           <td className={cellClass}>
                             {attempt.profiles?.full_name ?? "Unknown student"}
                           </td>
@@ -397,7 +441,7 @@ export default async function ManageClassroomPage({
                       <tr>
                         <td
                           colSpan={4}
-                          className={`${cellClass} text-center text-indigo-400`}
+                          className={`${cellClass} text-center text-[#6f6061]`}
                         >
                           No attempts yet.
                         </td>
@@ -406,16 +450,14 @@ export default async function ManageClassroomPage({
                   </tbody>
                 </table>
               </div>
-            </div>
+            </Card>
           </section>
 
-          <section className="rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_25px_70px_rgba(255,173,109,0.2)]">
-            <ClassroomRoster
-              classId={classId}
-              students={classStudents}
-              allStudents={availableStudents}
-            />
-          </section>
+          <ClassroomRoster
+            classId={classId}
+            students={classStudents}
+            allStudents={availableStudents}
+          />
 
           <ClassReadingList
             classId={classId}
@@ -427,25 +469,20 @@ export default async function ManageClassroomPage({
 
       {view === "quizzes" && (
         <div className="space-y-6 animate-in fade-in duration-500">
-          <section className="rounded-[32px] border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-6">
-            <div className="mb-4">
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1">
-                <p className="text-xs font-black uppercase tracking-wide text-purple-600">
-                  Quiz Management
-                </p>
-              </div>
-              <h2 className="text-2xl font-black text-indigo-950">
-                Create & Assign Quizzes
-              </h2>
-              <p className="text-sm text-indigo-500">
-                Create AI-generated quizzes or assign existing quizzes to your class.
-              </p>
-            </div>
-          </section>
+          <Card variant="playful" padding="cozy">
+            <CardHeader className="mb-0">
+              <Badge variant="amber">Quiz management</Badge>
+              <CardTitle>Create and assign quizzes</CardTitle>
+              <CardDescription>
+                Create AI-generated quizzes or assign existing quizzes to your
+                class.
+              </CardDescription>
+            </CardHeader>
+          </Card>
 
           {assignedBooks.length > 0 ? (
             <div className="space-y-4">
-              {assignedBooks.map((book: any) => (
+              {assignedBooks.map((book) => (
                 <BookQuizSection
                   key={book.book_id}
                   classId={classId}
@@ -455,13 +492,12 @@ export default async function ManageClassroomPage({
               ))}
             </div>
           ) : (
-            <div className="rounded-[32px] border border-dashed border-purple-300 bg-white/80 p-12 text-center">
-              <div className="mb-4 text-5xl">📚</div>
-              <h3 className="text-lg font-bold text-indigo-950">No Books Assigned</h3>
-              <p className="text-sm text-indigo-500">
+            <Card padding="cozy" className="border-dashed text-center">
+              <CardTitle className="text-lg">No books assigned</CardTitle>
+              <CardDescription>
                 Assign books to your class first to create quizzes for them.
-              </p>
-            </div>
+              </CardDescription>
+            </Card>
           )}
         </div>
       )}
@@ -488,13 +524,12 @@ async function BookQuizSection({
   bookId: number;
   bookTitle: string;
 }) {
-  // Fetch available quizzes for this book
   const availableQuizzes = await getPublishedQuizzesByBook(bookId);
-
-  // Fetch assigned quizzes for this class
   const allAssignments = await getClassQuizAssignments(classId);
   const assignedQuizzes =
-    allAssignments?.filter((a: any) => a.book_id === bookId) ?? [];
+    allAssignments?.filter(
+      (assignment: ClassQuizAssignment) => assignment.book_id === bookId,
+    ) ?? [];
 
   return (
     <ClassQuizList

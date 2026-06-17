@@ -2,8 +2,36 @@ import { query } from "@/lib/db";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { ClassroomManager } from "@/components/dashboard/ClassroomManager";
 import { AllClassroomsTable } from "@/components/dashboard/AllClassroomsTable";
+import {
+  Badge,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
 
 export const dynamic = "force-dynamic";
+
+type MyClassroomRow = {
+  id: number;
+  name: string;
+  student_count: string;
+};
+
+type TeacherRow = {
+  id: string;
+  full_name: string | null;
+};
+
+type AdminClassroomDbRow = {
+  id: number | string;
+  name: string;
+  teacher_id: string;
+  teacher_name: string | null;
+  student_count: string;
+  book_count: string;
+  created_at: string;
+};
 
 type AdminClassroomRow = {
   id: number;
@@ -26,10 +54,10 @@ export default async function ClassroomManagementPage() {
      LEFT JOIN class_students cs ON c.id = cs.class_id
      WHERE c.teacher_id = $1
      GROUP BY c.id, c.name`,
-    [user.id]
+    [user.id],
   );
 
-  const myClassrooms = myClassroomsResult.rows.map((row: any) => ({
+  const myClassrooms = myClassroomsResult.rows.map((row: MyClassroomRow) => ({
     id: row.id,
     name: row.name,
     student_count: parseInt(row.student_count),
@@ -48,45 +76,46 @@ export default async function ClassroomManagementPage() {
         (SELECT COUNT(*) FROM class_books cb WHERE cb.class_id = c.id) as book_count
        FROM classes c
        LEFT JOIN profiles p ON c.teacher_id = p.id
-       ORDER BY c.created_at DESC`
+       ORDER BY c.created_at DESC`,
     );
 
-    allClassrooms = allClassroomsResult.rows.map((row: any): AdminClassroomRow => ({
-      id: Number(row.id),
-      name: row.name,
-      teacher_id: row.teacher_id,
-      teacher_name: row.teacher_name || "Unknown",
-      student_count: parseInt(row.student_count),
-      book_count: parseInt(row.book_count),
-      created_at: row.created_at,
-    }));
+    allClassrooms = allClassroomsResult.rows.map(
+      (row: AdminClassroomDbRow): AdminClassroomRow => ({
+        id: Number(row.id),
+        name: row.name,
+        teacher_id: row.teacher_id,
+        teacher_name: row.teacher_name || "Unknown",
+        student_count: parseInt(row.student_count),
+        book_count: parseInt(row.book_count),
+        created_at: row.created_at,
+      }),
+    );
   }
 
   // Get all teachers for the dropdown
   const allTeachersResult = await query(
-    `SELECT id, full_name FROM profiles WHERE role = 'TEACHER' ORDER BY full_name ASC`
+    `SELECT id, full_name FROM profiles WHERE role = 'TEACHER' ORDER BY full_name ASC`,
   );
 
-  const allTeachers = allTeachersResult.rows.map((t: any) => ({
+  const allTeachers = allTeachersResult.rows.map((t: TeacherRow) => ({
     id: t.id,
     full_name: t.full_name ?? "",
   }));
 
   return (
     <div className="space-y-8">
-      <header className="rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_25px_70px_rgba(93,80,255,0.18)]">
-        <div className="mb-3 inline-flex items-center gap-3 rounded-full bg-indigo-100/80 px-4 py-2">
-          <p className="text-sm font-black uppercase tracking-wide text-indigo-600">
-            Classrooms
-          </p>
-        </div>
-        <h1 className="text-3xl font-black text-indigo-950">
-          Classroom Management
-        </h1>
-        <p className="text-base font-semibold text-indigo-500">
-          Create classes, then jump in to manage each one.
-        </p>
-      </header>
+      <Card variant="glow" padding="cozy">
+        <CardHeader className="mb-0">
+          <Badge variant="bubble">Classrooms</Badge>
+          <h1 className="heading-font text-3xl font-bold leading-tight text-[#241718] md:text-4xl">
+            Classroom management
+          </h1>
+          <CardDescription>
+            Create classes, then jump in to manage rosters, reading lists, and
+            quizzes.
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       <ClassroomManager
         classrooms={myClassrooms}
@@ -102,11 +131,12 @@ export default async function ClassroomManagementPage() {
       )}
 
       {role === "ADMIN" && allClassrooms.length === 0 && (
-        <div className="rounded-[32px] border border-white/70 bg-white/95 p-8 text-center shadow-[0_25px_70px_rgba(147,118,255,0.2)]">
-          <p className="text-lg font-semibold text-indigo-500">
-            No classrooms in the system yet.
-          </p>
-        </div>
+        <Card padding="cozy" className="border-dashed text-center">
+          <CardTitle className="text-lg">No classrooms yet</CardTitle>
+          <CardDescription>
+            No classrooms have been created in the system yet.
+          </CardDescription>
+        </Card>
       )}
     </div>
   );

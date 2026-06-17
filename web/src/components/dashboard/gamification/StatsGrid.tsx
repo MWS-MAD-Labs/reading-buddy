@@ -7,27 +7,52 @@ interface StatsGridProps {
   className?: string;
 }
 
+type Tone = "gold" | "sky" | "sage" | "rose";
+
 interface StatCardProps {
   label: string;
   value: string | number;
-  icon: string;
-  color: string;
+  tone: Tone;
 }
 
-function StatCard({ label, value, icon, color }: StatCardProps) {
+const toneStyles: Record<Tone, { card: string; label: string; value: string }> =
+  {
+    gold: {
+      card: "border-[#D6A13A]/35 bg-[#FBF2DF]/75",
+      label: "text-[#7a5311]",
+      value: "text-[#D6A13A]",
+    },
+    sky: {
+      card: "border-[#B8DDF8]/60 bg-[#EFF8FE]/80",
+      label: "text-[#25638e]",
+      value: "text-[#1F2A44]",
+    },
+    sage: {
+      card: "border-[#6F8B6A]/25 bg-[#EDF3EB]/80",
+      label: "text-[#486142]",
+      value: "text-[#6F8B6A]",
+    },
+    rose: {
+      card: "border-[#B94A4E]/25 bg-[#F8EAEB]/80",
+      label: "text-[#B94A4E]",
+      value: "text-[#B94A4E]",
+    },
+  };
+
+function StatCard({ label, value, tone }: StatCardProps) {
+  const styles = toneStyles[tone];
   return (
-    <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_8px_25px_rgba(147,118,255,0.12)]">
-      <div className="flex items-center gap-3">
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-full text-lg ${color}`}
-        >
-          {icon}
-        </div>
-        <div>
-          <p className="text-xl font-bold text-indigo-950">{value}</p>
-          <p className="text-xs text-indigo-500">{label}</p>
-        </div>
-      </div>
+    <div className={`rounded-2xl border p-4 card-shadow ${styles.card}`}>
+      <p
+        className={`heading-font text-xs font-bold uppercase tracking-[0.18em] ${styles.label}`}
+      >
+        {label}
+      </p>
+      <p
+        className={`heading-font mt-2 text-2xl font-extrabold ${styles.value}`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -35,29 +60,21 @@ function StatCard({ label, value, icon, color }: StatCardProps) {
 export function StatsGrid({ stats, className = "" }: StatsGridProps) {
   return (
     <div className={`grid grid-cols-2 gap-3 md:grid-cols-4 ${className}`}>
+      <StatCard label="Day Streak" value={stats.reading_streak} tone="gold" />
       <StatCard
-        icon="🔥"
-        label="Day Streak"
-        value={stats.reading_streak}
-        color="bg-orange-100"
-      />
-      <StatCard
-        icon="📚"
         label="Books Read"
         value={stats.total_books_completed}
-        color="bg-blue-100"
+        tone="sky"
       />
       <StatCard
-        icon="📄"
         label="Pages Read"
         value={stats.total_pages_read.toLocaleString()}
-        color="bg-green-100"
+        tone="sage"
       />
       <StatCard
-        icon="✅"
         label="Quizzes Done"
         value={stats.total_quizzes_completed}
-        color="bg-purple-100"
+        tone="rose"
       />
     </div>
   );
@@ -74,32 +91,27 @@ export function StreakCard({
   longestStreak,
   className = "",
 }: StreakCardProps) {
-  // Generate last 7 days streak indicator
   const days = ["S", "M", "T", "W", "T", "F", "S"];
   const today = new Date().getDay();
 
   return (
     <div
-      className={`rounded-[28px] border border-white/70 bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 p-6 shadow-[0_15px_40px_rgba(251,146,60,0.2)] ${className}`}
+      className={`rounded-[28px] border border-[#D6A13A]/35 bg-[#FBF2DF]/75 p-6 card-shadow ${className}`}
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.25em] text-orange-500">
-            Reading Streak
-          </p>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-4xl font-black text-orange-600">
-              {currentStreak}
-            </span>
-            <span className="text-lg text-orange-400">
-              {currentStreak === 1 ? "day" : "days"}
-            </span>
-          </div>
+      <div>
+        <p className="heading-font text-xs font-bold uppercase tracking-[0.18em] text-[#7a5311]">
+          Reading Streak
+        </p>
+        <div className="mt-1 flex items-baseline gap-2">
+          <span className="heading-font text-4xl font-extrabold text-[#D6A13A]">
+            {currentStreak}
+          </span>
+          <span className="text-lg text-[#7a5311]">
+            {currentStreak === 1 ? "day" : "days"}
+          </span>
         </div>
-        <div className="text-4xl">🔥</div>
       </div>
 
-      {/* Week indicator */}
       <div className="mt-4 flex justify-between gap-1">
         {days.map((day, i) => {
           const isToday = i === today;
@@ -111,10 +123,10 @@ export function StreakCard({
               <div
                 className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium transition-all ${
                   isActive
-                    ? "bg-orange-400 text-white"
+                    ? "bg-[#D6A13A] text-[#241718]"
                     : isToday
-                      ? "border-2 border-dashed border-orange-300 text-orange-400"
-                      : "bg-orange-100 text-orange-300"
+                      ? "border border-dashed border-[#D6A13A] text-[#7a5311]"
+                      : "bg-white/70 text-[#9b898a]"
                 }`}
               >
                 {isActive && currentStreak > 0 ? "✓" : day}
@@ -125,7 +137,7 @@ export function StreakCard({
       </div>
 
       {longestStreak > 0 && (
-        <p className="mt-3 text-center text-xs text-orange-400">
+        <p className="mt-3 text-center text-xs text-[#7a5311]">
           Best streak: {longestStreak} days
         </p>
       )}

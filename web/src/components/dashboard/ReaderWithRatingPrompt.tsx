@@ -71,37 +71,14 @@ export function ReaderWithRatingPrompt({
     };
   }, []);
 
-  const handleConfirmFinish = useCallback(async () => {
-    setShowConfirmDialog(false);
-
-    try {
-      await markBookAsCompleted({ bookId });
-    } catch (error) {
-      console.error("Failed to mark book as completed:", error);
-    }
-
-    if (hasReviewed === false && !hasShownPrompt) {
-      setShowRatingPrompt(true);
-      setHasShownPrompt(true);
-    }
-  }, [bookId, hasReviewed, hasShownPrompt]);
-
-  const handleFinishClick = useCallback(() => {
-    setShowConfirmDialog(true);
-  }, []);
-
-  const handlePageChange = useCallback(
-    (page: number) => {
-      setCurrentPage(page);
-
+  const updateFinishButtonVisibility = useCallback(
+    (page: number, totalPages: number | null) => {
       if (finishButtonTimeoutRef.current) {
         clearTimeout(finishButtonTimeoutRef.current);
         finishButtonTimeoutRef.current = null;
       }
 
-      const progressPercent = effectiveTotalPages
-        ? (page / effectiveTotalPages) * 100
-        : 0;
+      const progressPercent = totalPages ? (page / totalPages) * 100 : 0;
       const hasReachedThreshold =
         progressPercent >= COMPLETION_THRESHOLD_PERCENT;
 
@@ -113,8 +90,35 @@ export function ReaderWithRatingPrompt({
         setShowFinishButton(false);
       }
     },
-    [effectiveTotalPages],
+    [],
   );
+
+  useEffect(() => {
+    updateFinishButtonVisibility(currentPage, effectiveTotalPages);
+  }, [currentPage, effectiveTotalPages, updateFinishButtonVisibility]);
+
+  const handleConfirmFinish = useCallback(async () => {
+    setShowConfirmDialog(false);
+
+    try {
+      await markBookAsCompleted({ bookId });
+    } catch (error) {
+      console.error("Failed to mark book as completed:", error);
+    }
+
+    if (hasReviewed !== true && !hasShownPrompt) {
+      setShowRatingPrompt(true);
+      setHasShownPrompt(true);
+    }
+  }, [bookId, hasReviewed, hasShownPrompt]);
+
+  const handleFinishClick = useCallback(() => {
+    setShowConfirmDialog(true);
+  }, []);
+
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
 
   return (
     <>

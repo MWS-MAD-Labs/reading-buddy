@@ -1,5 +1,13 @@
 "use client";
 
+import {
+  Badge,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
+
 type Challenge = {
   id: string;
   title: string;
@@ -22,47 +30,41 @@ export function WeeklyChallengeCard({ challenge }: WeeklyChallengeCardProps) {
   const isCompleted = challenge.progress >= challenge.goal;
 
   return (
-    <div className="rounded-[28px] border border-white/70 bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50 p-6 shadow-[0_20px_50px_rgba(147,118,255,0.2)]">
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <Card className="border-[#D6A13A]/35 bg-[#FBF2DF]/75" padding="cozy">
+      <CardHeader className="flex items-start justify-between gap-3 sm:flex-row">
         <div className="flex-1">
-          <div className="mb-2 inline-block rounded-full border-2 border-purple-200 bg-white px-3 py-1">
-            <p className="text-xs font-bold uppercase tracking-wider text-purple-600">
-              Weekly Challenge
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-4xl">{challenge.icon}</span>
-            <div>
-              <h3 className="text-xl font-black text-purple-900">
-                {challenge.title}
-              </h3>
-              <p className="text-sm text-purple-600">{challenge.description}</p>
-            </div>
-          </div>
+          <Badge variant="amber" size="sm" className="mb-2 bg-white">
+            Weekly Challenge
+          </Badge>
+          <CardTitle className="text-xl text-[#7E1518]">
+            {challenge.title}
+          </CardTitle>
+          <CardDescription>{challenge.description}</CardDescription>
         </div>
         {isCompleted && (
-          <div className="flex-shrink-0 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 px-3 py-1 text-xs font-black text-white shadow-md">
-            ✓ Done!
-          </div>
+          <Badge
+            variant="lime"
+            size="sm"
+            className="shrink-0 bg-[#6F8B6A] text-white"
+          >
+            Done
+          </Badge>
         )}
-      </div>
+      </CardHeader>
 
-      {/* Progress Bar */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="font-bold text-purple-700">
+          <span className="heading-font font-bold text-[#7a5311]">
             {challenge.progress} / {challenge.goal}
           </span>
-          <span className="font-semibold text-purple-500">
+          <span className="font-semibold text-[#7E1518]">
             +{challenge.xpReward} XP
           </span>
         </div>
         <div className="h-3 overflow-hidden rounded-full bg-white/80">
           <div
             className={`h-full rounded-full transition-all duration-500 ${
-              isCompleted
-                ? "bg-gradient-to-r from-green-400 to-emerald-400"
-                : "bg-gradient-to-r from-purple-400 to-fuchsia-400"
+              isCompleted ? "bg-[#6F8B6A]" : "bg-[#D6A13A]"
             }`}
             style={{ width: `${progressPercentage}%` }}
           />
@@ -70,10 +72,10 @@ export function WeeklyChallengeCard({ challenge }: WeeklyChallengeCardProps) {
       </div>
 
       {isCompleted && (
-        <p className="mt-3 text-center text-xs font-semibold text-green-600">
-          🎉 Challenge completed! XP awarded!
+        <p className="mt-3 text-center text-xs font-semibold text-[#486142]">
+          Challenge completed. XP awarded.
         </p>
       )}
-    </div>
+    </Card>
   );
 }

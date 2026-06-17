@@ -1,35 +1,64 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/auth/roleCheck";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getPendingReviews } from "@/app/(dashboard)/dashboard/library/review-actions";
+import {
+  Alert,
+  Badge,
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  buttonVariants,
+} from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { ReviewModerationList } from "./ReviewModerationList";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReviewModerationPage() {
-    await requireRole(["ADMIN", "LIBRARIAN"]);
-    const user = await getCurrentUser();
+  await requireRole(["ADMIN", "LIBRARIAN"]);
+  const user = await getCurrentUser();
 
-    if (!user?.userId) {
-        return <div>Not authenticated</div>;
-    }
+  if (!user?.userId) {
+    return <Alert variant="error">Not authenticated.</Alert>;
+  }
 
-    const { reviews } = await getPendingReviews();
+  const { reviews } = await getPendingReviews();
 
-    return (
-        <div className="space-y-6">
-            <header className="pop-in rounded-3xl border-4 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50 p-6 shadow-lg">
-                <div className="mb-2 inline-block rounded-2xl border-4 border-amber-300 bg-amber-400 px-4 py-1">
-                    <p className="text-sm font-black uppercase tracking-wide text-amber-900">
-                        Moderation
-                    </p>
-                </div>
-                <h1 className="text-3xl font-black text-amber-900">Review Moderation</h1>
-                <p className="text-base font-semibold text-amber-700">
-                    Approve or reject book reviews submitted by students.
-                </p>
-            </header>
+  return (
+    <div className="space-y-6">
+      <Card
+        variant="glow"
+        padding="spacious"
+        className="border-4 border-white/70"
+      >
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="max-w-2xl space-y-3">
+            <Badge variant="bubble" size="sm">
+              Review moderation
+            </Badge>
+            <CardTitle className="text-3xl md:text-4xl">
+              Student review queue
+            </CardTitle>
+            <CardDescription>
+              Approve thoughtful book reviews or send revision guidance before
+              reviews appear in the library.
+            </CardDescription>
+          </div>
+          <Link
+            href="/dashboard/librarian"
+            className={cn(
+              buttonVariants({ variant: "neutral", size: "md" }),
+              "no-underline",
+            )}
+          >
+            Back to Librarian
+          </Link>
+        </CardHeader>
+      </Card>
 
-            <ReviewModerationList initialReviews={reviews} />
-        </div>
-    );
+      <ReviewModerationList initialReviews={reviews} />
+    </div>
+  );
 }
