@@ -91,6 +91,7 @@ reading-buddy/
 ## 📚 Documentation
 
 Detailed guides are available in the [docs/](docs/) directory:
+- [Offline Reading Progress Synchronization](docs/features/OFFLINE_READING_PROGRESS_SYNC.md)
 - [Installation Guide](docs/self-hosted/INSTALLATION.md)
 - [Configuration Reference](docs/self-hosted/CONFIGURATION.md)
 - [Database Schema](docs/self-hosted/DATABASE.md)
