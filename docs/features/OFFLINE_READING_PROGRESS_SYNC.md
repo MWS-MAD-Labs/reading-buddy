@@ -677,12 +677,24 @@ Implementation notes:
 - My Readings cards show page totals, percentages, and a visible physical-book source label, with EPUB and unknown-page-count guidance in the dialog.
 - Focused server-action and component tests, TypeScript type-check, and changed-file ESLint validation passed. ESLint retains pre-existing warnings in the student dashboard page.
 
-### Phase 3: Completion and checkpoints
+### Phase 3: Completion and checkpoints — Complete
 
-1. Prompt for completion after a final-page save.
-2. Reuse `markBookAsCompleted()` after confirmation.
-3. Surface pending checkpoints without forced navigation.
-4. Add end-to-end coverage.
+**Completed:** 2026-08-11
+
+- [x] Prompt for completion after a final-page save.
+- [x] Reuse `markBookAsCompleted()` after confirmation.
+- [x] Surface pending checkpoints without forced navigation.
+- [x] Add end-to-end coverage.
+
+Implementation notes:
+
+- Final-page manual saves remain progress-only until the student explicitly selects **Mark as finished**.
+- Completion is transactionally idempotent, preventing duplicate completion journal entries, statistics, or rewards if confirmation is retried.
+- Manual updates query for the latest genuinely pending required checkpoint and show an optional **Start quiz** action without redirecting automatically. Quiz return navigation uses the checkpoint page rather than a later saved page.
+- The dashboard includes existing completion state so already-finished books are not prompted again.
+- Component coverage verifies both pending and absent checkpoint states, including reading past a checkpoint before starting its quiz.
+- The opt-in Playwright scenario seeds isolated data and removes dependent quiz, journal, gamification, progress, profile, book, and user records in a reverse-dependency transaction.
+- Twenty-nine focused server-action and component tests, TypeScript type-check, changed-file ESLint, `git diff --check`, and Playwright test discovery passed. The authenticated Playwright scenario is opt-in with `RUN_PROGRESS_SYNC_E2E=1` and could not be executed locally because no Compose services were running and the configured external database rejected the available credentials.
 
 ### Phase 4: Optional analytics and rewards
 
@@ -732,7 +744,9 @@ Required dialog cases:
 - confirms backward movement;
 - displays a same-page message;
 - displays an EPUB approximation warning;
-- offers completion after the final page; and
+- offers completion after the final page;
+- surfaces a pending checkpoint without forced navigation;
+- keeps checkpoint messaging hidden when no checkpoint is pending; and
 - closes or updates local card state after success.
 
 ### 16.3 End-to-end scenario
@@ -750,7 +764,7 @@ Required dialog cases:
 
 ## 17. Acceptance criteria
 
-The MVP is accepted when all of the following are true. Items completed through Phase 2 are checked; completion prompts, checkpoints, and end-to-end verification remain Phase 3 work.
+The MVP is accepted when all of the following are true. Phase 3 completion and checkpoint behavior is implemented; the environment-backed browser scenario remains to be executed where valid test database credentials are available.
 
 - [x] A signed-in student can update a book's current page from **My Readings**.
 - [x] The action derives `student_id` from the authenticated session.
@@ -763,10 +777,10 @@ The MVP is accepted when all of the following are true. Items completed through 
 - [x] Backward corrections require client confirmation and are accepted by the server.
 - [x] Manual updates do not award XP, alter streaks, or increment total pages in the MVP.
 - [x] Entering the final page does not automatically complete the book.
-- [ ] The student can explicitly mark the book complete after a prompt. _(Phase 3)_
+- [x] The student can explicitly mark the book complete after a prompt.
 - [x] Existing digital-reader progress still saves successfully.
 - [x] Digital activity calculations no longer depend on process-local cache state.
-- [ ] Dashboard, reader, and journal views show the updated page in end-to-end verification. _(Phase 3)_
+- [ ] Dashboard, reader, and journal views show the updated page in environment-backed end-to-end verification. _(Automated scenario added; execution blocked locally by unavailable test database credentials.)_
 - [x] Automated tests cover validation, source behavior, no-op behavior, backward correction, stale CFI handling, and gamification isolation.
 
 ## 18. Definition of done

@@ -67,6 +67,7 @@ export default async function StudentDashboardPage() {
       sb.started_at,
       sb.progress_percent,
       sb.progress_source,
+      sb.completed,
       b.id as book_id_ref,
       b.title,
       b.author,
@@ -88,6 +89,7 @@ export default async function StudentDashboardPage() {
     progress_percent:
       row.progress_percent === null ? null : Number(row.progress_percent),
     progress_source: row.progress_source,
+    completed: row.completed === true,
     books: {
       id: row.book_id_ref,
       title: row.title,
@@ -284,6 +286,7 @@ export default async function StudentDashboardPage() {
                             currentPage={assignment.current_page ?? 1}
                             totalPages={book.page_count}
                             fileFormat={book.file_format}
+                            isCompleted={assignment.completed}
                           />
                         </div>
                       </div>

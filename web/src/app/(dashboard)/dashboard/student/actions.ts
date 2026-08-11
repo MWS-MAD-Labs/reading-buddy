@@ -548,9 +548,9 @@ export const getPendingCheckpointForPage = async (input: {
     throw new Error("You must be signed in to check checkpoints.");
   }
 
-  // Find the latest required checkpoint at or before the current page
-  // Note: Simplified query that doesn't depend on class_quiz_assignments table
-  // TODO: Add class-based filtering once that table is available
+  // Find the latest required checkpoint at or before the current page that
+  // does not yet have a submitted attempt for this student.
+  // TODO: Add class-based filtering once class quiz assignments are required.
   const checkpointResult = await queryWithContext(
     user.userId,
     `SELECT qc.id, qc.page_number, qc.quiz_id, qc.is_required
@@ -559,9 +559,16 @@ export const getPendingCheckpointForPage = async (input: {
        AND qc.is_required = true
        AND qc.quiz_id IS NOT NULL
        AND qc.page_number <= $2
+       AND NOT EXISTS (
+         SELECT 1
+         FROM quiz_attempts qa
+         WHERE qa.quiz_id = qc.quiz_id
+           AND qa.student_id = $3
+           AND qa.score IS NOT NULL
+       )
      ORDER BY qc.page_number DESC
      LIMIT 1`,
-    [input.bookId, input.currentPage],
+    [input.bookId, input.currentPage, user.profileId],
   );
 
   if (checkpointResult.rows.length === 0) {
@@ -569,31 +576,9 @@ export const getPendingCheckpointForPage = async (input: {
   }
 
   const checkpoint = checkpointResult.rows[0] as {
-    quiz_id: number | null;
+    quiz_id: number;
     page_number: number;
   };
-
-  if (!checkpoint.quiz_id) {
-    return { checkpointRequired: false as const };
-  }
-
-  // Check if the student has already completed this checkpoint quiz
-  const attemptResult = await queryWithContext(
-    user.userId,
-    `SELECT id, score
-     FROM quiz_attempts
-     WHERE quiz_id = $1 AND student_id = $2
-     ORDER BY submitted_at DESC
-     LIMIT 1`,
-    [checkpoint.quiz_id, user.profileId],
-  );
-
-  const attempt = attemptResult.rows[0];
-  const completed = attempt && attempt.score !== null;
-
-  if (completed) {
-    return { checkpointRequired: false as const };
-  }
 
   return {
     checkpointRequired: true as const,
@@ -617,59 +602,92 @@ export const markBookAsCompleted = async (input: {
     throw new Error("You must be signed in to mark a book as completed.");
   }
 
-  // Get the book's page count
-  const bookResult = await queryWithContext(
-    user.userId,
-    `SELECT page_count FROM books WHERE id = $1`,
-    [input.bookId],
-  );
+  let book: { page_count: number | null; title: string | null };
+  let newlyCompleted = false;
 
-  if (bookResult.rows.length === 0) {
-    throw new Error("Book not found.");
-  }
-
-  const book = bookResult.rows[0];
-
-  // Update student_books to mark as completed
   try {
-    await queryWithContext(
+    const completion = await transactionWithContext(
       user.userId,
-      `INSERT INTO student_books (student_id, book_id, current_page, completed, completed_at)
-       VALUES ($1, $2, $3, true, NOW())
-       ON CONFLICT (student_id, book_id)
-       DO UPDATE SET
-         current_page = $3,
-         completed = true,
-         completed_at = NOW(),
-         updated_at = NOW()`,
-      [user.profileId, input.bookId, book.page_count ?? 1],
+      async (client) => {
+        await client.query(
+          "SELECT pg_advisory_xact_lock(hashtext($1), $2)",
+          [user.profileId, input.bookId],
+        );
+
+        const bookResult = await client.query<{
+          page_count: number | null;
+          title: string | null;
+        }>(`SELECT page_count, title FROM books WHERE id = $1`, [input.bookId]);
+        const selectedBook = bookResult.rows[0];
+
+        if (!selectedBook) {
+          throw new Error("Book not found.");
+        }
+
+        const progressResult = await client.query<{ completed: boolean }>(
+          `SELECT completed
+           FROM student_books
+           WHERE student_id = $1 AND book_id = $2
+           FOR UPDATE`,
+          [user.profileId, input.bookId],
+        );
+        const wasCompleted = progressResult.rows[0]?.completed === true;
+
+        if (!wasCompleted) {
+          await client.query(
+            `INSERT INTO student_books (
+               student_id,
+               book_id,
+               current_page,
+               completed,
+               completed_at
+             )
+             VALUES ($1, $2, $3, true, NOW())
+             ON CONFLICT (student_id, book_id)
+             DO UPDATE SET
+               current_page = $3,
+               completed = true,
+               completed_at = NOW(),
+               updated_at = NOW()`,
+            [user.profileId, input.bookId, selectedBook.page_count ?? 1],
+          );
+        }
+
+        return { book: selectedBook, newlyCompleted: !wasCompleted };
+      },
     );
+    book = completion.book;
+    newlyCompleted = completion.newlyCompleted;
   } catch (error) {
     console.error("Failed to mark book as completed:", error);
+    if (error instanceof Error && error.message === "Book not found.") {
+      throw error;
+    }
     throw new Error("Failed to mark book as completed.");
   }
 
-  // Log to journal
-  try {
-    const bookData = bookResult.rows[0];
-    await createJournalEntry({
-      entryType: "finished_book",
-      bookId: input.bookId,
-      content: `Finished reading ${bookData.title || "this book"}! 🏁`,
-      metadata: {
-        completed_at: new Date().toISOString(),
-      },
-    });
-  } catch (err) {
-    console.error("Failed to log finished_book to journal:", err);
-  }
+  let completionRewards = { newBadges: [] as Badge[], totalXpAwarded: 0 };
 
-  // Trigger book completion rewards
-  const result = await onBookCompleted(
-    user.userId,
-    user.profileId,
-    input.bookId,
-  );
+  if (newlyCompleted) {
+    try {
+      await createJournalEntry({
+        entryType: "finished_book",
+        bookId: input.bookId,
+        content: `Finished reading ${book.title || "this book"}! 🏁`,
+        metadata: {
+          completed_at: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      console.error("Failed to log finished_book to journal:", err);
+    }
+
+    completionRewards = await onBookCompleted(
+      user.userId,
+      user.profileId,
+      input.bookId,
+    );
+  }
 
   // Get updated profile for level info
   const profileResult = await queryWithContext(
@@ -680,7 +698,8 @@ export const markBookAsCompleted = async (input: {
   const profile = profileResult.rows[0];
 
   const currentLevel = profile?.level ?? 1;
-  const previousXp = (profile?.xp ?? 0) - result.totalXpAwarded;
+  const xpAwarded = completionRewards.totalXpAwarded;
+  const previousXp = (profile?.xp ?? 0) - xpAwarded;
   const previousLevel = Math.min(
     Math.floor(Math.sqrt(previousXp / 50)) + 1,
     100,
@@ -693,8 +712,8 @@ export const markBookAsCompleted = async (input: {
 
   return {
     success: true,
-    newBadges: result.newBadges,
-    xpAwarded: result.totalXpAwarded,
+    newBadges: completionRewards.newBadges,
+    xpAwarded,
     leveledUp,
     newLevel: leveledUp ? currentLevel : undefined,
   };

@@ -3,6 +3,8 @@
 import { FormEvent, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  getPendingCheckpointForPage,
+  markBookAsCompleted,
   updatePhysicalReadingProgress,
   type SaveReadingPositionResult,
 } from "@/app/(dashboard)/dashboard/student/actions";
@@ -26,6 +28,7 @@ type UpdateReadingProgressDialogProps = {
   currentPage: number;
   totalPages: number | null;
   fileFormat: string | null;
+  isCompleted?: boolean;
   onProgressUpdated?: (result: SaveReadingPositionResult) => void;
 };
 
@@ -35,6 +38,7 @@ export function UpdateReadingProgressDialog({
   currentPage,
   totalPages,
   fileFormat,
+  isCompleted = false,
   onProgressUpdated,
 }: UpdateReadingProgressDialogProps) {
   const router = useRouter();
@@ -46,12 +50,20 @@ export function UpdateReadingProgressDialog({
   const [page, setPage] = useState(String(currentPage));
   const [pendingPage, setPendingPage] = useState<number | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [completed, setCompleted] = useState(isCompleted);
+  const [showCompletionPrompt, setShowCompletionPrompt] = useState(false);
+  const [pendingCheckpoint, setPendingCheckpoint] = useState<{
+    quizId: number;
+    checkpointPage: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const reset = () => {
     setPage(String(savedPage));
     setPendingPage(null);
+    setShowCompletionPrompt(false);
+    setPendingCheckpoint(null);
     setError(null);
     setSuccess(null);
   };
@@ -101,11 +113,55 @@ export function UpdateReadingProgressDialog({
       setSavedPage(result.data.currentPage);
       setPage(String(result.data.currentPage));
       setPendingPage(null);
+      setShowCompletionPrompt(result.data.reachedFinalPage && !completed);
       onProgressUpdated?.(result.data);
       router.refresh();
+
+      try {
+        const checkpoint = await getPendingCheckpointForPage({
+          bookId,
+          currentPage: result.data.currentPage,
+        });
+        setPendingCheckpoint(
+          checkpoint.checkpointRequired
+            ? {
+                quizId: checkpoint.quizId,
+                checkpointPage: checkpoint.checkpointPage,
+              }
+            : null,
+        );
+      } catch (checkpointError) {
+        console.error("Failed to check reading checkpoint:", checkpointError);
+        setPendingCheckpoint(null);
+      }
+
       requestAnimationFrame(() => messageRef.current?.focus());
     } catch {
       setError("We could not save your progress. Please try again.");
+      requestAnimationFrame(() => messageRef.current?.focus());
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  const handleMarkCompleted = async () => {
+    setIsPending(true);
+    setError(null);
+
+    try {
+      const result = await markBookAsCompleted({ bookId });
+      if (!result.success) {
+        setError("We could not mark this book as finished. Please try again.");
+        return;
+      }
+
+      setCompleted(true);
+      setShowCompletionPrompt(false);
+      setSuccess(`${bookTitle} is marked as finished.`);
+      router.refresh();
+      requestAnimationFrame(() => messageRef.current?.focus());
+    } catch {
+      setError("We could not mark this book as finished. Please try again.");
       requestAnimationFrame(() => messageRef.current?.focus());
     } finally {
       setIsPending(false);
@@ -221,10 +277,61 @@ export function UpdateReadingProgressDialog({
               ref={messageRef}
               tabIndex={-1}
               aria-live="polite"
+              className="space-y-3"
             >
               {error && <FieldError>{error}</FieldError>}
               {success && (
                 <p className="text-sm font-bold text-[#4f704a]">{success}</p>
+              )}
+
+              {showCompletionPrompt && (
+                <div className="space-y-3 rounded-2xl border border-[#73a66b]/40 bg-[#f4fbf2] px-4 py-3">
+                  <p className="text-sm font-bold text-[#355b30]">
+                    You reached the final page. Mark this book as finished?
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="neutral"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => setShowCompletionPrompt(false)}
+                    >
+                      Not yet
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      loading={isPending}
+                      onClick={handleMarkCompleted}
+                    >
+                      Mark as finished
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {pendingCheckpoint && (
+                <div className="space-y-3 rounded-2xl border border-[#D6A13A]/40 bg-[#fff8e8] px-4 py-3">
+                  <p className="text-sm font-bold text-[#7a5311]">
+                    You reached a required reading checkpoint at page{" "}
+                    {pendingCheckpoint.checkpointPage}. Take the quiz when you are
+                    ready.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() =>
+                      router.push(
+                        `/dashboard/student/quiz/${pendingCheckpoint.quizId}?bookId=${bookId}&page=${pendingCheckpoint.checkpointPage}`,
+                      )
+                    }
+                  >
+                    Start quiz
+                  </Button>
+                </div>
               )}
             </div>
 

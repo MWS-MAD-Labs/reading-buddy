@@ -473,3 +473,121 @@ describe("updatePhysicalReadingProgress", () => {
     expect(updateReadingStreak).not.toHaveBeenCalled();
   });
 });
+
+describe("getPendingCheckpointForPage", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getCurrentUser).mockResolvedValue({
+      userId: "user-1",
+      profileId: "profile-1",
+    } as Awaited<ReturnType<typeof getCurrentUser>>);
+  });
+
+  it("queries for the latest checkpoint without a completed attempt", async () => {
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ quiz_id: 12, page_number: 50 }]),
+    );
+    const { getPendingCheckpointForPage } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await expect(
+      getPendingCheckpointForPage({ bookId: 3, currentPage: 65 }),
+    ).resolves.toEqual({
+      checkpointRequired: true,
+      quizId: 12,
+      checkpointPage: 50,
+    });
+
+    expect(queryWithContext).toHaveBeenCalledWith(
+      "user-1",
+      expect.stringContaining("NOT EXISTS"),
+      [3, 65, "profile-1"],
+    );
+    expect(queryWithContext).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("markBookAsCompleted", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getCurrentUser).mockResolvedValue({
+      userId: "user-1",
+      profileId: "profile-1",
+    } as Awaited<ReturnType<typeof getCurrentUser>>);
+    vi.mocked(onBookCompleted).mockResolvedValue({
+      newBadges: [],
+      totalXpAwarded: 25,
+    });
+    vi.mocked(createJournalEntry).mockResolvedValue({
+      id: "journal-1",
+    } as Awaited<ReturnType<typeof createJournalEntry>>);
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ level: 2, xp: 75 }]),
+    );
+  });
+
+  const mockCompletionTransaction = (completed: boolean) => {
+    const transactionQueries: Array<{ sql: string; params: unknown[] }> = [];
+    vi.mocked(transactionWithContext).mockImplementation(
+      async (_userId, callback) => {
+        const client = {
+          query: vi.fn(async (sql: string, params: unknown[] = []) => {
+            transactionQueries.push({ sql, params });
+            if (sql.includes("pg_advisory_xact_lock")) return queryResult([]);
+            if (sql.includes("SELECT page_count, title")) {
+              return queryResult([{ page_count: 100, title: "Test Book" }]);
+            }
+            if (sql.includes("SELECT completed")) {
+              return queryResult([{ completed }]);
+            }
+            return queryResult([]);
+          }),
+        } as unknown as PoolClient;
+        return callback(client);
+      },
+    );
+    return transactionQueries;
+  };
+
+  it("awards completion side effects only when the book becomes completed", async () => {
+    const transactionQueries = mockCompletionTransaction(false);
+    const { markBookAsCompleted } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await expect(markBookAsCompleted({ bookId: 7 })).resolves.toMatchObject({
+      success: true,
+      xpAwarded: 25,
+    });
+
+    expect(
+      transactionQueries.some(({ sql }) =>
+        sql.includes("INSERT INTO student_books"),
+      ),
+    ).toBe(true);
+    expect(createJournalEntry).toHaveBeenCalledTimes(1);
+    expect(onBookCompleted).toHaveBeenCalledWith("user-1", "profile-1", 7);
+  });
+
+  it("is idempotent when the book was already completed", async () => {
+    const transactionQueries = mockCompletionTransaction(true);
+    const { markBookAsCompleted } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await expect(markBookAsCompleted({ bookId: 7 })).resolves.toMatchObject({
+      success: true,
+      xpAwarded: 0,
+      newBadges: [],
+    });
+
+    expect(
+      transactionQueries.some(({ sql }) =>
+        sql.includes("INSERT INTO student_books"),
+      ),
+    ).toBe(false);
+    expect(createJournalEntry).not.toHaveBeenCalled();
+    expect(onBookCompleted).not.toHaveBeenCalled();
+  });
+});
