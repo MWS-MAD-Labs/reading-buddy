@@ -1,6 +1,6 @@
 # Offline Reading Progress Synchronization
 
-**Status:** In progress — Phase 1 complete
+**Status:** In progress — Phase 2 complete
 
 **Audience:** Product, frontend, backend, database, and QA engineers
 
@@ -658,14 +658,24 @@ Implementation notes:
 - The schema update is represented in the deploy migration, primary bootstrap schema, self-hosted schema, staging bootstrap schema, and TypeScript database types.
 - Focused server-action tests and the TypeScript type-check passed. ESLint reported no errors; the database helper retains four pre-existing `no-explicit-any` warnings.
 
-### Phase 2: Manual update action and UI
+### Phase 2: Manual update action and UI — Complete
 
-1. Add `updatePhysicalReadingProgress()`.
-2. Add server-side page validation and calculation.
-3. Add `UpdateReadingProgressDialog`.
-4. Add **Update page** to My Readings cards.
-5. Display source and total-page information.
-6. Add component tests.
+**Completed:** 2026-08-11
+
+- [x] Add `updatePhysicalReadingProgress()`.
+- [x] Add server-side page validation and calculation.
+- [x] Add `UpdateReadingProgressDialog`.
+- [x] Add **Update page** to My Readings cards.
+- [x] Display source and total-page information.
+- [x] Add component tests.
+
+Implementation notes:
+
+- Manual updates derive the student from the authenticated session, validate against catalog page counts, calculate percentages server-side, and clear stale EPUB CFI state.
+- Identical page submissions are transactionally detected and do not update `updated_at` or `last_manual_sync_at`.
+- Manual updates do not run XP, streak, badge, journal, or total-pages side effects.
+- My Readings cards show page totals, percentages, and a visible physical-book source label, with EPUB and unknown-page-count guidance in the dialog.
+- Focused server-action and component tests, TypeScript type-check, and changed-file ESLint validation passed. ESLint retains pre-existing warnings in the student dashboard page.
 
 ### Phase 3: Completion and checkpoints
 
@@ -740,24 +750,24 @@ Required dialog cases:
 
 ## 17. Acceptance criteria
 
-The MVP is accepted when all of the following are true:
+The MVP is accepted when all of the following are true. Items completed through Phase 2 are checked; completion prompts, checkpoints, and end-to-end verification remain Phase 3 work.
 
-- [ ] A signed-in student can update a book's current page from **My Readings**.
-- [ ] The action derives `student_id` from the authenticated session.
-- [ ] The server rejects invalid and out-of-range pages.
-- [ ] `student_books.current_page` remains the canonical latest position.
-- [ ] Progress percentage uses `books.page_count`, not an estimate.
-- [ ] Manual updates are identified as `manual_physical`.
-- [ ] Manual updates clear stale EPUB CFI data.
-- [ ] Same-page submissions are idempotent.
-- [ ] Backward corrections require client confirmation and are accepted by the server.
-- [ ] Manual updates do not award XP, alter streaks, or increment total pages in the MVP.
-- [ ] Entering the final page does not automatically complete the book.
-- [ ] The student can explicitly mark the book complete after a prompt.
-- [ ] Existing digital-reader progress still saves successfully.
-- [ ] Digital activity calculations no longer depend on process-local cache state.
-- [ ] Dashboard, reader, and journal views show the updated page after revalidation.
-- [ ] Automated tests cover validation, source behavior, no-op behavior, backward correction, stale CFI handling, and gamification isolation.
+- [x] A signed-in student can update a book's current page from **My Readings**.
+- [x] The action derives `student_id` from the authenticated session.
+- [x] The server rejects invalid and out-of-range pages.
+- [x] `student_books.current_page` remains the canonical latest position.
+- [x] Progress percentage uses `books.page_count`, not an estimate.
+- [x] Manual updates are identified as `manual_physical`.
+- [x] Manual updates clear stale EPUB CFI data.
+- [x] Same-page submissions are idempotent.
+- [x] Backward corrections require client confirmation and are accepted by the server.
+- [x] Manual updates do not award XP, alter streaks, or increment total pages in the MVP.
+- [x] Entering the final page does not automatically complete the book.
+- [ ] The student can explicitly mark the book complete after a prompt. _(Phase 3)_
+- [x] Existing digital-reader progress still saves successfully.
+- [x] Digital activity calculations no longer depend on process-local cache state.
+- [ ] Dashboard, reader, and journal views show the updated page in end-to-end verification. _(Phase 3)_
+- [x] Automated tests cover validation, source behavior, no-op behavior, backward correction, stale CFI handling, and gamification isolation.
 
 ## 18. Definition of done
 

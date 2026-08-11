@@ -26,6 +26,7 @@ type SaveReadingPositionInput = {
   epubCfi?: string | null;
   progressPercent?: number | null;
   source: ReadingProgressSource;
+  totalPages?: number | null;
 };
 
 export type SaveReadingPositionResult = {
@@ -39,6 +40,22 @@ export type SaveReadingPositionResult = {
   reachedFinalPage: boolean;
   isNewBook: boolean;
 };
+
+export type ManualProgressErrorCode =
+  | "UNAUTHENTICATED"
+  | "FORBIDDEN"
+  | "BOOK_NOT_FOUND"
+  | "INVALID_PAGE"
+  | "PAGE_EXCEEDS_BOOK"
+  | "SAVE_FAILED";
+
+export type ManualProgressResult =
+  | { success: true; data: SaveReadingPositionResult }
+  | {
+      success: false;
+      code: ManualProgressErrorCode;
+      message: string;
+    };
 
 type DigitalActivityResult = {
   streakUpdated: boolean;
@@ -60,14 +77,41 @@ async function saveReadingPosition(
 
     const previousResult = await client.query<{
       current_page: number;
+      progress_percent: string | number | null;
+      progress_source: ReadingProgressSource;
     }>(
-      `SELECT current_page
+      `SELECT current_page, progress_percent, progress_source
        FROM student_books
        WHERE student_id = $1 AND book_id = $2
        FOR UPDATE`,
       [user.profileId, input.bookId],
     );
-    const previousPage = previousResult.rows[0]?.current_page ?? null;
+    const previous = previousResult.rows[0];
+    const previousPage = previous?.current_page ?? null;
+
+    if (
+      input.source === "manual_physical" &&
+      previousPage === input.currentPage
+    ) {
+      return {
+        previousPage,
+        currentPage: previousPage,
+        totalPages: input.totalPages ?? null,
+        progressPercent:
+          previous?.progress_percent === null ||
+          previous?.progress_percent === undefined
+            ? null
+            : Number(previous.progress_percent),
+        source: previous?.progress_source ?? input.source,
+        changed: false,
+        movedBackward: false,
+        reachedFinalPage:
+          input.totalPages !== null &&
+          input.totalPages !== undefined &&
+          previousPage === input.totalPages,
+        isNewBook: false,
+      };
+    }
 
     const savedResult = await client.query<{
       current_page: number;
@@ -130,13 +174,16 @@ async function saveReadingPosition(
     return {
       previousPage,
       currentPage: saved?.current_page ?? input.currentPage,
-      totalPages: null,
+      totalPages: input.totalPages ?? null,
       progressPercent,
       source: input.source,
-      changed: previousPage !== input.currentPage,
+      changed: true,
       movedBackward:
         previousPage !== null && input.currentPage < previousPage,
-      reachedFinalPage: false,
+      reachedFinalPage:
+        input.totalPages !== null &&
+        input.totalPages !== undefined &&
+        input.currentPage === input.totalPages,
       isNewBook: saved?.is_new ?? previousPage === null,
     };
   });
@@ -298,6 +345,126 @@ export const recordReadingProgress = async (input: {
     success: true,
     ...activity,
   };
+};
+
+export const updatePhysicalReadingProgress = async (input: {
+  bookId: number;
+  currentPage: number;
+}): Promise<ManualProgressResult> => {
+  const user = await getCurrentUser();
+
+  if (!user || !user.userId || !user.profileId) {
+    return {
+      success: false,
+      code: "UNAUTHENTICATED",
+      message: "You must be signed in to update progress.",
+    };
+  }
+
+  if (user.role && user.role !== "STUDENT") {
+    return {
+      success: false,
+      code: "FORBIDDEN",
+      message: "Only student accounts can update reading progress.",
+    };
+  }
+
+  if (!Number.isInteger(input.bookId) || input.bookId < 1) {
+    return {
+      success: false,
+      code: "BOOK_NOT_FOUND",
+      message: "We could not find that book.",
+    };
+  }
+
+  if (
+    !Number.isFinite(input.currentPage) ||
+    !Number.isInteger(input.currentPage) ||
+    input.currentPage < 1
+  ) {
+    return {
+      success: false,
+      code: "INVALID_PAGE",
+      message: "Enter a whole page number of 1 or greater.",
+    };
+  }
+
+  let book: { id: number; page_count: number | null } | undefined;
+  try {
+    const bookResult = await queryWithContext<{
+      id: number;
+      page_count: number | null;
+    }>(
+      user.userId,
+      `SELECT id, page_count
+       FROM books
+       WHERE id = $1`,
+      [input.bookId],
+    );
+    book = bookResult.rows[0];
+  } catch (error) {
+    console.error("Failed to load book for physical progress:", error);
+    return {
+      success: false,
+      code: "SAVE_FAILED",
+      message: "We could not save your progress. Please try again.",
+    };
+  }
+
+  if (!book) {
+    return {
+      success: false,
+      code: "BOOK_NOT_FOUND",
+      message: "We could not find that book.",
+    };
+  }
+
+  const totalPages =
+    book.page_count === null || book.page_count === undefined
+      ? null
+      : Number(book.page_count);
+
+  if (totalPages !== null && input.currentPage > totalPages) {
+    return {
+      success: false,
+      code: "PAGE_EXCEEDS_BOOK",
+      message: `Enter a page between 1 and ${totalPages}.`,
+    };
+  }
+
+  const progressPercent =
+    totalPages === null
+      ? null
+      : Math.min(
+          100,
+          Number(((input.currentPage / totalPages) * 100).toFixed(2)),
+        );
+
+  try {
+    const data = await saveReadingPosition(
+      { userId: user.userId, profileId: user.profileId },
+      {
+        bookId: input.bookId,
+        currentPage: input.currentPage,
+        epubCfi: null,
+        progressPercent,
+        source: "manual_physical",
+        totalPages,
+      },
+    );
+
+    revalidatePath("/dashboard/student");
+    revalidatePath(`/dashboard/student/read/${input.bookId}`);
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("Failed to update physical reading progress:", error);
+    return {
+      success: false,
+      code: "SAVE_FAILED",
+      message: "We could not save your progress. Please try again.",
+    };
+  }
 };
 
 export const evaluateAchievements = async (

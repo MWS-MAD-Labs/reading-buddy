@@ -295,3 +295,181 @@ describe("recordReadingProgress", () => {
     ).toHaveLength(2);
   });
 });
+
+describe("updatePhysicalReadingProgress", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getCurrentUser).mockResolvedValue({
+      userId: "user-1",
+      profileId: "profile-1",
+    } as Awaited<ReturnType<typeof getCurrentUser>>);
+  });
+
+  it("rejects authenticated non-student profiles when the role is available", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue({
+      userId: "user-1",
+      profileId: "profile-1",
+      role: "TEACHER",
+    } as Awaited<ReturnType<typeof getCurrentUser>>);
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await expect(
+      updatePhysicalReadingProgress({ bookId: 1, currentPage: 5 }),
+    ).resolves.toMatchObject({ success: false, code: "FORBIDDEN" });
+    expect(queryWithContext).not.toHaveBeenCalled();
+  });
+
+  it("validates the submitted page before querying the book", async () => {
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await expect(
+      updatePhysicalReadingProgress({ bookId: 1, currentPage: 0 }),
+    ).resolves.toMatchObject({ success: false, code: "INVALID_PAGE" });
+    await expect(
+      updatePhysicalReadingProgress({ bookId: 1, currentPage: 2.5 }),
+    ).resolves.toMatchObject({ success: false, code: "INVALID_PAGE" });
+    expect(queryWithContext).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing books and pages above the catalog page count", async () => {
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    vi.mocked(queryWithContext).mockResolvedValueOnce(queryResult([]));
+    await expect(
+      updatePhysicalReadingProgress({ bookId: 404, currentPage: 1 }),
+    ).resolves.toMatchObject({ success: false, code: "BOOK_NOT_FOUND" });
+
+    vi.mocked(queryWithContext).mockResolvedValueOnce(
+      queryResult([{ id: 2, page_count: 100 }]),
+    );
+    await expect(
+      updatePhysicalReadingProgress({ bookId: 2, currentPage: 101 }),
+    ).resolves.toMatchObject({
+      success: false,
+      code: "PAGE_EXCEEDS_BOOK",
+    });
+  });
+
+  it("calculates percentage, clears EPUB position, and skips reward side effects", async () => {
+    const transactionQueries = mockProgressTransaction([20]);
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ id: 3, page_count: 80 }]),
+    );
+
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+    const result = await updatePhysicalReadingProgress({
+      bookId: 3,
+      currentPage: 30,
+    });
+
+    expect(result).toEqual({
+      success: true,
+      data: {
+        previousPage: 20,
+        currentPage: 30,
+        totalPages: 80,
+        progressPercent: 37.5,
+        source: "manual_physical",
+        changed: true,
+        movedBackward: false,
+        reachedFinalPage: false,
+        isNewBook: false,
+      },
+    });
+    const upsert = transactionQueries.find(({ sql }) =>
+      sql.includes("INSERT INTO student_books"),
+    );
+    expect(upsert?.params).toEqual([
+      "profile-1",
+      3,
+      30,
+      null,
+      37.5,
+      "manual_physical",
+    ]);
+    expect(upsert?.sql).toContain("THEN NULL");
+    expect(awardXP).not.toHaveBeenCalled();
+    expect(updateReadingStreak).not.toHaveBeenCalled();
+    expect(evaluateBadges).not.toHaveBeenCalled();
+  });
+
+  it("stores null percentage when the page count is unknown", async () => {
+    const transactionQueries = mockProgressTransaction([null]);
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ id: 4, page_count: null }]),
+    );
+
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+    const result = await updatePhysicalReadingProgress({
+      bookId: 4,
+      currentPage: 12,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      data: { progressPercent: null, isNewBook: true },
+    });
+    const upsert = transactionQueries.find(({ sql }) =>
+      sql.includes("INSERT INTO student_books"),
+    );
+    expect(upsert?.params[4]).toBeNull();
+  });
+
+  it("treats an identical page as a no-op without writing timestamps", async () => {
+    const transactionQueries = mockProgressTransaction([25]);
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ id: 5, page_count: 100 }]),
+    );
+
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+    const result = await updatePhysicalReadingProgress({
+      bookId: 5,
+      currentPage: 25,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      data: { changed: false, currentPage: 25 },
+    });
+    expect(
+      transactionQueries.some(({ sql }) =>
+        sql.includes("INSERT INTO student_books"),
+      ),
+    ).toBe(false);
+  });
+
+  it("allows backward corrections without changing historical statistics", async () => {
+    mockProgressTransaction([40]);
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ id: 6, page_count: 120 }]),
+    );
+
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+    const result = await updatePhysicalReadingProgress({
+      bookId: 6,
+      currentPage: 35,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      data: { movedBackward: true, currentPage: 35 },
+    });
+    expect(queryWithContext).toHaveBeenCalledTimes(1);
+    expect(awardXP).not.toHaveBeenCalled();
+    expect(updateReadingStreak).not.toHaveBeenCalled();
+  });
+});
