@@ -142,6 +142,8 @@ export interface ClassWithTeacher extends Class {
 // Student Books (Reading Progress)
 // ============================================================================
 
+export type ReadingProgressSource = "digital_reader" | "manual_physical";
+
 export interface StudentBook {
   id: number;
   student_id: string;
@@ -150,6 +152,8 @@ export interface StudentBook {
   current_page: number;
   epub_cfi?: string | null;
   progress_percent?: number | null;
+  progress_source: ReadingProgressSource;
+  last_manual_sync_at: string | null;
   total_pages: number | null;
   status: "not_started" | "in_progress" | "completed";
   started_at: string | null;

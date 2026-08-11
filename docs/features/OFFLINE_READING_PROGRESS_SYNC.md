@@ -1,6 +1,6 @@
 # Offline Reading Progress Synchronization
 
-**Status:** Proposed
+**Status:** In progress — Phase 1 complete
 
 **Audience:** Product, frontend, backend, database, and QA engineers
 
@@ -639,14 +639,24 @@ Potential controls include:
 
 ## 15. Implementation sequence
 
-### Phase 1: Progress foundation
+### Phase 1: Progress foundation — Complete
 
-1. Introduce `ReadingProgressSource`.
-2. Add schema fields and deploy migration.
-3. Refactor persistence to read the previous page from PostgreSQL.
-4. Remove `lastPageReadCache` as an authority for side effects.
-5. Preserve current digital reader calls and behavior.
-6. Add focused server-action tests.
+**Completed:** 2026-08-11
+
+- [x] Introduce `ReadingProgressSource`.
+- [x] Add schema fields and deploy migration.
+- [x] Refactor persistence to read the previous page from PostgreSQL.
+- [x] Remove `lastPageReadCache` as an authority for side effects.
+- [x] Preserve current digital reader calls and behavior.
+- [x] Add focused server-action tests.
+
+Implementation notes:
+
+- Digital progress saves are serialized per student/book pair with a PostgreSQL transaction-level advisory lock.
+- Page activity side effects use the previous page loaded from PostgreSQL rather than process memory.
+- Digital saves set `progress_source = 'digital_reader'` and preserve `last_manual_sync_at`.
+- The schema update is represented in the deploy migration, primary bootstrap schema, self-hosted schema, staging bootstrap schema, and TypeScript database types.
+- Focused server-action tests and the TypeScript type-check passed. ESLint reported no errors; the database helper retains four pre-existing `no-explicit-any` warnings.
 
 ### Phase 2: Manual update action and UI
 

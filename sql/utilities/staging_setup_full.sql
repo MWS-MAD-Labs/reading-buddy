@@ -216,11 +216,15 @@ CREATE TABLE student_books (
   current_page INT NOT NULL DEFAULT 1,
   epub_cfi TEXT,
   progress_percent NUMERIC(5,2),
+  progress_source VARCHAR(30) NOT NULL DEFAULT 'digital_reader',
+  last_manual_sync_at TIMESTAMPTZ,
   completed BOOLEAN NOT NULL DEFAULT FALSE,
   started_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(student_id, book_id)
+  UNIQUE(student_id, book_id),
+  CONSTRAINT student_books_progress_source_check
+    CHECK (progress_source IN ('digital_reader', 'manual_physical'))
 );
 
 -- Quizzes table

@@ -2,3 +2,4 @@
 # Add new top-level sql/migrations/*.sql files here in execution order.
 
 20260417_add_epub_progress_fields.sql
+20260811_add_manual_reading_progress_source.sql

@@ -121,7 +121,7 @@ export async function transactionWithContext<T>(
 
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL app.user_id = $1", [userId]);
+    await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
     const result = await callback(client);
     await client.query("COMMIT");
     return result;

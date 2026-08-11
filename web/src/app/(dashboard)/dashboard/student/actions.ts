@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
-import { queryWithContext } from "@/lib/db";
+import { queryWithContext, transactionWithContext } from "@/lib/db";
 import {
   updateReadingStreak,
   awardXP,
@@ -13,8 +13,227 @@ import {
 import { createJournalEntry } from "@/app/(dashboard)/dashboard/journal/journal-actions";
 import type { Badge } from "@/types/database";
 
-// Track last page read to avoid duplicate XP awards
-const lastPageReadCache = new Map<string, number>();
+export type ReadingProgressSource = "digital_reader" | "manual_physical";
+
+type AuthenticatedUser = {
+  userId: string;
+  profileId: string;
+};
+
+type SaveReadingPositionInput = {
+  bookId: number;
+  currentPage: number;
+  epubCfi?: string | null;
+  progressPercent?: number | null;
+  source: ReadingProgressSource;
+};
+
+export type SaveReadingPositionResult = {
+  previousPage: number | null;
+  currentPage: number;
+  totalPages: number | null;
+  progressPercent: number | null;
+  source: ReadingProgressSource;
+  changed: boolean;
+  movedBackward: boolean;
+  reachedFinalPage: boolean;
+  isNewBook: boolean;
+};
+
+type DigitalActivityResult = {
+  streakUpdated: boolean;
+  currentStreak: number;
+  xpAwarded: number;
+};
+
+async function saveReadingPosition(
+  user: AuthenticatedUser,
+  input: SaveReadingPositionInput,
+): Promise<SaveReadingPositionResult> {
+  return transactionWithContext(user.userId, async (client) => {
+    // Serialize saves for one student/book pair so concurrent requests cannot
+    // calculate the same page delta and duplicate activity side effects.
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtext($1), $2)",
+      [user.profileId, input.bookId],
+    );
+
+    const previousResult = await client.query<{
+      current_page: number;
+    }>(
+      `SELECT current_page
+       FROM student_books
+       WHERE student_id = $1 AND book_id = $2
+       FOR UPDATE`,
+      [user.profileId, input.bookId],
+    );
+    const previousPage = previousResult.rows[0]?.current_page ?? null;
+
+    const savedResult = await client.query<{
+      current_page: number;
+      progress_percent: string | number | null;
+      is_new: boolean;
+    }>(
+      `INSERT INTO student_books (
+         student_id,
+         book_id,
+         current_page,
+         epub_cfi,
+         progress_percent,
+         progress_source,
+         last_manual_sync_at
+       )
+       VALUES (
+         $1,
+         $2,
+         $3,
+         $4,
+         $5,
+         $6,
+         CASE WHEN $6 = 'manual_physical' THEN NOW() ELSE NULL END
+       )
+       ON CONFLICT (student_id, book_id)
+       DO UPDATE SET
+         current_page = EXCLUDED.current_page,
+         epub_cfi = CASE
+           WHEN EXCLUDED.progress_source = 'manual_physical' THEN NULL
+           ELSE COALESCE(EXCLUDED.epub_cfi, student_books.epub_cfi)
+         END,
+         progress_percent = CASE
+           WHEN EXCLUDED.progress_source = 'manual_physical'
+             THEN EXCLUDED.progress_percent
+           ELSE COALESCE(EXCLUDED.progress_percent, student_books.progress_percent)
+         END,
+         progress_source = EXCLUDED.progress_source,
+         last_manual_sync_at = CASE
+           WHEN EXCLUDED.progress_source = 'manual_physical' THEN NOW()
+           ELSE student_books.last_manual_sync_at
+         END,
+         updated_at = NOW()
+       RETURNING current_page, progress_percent, (xmax = 0) AS is_new`,
+      [
+        user.profileId,
+        input.bookId,
+        input.currentPage,
+        input.epubCfi ?? null,
+        input.progressPercent ?? null,
+        input.source,
+      ],
+    );
+
+    const saved = savedResult.rows[0];
+    const progressPercent =
+      saved?.progress_percent === null || saved?.progress_percent === undefined
+        ? null
+        : Number(saved.progress_percent);
+
+    return {
+      previousPage,
+      currentPage: saved?.current_page ?? input.currentPage,
+      totalPages: null,
+      progressPercent,
+      source: input.source,
+      changed: previousPage !== input.currentPage,
+      movedBackward:
+        previousPage !== null && input.currentPage < previousPage,
+      reachedFinalPage: false,
+      isNewBook: saved?.is_new ?? previousPage === null,
+    };
+  });
+}
+
+async function processDigitalReadingActivity(
+  user: AuthenticatedUser,
+  bookId: number,
+  result: SaveReadingPositionResult,
+): Promise<DigitalActivityResult> {
+  let xpAwarded = 0;
+  let streakResult = { currentStreak: 0, isNewStreak: false };
+  const pagesAdvanced = Math.max(
+    0,
+    result.currentPage - (result.previousPage ?? 0),
+  );
+
+  if (result.isNewBook) {
+    try {
+      await createJournalEntry({
+        entryType: "started_book",
+        bookId,
+        content: "Started reading this book! 📚",
+      });
+    } catch (err) {
+      console.error("Failed to log started_book:", err);
+    }
+  }
+
+  if (pagesAdvanced === 0) {
+    return {
+      streakUpdated: false,
+      currentStreak: 0,
+      xpAwarded: 0,
+    };
+  }
+
+  if (result.previousPage === null || result.currentPage % 5 === 0) {
+    try {
+      await createJournalEntry({
+        entryType: "reading_session",
+        bookId,
+        pageRangeStart: result.previousPage ?? 1,
+        pageRangeEnd: result.currentPage,
+        content: `Read up to page ${result.currentPage} 📖`,
+      });
+    } catch (err) {
+      console.error("Failed to log reading_session:", err);
+    }
+  }
+
+  try {
+    streakResult = await updateReadingStreak(user.userId, user.profileId);
+  } catch (err) {
+    console.error("Failed to update streak:", err);
+  }
+
+  try {
+    const pageXp = pagesAdvanced * XP_REWARDS.PAGE_READ;
+    await awardXP(
+      user.userId,
+      user.profileId,
+      pageXp,
+      "page_read",
+      `${bookId}-${result.currentPage}`,
+      `Read ${pagesAdvanced} page(s)`,
+    );
+    xpAwarded += pageXp;
+
+    const profileResult = await queryWithContext(
+      user.userId,
+      `SELECT total_pages_read FROM profiles WHERE id = $1`,
+      [user.profileId],
+    );
+    const profile = profileResult.rows[0];
+
+    await queryWithContext(
+      user.userId,
+      `UPDATE profiles SET total_pages_read = $1 WHERE id = $2`,
+      [(profile?.total_pages_read ?? 0) + pagesAdvanced, user.profileId],
+    );
+  } catch (err) {
+    console.error("Failed to award page XP:", err);
+  }
+
+  try {
+    await evaluateBadges(user.userId, user.profileId, { bookId });
+  } catch (err) {
+    console.error("Failed to evaluate badges:", err);
+  }
+
+  return {
+    streakUpdated: streakResult.isNewStreak,
+    currentStreak: streakResult.currentStreak,
+    xpAwarded,
+  };
+}
 
 export const recordReadingProgress = async (input: {
   bookId: number;
@@ -33,138 +252,43 @@ export const recordReadingProgress = async (input: {
     throw new Error("You must be signed in to save progress.");
   }
 
-  const cacheKey = `${user.profileId}-${input.bookId}`;
-  const lastPage = lastPageReadCache.get(cacheKey) ?? 0;
+  const authenticatedUser: AuthenticatedUser = {
+    userId: user.userId,
+    profileId: user.profileId,
+  };
+  const resolvedPage =
+    typeof input.currentPage === "number" && input.currentPage > 0
+      ? input.currentPage
+      : 1;
 
   console.log("📖 Recording progress:", {
     student_id: user.profileId,
     book_id: input.bookId,
-    current_page: input.currentPage,
+    current_page: resolvedPage,
     epub_cfi: input.epubCfi,
     progress_percent: input.progressPercent,
+    source: "digital_reader",
   });
 
+  let savedPosition: SaveReadingPositionResult;
   try {
-    const resolvedPage =
-      typeof input.currentPage === "number" && input.currentPage > 0
-        ? input.currentPage
-        : 1;
-
-    const result = await queryWithContext(
-      user.userId,
-      `INSERT INTO student_books (
-         student_id,
-         book_id,
-         current_page,
-         epub_cfi,
-         progress_percent
-       )
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (student_id, book_id)
-       DO UPDATE SET
-         current_page = COALESCE($3, student_books.current_page),
-         epub_cfi = COALESCE($4, student_books.epub_cfi),
-         progress_percent = COALESCE($5, student_books.progress_percent),
-         updated_at = NOW()
-       RETURNING *, (xmax = 0) AS is_new`,
-      [
-        user.profileId,
-        input.bookId,
-        resolvedPage,
-        input.epubCfi ?? null,
-        input.progressPercent ?? null,
-      ],
-    );
-
-    const isNew = result.rows[0]?.is_new;
-
-    if (isNew) {
-      // Log started_book
-      try {
-        await createJournalEntry({
-          entryType: "started_book",
-          bookId: input.bookId,
-          content: "Started reading this book! 📚",
-        });
-      } catch (err) {
-        console.error("Failed to log started_book:", err);
-      }
-    }
+    savedPosition = await saveReadingPosition(authenticatedUser, {
+      bookId: input.bookId,
+      currentPage: resolvedPage,
+      epubCfi: input.epubCfi,
+      progressPercent: input.progressPercent,
+      source: "digital_reader",
+    });
   } catch (error) {
     console.error("❌ Failed to save progress:", error);
     throw error;
   }
 
-  let xpAwarded = 0;
-  let streakResult = { currentStreak: 0, isNewStreak: false };
-
-  // Award XP for new pages read (avoid duplicates)
-  if ((input.currentPage ?? 0) > lastPage) {
-    const newPagesRead = (input.currentPage ?? 0) - lastPage;
-
-    // Log reading session periodically (every 5 pages or first page read)
-    if (lastPage === 0 || (input.currentPage ?? 0) % 5 === 0) {
-      try {
-        await createJournalEntry({
-          entryType: "reading_session",
-          bookId: input.bookId,
-          pageRangeStart: lastPage === 0 ? 1 : lastPage,
-          pageRangeEnd: input.currentPage ?? 0,
-          content: `Read up to page ${input.currentPage ?? 0} 📖`,
-        });
-      } catch (err) {
-        console.error("Failed to log reading_session:", err);
-      }
-    }
-
-    // Update streak (once per day)
-    try {
-      streakResult = await updateReadingStreak(user.userId, user.profileId);
-    } catch (err) {
-      console.error("Failed to update streak:", err);
-    }
-
-    // Award page XP
-    try {
-      const pageXp = newPagesRead * XP_REWARDS.PAGE_READ;
-      await awardXP(
-        user.userId,
-        user.profileId,
-        pageXp,
-        "page_read",
-        `${input.bookId}-${input.currentPage ?? 0}`,
-        `Read ${newPagesRead} page(s)`,
-      );
-      xpAwarded += pageXp;
-
-      // Update total pages read
-      const profileResult = await queryWithContext(
-        user.userId,
-        `SELECT total_pages_read FROM profiles WHERE id = $1`,
-        [user.profileId],
-      );
-      const profile = profileResult.rows[0];
-
-      await queryWithContext(
-        user.userId,
-        `UPDATE profiles SET total_pages_read = $1 WHERE id = $2`,
-        [(profile?.total_pages_read ?? 0) + newPagesRead, user.profileId],
-      );
-    } catch (err) {
-      console.error("Failed to award page XP:", err);
-    }
-
-    // Evaluate page-based badges
-    try {
-      await evaluateBadges(user.userId, user.profileId, {
-        bookId: input.bookId,
-      });
-    } catch (err) {
-      console.error("Failed to evaluate badges:", err);
-    }
-
-    lastPageReadCache.set(cacheKey, input.currentPage ?? 0);
-  }
+  const activity = await processDigitalReadingActivity(
+    authenticatedUser,
+    input.bookId,
+    savedPosition,
+  );
 
   console.log("✅ Progress saved successfully");
   revalidatePath("/dashboard/student");
@@ -172,9 +296,7 @@ export const recordReadingProgress = async (input: {
 
   return {
     success: true,
-    streakUpdated: streakResult.isNewStreak,
-    currentStreak: streakResult.currentStreak,
-    xpAwarded,
+    ...activity,
   };
 };
 
