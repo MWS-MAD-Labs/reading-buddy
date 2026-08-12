@@ -4,3 +4,4 @@
 20260417_add_epub_progress_fields.sql
 20260811_add_manual_reading_progress_source.sql
 20260811_add_reading_progress_events.sql
+20260812_tighten_book_review_update_policies.sql

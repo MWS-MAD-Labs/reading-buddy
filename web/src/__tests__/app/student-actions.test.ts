@@ -155,12 +155,7 @@ describe("recordReadingProgress", () => {
 
   it("writes digital position fields and source in one transaction", async () => {
     const transactionQueries = mockProgressTransaction([10]);
-    vi.mocked(queryWithContext).mockImplementation(async (_userId, sql) => {
-      if (sql.includes("SELECT total_pages_read FROM profiles")) {
-        return queryResult([{ total_pages_read: 20 }]);
-      }
-      return queryResult([]);
-    });
+    vi.mocked(queryWithContext).mockResolvedValue(queryResult([]));
 
     const { recordReadingProgress } = await import(
       "@/app/(dashboard)/dashboard/student/actions"
@@ -181,6 +176,7 @@ describe("recordReadingProgress", () => {
       sql.includes("INSERT INTO student_books"),
     );
     expect(upsert?.sql).toContain("progress_source");
+    expect(upsert?.sql).toContain("$6::VARCHAR(30)");
     expect(upsert?.sql).toContain("last_manual_sync_at");
     expect(upsert?.params).toEqual([
       "profile-1",
@@ -219,12 +215,7 @@ describe("recordReadingProgress", () => {
 
   it("calculates digital activity from the previous page in PostgreSQL", async () => {
     mockProgressTransaction([8]);
-    vi.mocked(queryWithContext).mockImplementation(async (_userId, sql) => {
-      if (sql.includes("SELECT total_pages_read FROM profiles")) {
-        return queryResult([{ total_pages_read: 30 }]);
-      }
-      return queryResult([]);
-    });
+    vi.mocked(queryWithContext).mockResolvedValue(queryResult([]));
 
     const { recordReadingProgress } = await import(
       "@/app/(dashboard)/dashboard/student/actions"
@@ -245,8 +236,10 @@ describe("recordReadingProgress", () => {
     );
     expect(queryWithContext).toHaveBeenCalledWith(
       "user-1",
-      "UPDATE profiles SET total_pages_read = $1 WHERE id = $2",
-      [33, "profile-1"],
+      expect.stringContaining(
+        "SET total_pages_read = COALESCE(total_pages_read, 0) + $1",
+      ),
+      [3, "profile-1"],
     );
     expect(result.xpAwarded).toBe(3);
   });
@@ -275,12 +268,7 @@ describe("recordReadingProgress", () => {
 
   it("serializes saves and awards only the database-backed page deltas", async () => {
     const transactionQueries = mockProgressTransaction([10, 12]);
-    vi.mocked(queryWithContext).mockImplementation(async (_userId, sql) => {
-      if (sql.includes("SELECT total_pages_read FROM profiles")) {
-        return queryResult([{ total_pages_read: 0 }]);
-      }
-      return queryResult([]);
-    });
+    vi.mocked(queryWithContext).mockResolvedValue(queryResult([]));
 
     const { recordReadingProgress } = await import(
       "@/app/(dashboard)/dashboard/student/actions"
@@ -312,6 +300,20 @@ describe("recordReadingProgress", () => {
         sql.includes("pg_advisory_xact_lock"),
       ),
     ).toHaveLength(2);
+    expect(queryWithContext).toHaveBeenCalledWith(
+      "user-1",
+      expect.stringContaining(
+        "SET total_pages_read = COALESCE(total_pages_read, 0) + $1",
+      ),
+      [2, "profile-1"],
+    );
+    expect(queryWithContext).toHaveBeenCalledWith(
+      "user-1",
+      expect.stringContaining(
+        "SET total_pages_read = COALESCE(total_pages_read, 0) + $1",
+      ),
+      [3, "profile-1"],
+    );
   });
 });
 

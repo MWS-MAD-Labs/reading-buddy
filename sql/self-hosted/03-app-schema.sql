@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS books (
   page_images_prefix TEXT,
   page_images_count INT,
   page_images_rendered_at TIMESTAMPTZ,
+  is_picture_book BOOLEAN NOT NULL DEFAULT FALSE,
   -- Multi-format support
   file_format VARCHAR(20) DEFAULT 'pdf',
   original_file_url TEXT,
@@ -153,6 +154,66 @@ CREATE TABLE IF NOT EXISTS student_books (
   CONSTRAINT student_books_unique UNIQUE(student_id, book_id),
   CONSTRAINT student_books_progress_source_check
     CHECK (progress_source IN ('digital_reader', 'manual_physical'))
+);
+
+-- Reading journal entries
+CREATE TABLE IF NOT EXISTS journal_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  entry_type VARCHAR(50) NOT NULL,
+  content TEXT,
+  book_id INTEGER REFERENCES books(id) ON DELETE SET NULL,
+  page_number INTEGER,
+  page_range_start INTEGER,
+  page_range_end INTEGER,
+  reading_duration_minutes INTEGER,
+  metadata JSONB DEFAULT '{}',
+  is_private BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT journal_entries_type_check CHECK (
+    entry_type IN ('note', 'reading_session', 'achievement', 'quote', 'question', 'started_book', 'finished_book')
+  )
+);
+
+CREATE TABLE IF NOT EXISTS book_journals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  personal_rating INTEGER CHECK (personal_rating BETWEEN 1 AND 5),
+  review_text TEXT,
+  favorite_quote TEXT,
+  favorite_quote_page INTEGER,
+  reading_goal_pages INTEGER,
+  notes_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT book_journals_student_book_unique UNIQUE(student_id, book_id)
+);
+
+-- Book reviews and helpful votes
+CREATE TABLE IF NOT EXISTS book_reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT NOT NULL CHECK (char_length(comment) >= 10),
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  rejection_feedback TEXT,
+  moderated_by UUID REFERENCES profiles(id),
+  moderated_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT book_reviews_student_book_unique UNIQUE(book_id, student_id),
+  CONSTRAINT book_reviews_status_check CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED'))
+);
+
+CREATE TABLE IF NOT EXISTS review_votes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  review_id UUID NOT NULL REFERENCES book_reviews(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT review_votes_review_user_unique UNIQUE(review_id, user_id)
 );
 
 -- Append-only reading progress history
@@ -366,6 +427,18 @@ CREATE INDEX IF NOT EXISTS idx_student_books_student ON student_books(student_id
 CREATE INDEX IF NOT EXISTS idx_student_books_book ON student_books(book_id);
 
 -- Reading progress event indexes
+CREATE INDEX IF NOT EXISTS idx_journal_entries_student ON journal_entries(student_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_journal_entries_book ON journal_entries(book_id, student_id);
+CREATE INDEX IF NOT EXISTS idx_journal_entries_type ON journal_entries(entry_type);
+CREATE INDEX IF NOT EXISTS idx_book_journals_student ON book_journals(student_id);
+CREATE INDEX IF NOT EXISTS idx_book_journals_book ON book_journals(book_id);
+
+CREATE INDEX IF NOT EXISTS idx_book_reviews_book ON book_reviews(book_id);
+CREATE INDEX IF NOT EXISTS idx_book_reviews_status ON book_reviews(status);
+CREATE INDEX IF NOT EXISTS idx_book_reviews_pending ON book_reviews(status) WHERE status = 'PENDING';
+CREATE INDEX IF NOT EXISTS idx_book_reviews_student ON book_reviews(student_id);
+CREATE INDEX IF NOT EXISTS idx_review_votes_review ON review_votes(review_id);
+
 CREATE INDEX IF NOT EXISTS idx_reading_progress_events_student_created ON reading_progress_events(student_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reading_progress_events_book_created ON reading_progress_events(book_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reading_progress_events_manual_daily_rewards ON reading_progress_events(student_id, created_at) WHERE source = 'manual_physical' AND rewarded_pages > 0;

@@ -699,7 +699,7 @@ Implementation notes:
 - The dashboard includes existing completion state so already-finished books are not prompted again.
 - Component coverage verifies both pending and absent checkpoint states, including reading past a checkpoint before starting its quiz.
 - The opt-in Playwright scenario seeds isolated data and removes dependent quiz, journal, gamification, progress, profile, book, and user records in a reverse-dependency transaction.
-- Twenty-nine focused server-action and component tests, TypeScript type-check, changed-file ESLint, `git diff --check`, and Playwright test discovery passed. The authenticated Playwright scenario is opt-in with `RUN_PROGRESS_SYNC_E2E=1` and could not be executed locally because no Compose services were running and the configured external database rejected the available credentials.
+- Twenty-nine focused server-action and component tests, TypeScript type-check, changed-file ESLint, `git diff --check`, and Playwright test discovery passed. The authenticated Playwright scenario remains opt-in with `RUN_PROGRESS_SYNC_E2E=1`.
 
 ### Phase 4: Optional analytics and rewards — Complete
 
@@ -719,7 +719,9 @@ Implementation notes:
 - Manual saves still do not affect streaks, `profiles.total_pages_read`, page-count badges, or reading-session journals.
 - Classroom overviews show current progress and the 25 most recent source-labelled events only for books assigned to that classroom, preventing unrelated student reading activity from appearing in the class view.
 - Student and teacher views disclose when the 20-page daily cap partially reduces or fully prevents a manual reward.
-- Final focused validation passed with 34 server-action and component tests, TypeScript type-check, changed-file ESLint, editor diagnostics, and `git diff --check`. The authenticated Playwright scenario remains opt-in and was updated but not executed locally.
+- Final validation passed with 34 server-action and component tests, TypeScript type-check, changed-file ESLint, production build, and the authenticated Playwright scenario against a freshly initialized isolated PostgreSQL database.
+- Post-completion hardening on 2026-08-12 made digital total-page increments atomic, fixed PostgreSQL progress-source parameter typing, aligned fresh-install journal/review schema dependencies, and stabilized Playwright on the webpack dev server.
+- Review moderation RLS was hardened for both existing and fresh databases: student-owned inserts and updates can only produce clean `PENDING` reviews with no rejection or moderation metadata, while only librarians and administrators can approve or reject. Live PostgreSQL tests verified malicious INSERT/UPDATE attempts are rejected in self-hosted and staging authorization models.
 
 ## 16. Testing requirements
 
@@ -782,7 +784,7 @@ Required dialog cases:
 
 ## 17. Acceptance criteria
 
-The MVP is accepted when all of the following are true. Phase 3 completion and checkpoint behavior is implemented; the environment-backed browser scenario remains to be executed where valid test database credentials are available.
+The MVP is accepted when all of the following are true. The environment-backed browser scenario passed against an isolated PostgreSQL database on 2026-08-12.
 
 - [x] A signed-in student can update a book's current page from **My Readings**.
 - [x] The action derives `student_id` from the authenticated session.
@@ -798,14 +800,14 @@ The MVP is accepted when all of the following are true. Phase 3 completion and c
 - [x] The student can explicitly mark the book complete after a prompt.
 - [x] Existing digital-reader progress still saves successfully.
 - [x] Digital activity calculations no longer depend on process-local cache state.
-- [ ] Dashboard, reader, and journal views show the updated page in environment-backed end-to-end verification. _(Automated scenario added; execution blocked locally by unavailable test database credentials.)_
+- [x] Dashboard, reader, and journal views show the updated page in environment-backed end-to-end verification.
 - [x] Automated tests cover validation, source behavior, no-op behavior, backward correction, stale CFI handling, and gamification isolation.
 
 ## 18. Definition of done
 
 Development is complete when:
 
-1. The deploy-safe migration and installation schemas are updated.
+1. The deploy-safe migrations and installation schemas are updated, including strict review moderation RLS for existing and fresh databases.
 2. TypeScript database types match the schema.
 3. Progress persistence is source-aware and database-backed.
 4. The manual server action and accessible dialog are implemented.

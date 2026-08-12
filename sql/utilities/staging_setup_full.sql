@@ -149,6 +149,7 @@ CREATE TABLE books (
   page_images_prefix TEXT,
   page_images_count INT,
   page_images_rendered_at TIMESTAMPTZ,
+  is_picture_book BOOLEAN NOT NULL DEFAULT FALSE,
   file_format VARCHAR(20) DEFAULT 'pdf',
   original_file_url TEXT,
   file_size_bytes BIGINT,
@@ -227,7 +228,67 @@ CREATE TABLE student_books (
     CHECK (progress_source IN ('digital_reader', 'manual_physical'))
 );
 
--- Quizzes table
+-- Reading journal entries
+CREATE TABLE journal_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  entry_type VARCHAR(50) NOT NULL,
+  content TEXT,
+  book_id INTEGER REFERENCES books(id) ON DELETE SET NULL,
+  page_number INTEGER,
+  page_range_start INTEGER,
+  page_range_end INTEGER,
+  reading_duration_minutes INTEGER,
+  metadata JSONB DEFAULT '{}',
+  is_private BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT journal_entries_type_check CHECK (
+    entry_type IN ('note', 'reading_session', 'achievement', 'quote', 'question', 'started_book', 'finished_book')
+  )
+);
+
+CREATE TABLE book_journals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  personal_rating INTEGER CHECK (personal_rating BETWEEN 1 AND 5),
+  review_text TEXT,
+  favorite_quote TEXT,
+  favorite_quote_page INTEGER,
+  reading_goal_pages INTEGER,
+  notes_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(student_id, book_id)
+);
+
+-- Book reviews and helpful votes
+CREATE TABLE book_reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT NOT NULL CHECK (char_length(comment) >= 10),
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  rejection_feedback TEXT,
+  moderated_by UUID REFERENCES profiles(id),
+  moderated_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(book_id, student_id),
+  CONSTRAINT book_reviews_status_check CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED'))
+);
+
+CREATE TABLE review_votes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  review_id UUID NOT NULL REFERENCES book_reviews(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(review_id, user_id)
+);
+
+-- Reading progress history
 CREATE TABLE reading_progress_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -386,6 +447,16 @@ CREATE TABLE weekly_challenge_completions (
 CREATE INDEX idx_books_text_extracted ON books(text_extracted_at) WHERE text_extracted_at IS NOT NULL;
 CREATE INDEX idx_books_extraction_failed ON books(text_extraction_error) WHERE text_extraction_error IS NOT NULL;
 CREATE INDEX idx_books_file_format ON books(file_format);
+CREATE INDEX idx_journal_entries_student ON journal_entries(student_id, created_at DESC);
+CREATE INDEX idx_journal_entries_book ON journal_entries(book_id, student_id);
+CREATE INDEX idx_journal_entries_type ON journal_entries(entry_type);
+CREATE INDEX idx_book_journals_student ON book_journals(student_id);
+CREATE INDEX idx_book_journals_book ON book_journals(book_id);
+CREATE INDEX idx_book_reviews_book ON book_reviews(book_id);
+CREATE INDEX idx_book_reviews_status ON book_reviews(status);
+CREATE INDEX idx_book_reviews_pending ON book_reviews(status) WHERE status = 'PENDING';
+CREATE INDEX idx_book_reviews_student ON book_reviews(student_id);
+CREATE INDEX idx_review_votes_review ON review_votes(review_id);
 CREATE INDEX idx_reading_progress_events_student_created ON reading_progress_events(student_id, created_at DESC);
 CREATE INDEX idx_reading_progress_events_book_created ON reading_progress_events(book_id, created_at DESC);
 CREATE INDEX idx_reading_progress_events_manual_daily_rewards ON reading_progress_events(student_id, created_at) WHERE source = 'manual_physical' AND rewarded_pages > 0;
@@ -540,6 +611,18 @@ CREATE TRIGGER update_student_books_updated_at
   BEFORE UPDATE ON student_books
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_journal_entries_updated_at
+  BEFORE UPDATE ON journal_entries
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_book_journals_updated_at
+  BEFORE UPDATE ON book_journals
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_book_reviews_updated_at
+  BEFORE UPDATE ON book_reviews
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- RLS (Enable but skip complex policies for brevity in this manual script - mostly)
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE books ENABLE ROW LEVEL SECURITY;
@@ -549,6 +632,10 @@ ALTER TABLE class_students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE class_books ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_render_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE student_books ENABLE ROW LEVEL SECURITY;
+ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE book_journals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE book_reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quiz_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
@@ -563,6 +650,114 @@ ALTER TABLE weekly_challenge_completions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public profiles are viewable by everyone." ON profiles FOR SELECT USING (true);
 CREATE POLICY "Users can insert their own profile." ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 CREATE POLICY "Users can update their own profile." ON profiles FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can view their own journal entries"
+  ON journal_entries FOR SELECT
+  USING (student_id = auth.uid());
+
+CREATE POLICY "Staff can view public journal entries"
+  ON journal_entries FOR SELECT
+  USING (
+    is_private = FALSE
+    AND EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('TEACHER', 'LIBRARIAN', 'ADMIN')
+    )
+  );
+
+CREATE POLICY "Users can create their own journal entries"
+  ON journal_entries FOR INSERT
+  WITH CHECK (student_id = auth.uid());
+
+CREATE POLICY "Users can update their own journal entries"
+  ON journal_entries FOR UPDATE
+  USING (student_id = auth.uid())
+  WITH CHECK (student_id = auth.uid());
+
+CREATE POLICY "Users can delete their own journal entries"
+  ON journal_entries FOR DELETE
+  USING (student_id = auth.uid());
+
+CREATE POLICY "Users can view their own book journals"
+  ON book_journals FOR SELECT
+  USING (student_id = auth.uid());
+
+CREATE POLICY "Users can create their own book journals"
+  ON book_journals FOR INSERT
+  WITH CHECK (student_id = auth.uid());
+
+CREATE POLICY "Users can update their own book journals"
+  ON book_journals FOR UPDATE
+  USING (student_id = auth.uid())
+  WITH CHECK (student_id = auth.uid());
+
+CREATE POLICY "Users can delete their own book journals"
+  ON book_journals FOR DELETE
+  USING (student_id = auth.uid());
+
+CREATE POLICY "Users can view approved or own reviews"
+  ON book_reviews FOR SELECT
+  USING (status = 'APPROVED' OR student_id = auth.uid());
+
+CREATE POLICY "Moderators can view all reviews"
+  ON book_reviews FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('LIBRARIAN', 'ADMIN')
+    )
+  );
+
+CREATE POLICY "Users can create their own reviews"
+  ON book_reviews FOR INSERT
+  WITH CHECK (
+    student_id = auth.uid()
+    AND status = 'PENDING'
+    AND rejection_feedback IS NULL
+    AND moderated_by IS NULL
+    AND moderated_at IS NULL
+  );
+
+CREATE POLICY "Users can update their own unmoderated reviews"
+  ON book_reviews FOR UPDATE
+  USING (
+    student_id = auth.uid()
+    AND status IN ('PENDING', 'REJECTED')
+  )
+  WITH CHECK (
+    student_id = auth.uid()
+    AND status = 'PENDING'
+    AND rejection_feedback IS NULL
+    AND moderated_by IS NULL
+    AND moderated_at IS NULL
+  );
+
+CREATE POLICY "Moderators can update reviews"
+  ON book_reviews FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('LIBRARIAN', 'ADMIN')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role IN ('LIBRARIAN', 'ADMIN')
+    )
+  );
+
+CREATE POLICY "Authenticated users can view review votes"
+  ON review_votes FOR SELECT
+  USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Users can create their own review votes"
+  ON review_votes FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can delete their own review votes"
+  ON review_votes FOR DELETE
+  USING (user_id = auth.uid());
 
 -- PART D: POST-SETUP FIXES (Self-Housing adjustments)
 -- ----------------------------------------------------------------------------

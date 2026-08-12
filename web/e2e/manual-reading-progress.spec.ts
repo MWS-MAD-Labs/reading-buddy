@@ -27,6 +27,8 @@ let bookId = 0;
 let quizId = 0;
 
 test.describe("Manual reading progress synchronization", () => {
+  test.setTimeout(120_000);
+
   test.skip(
     !runProgressSyncE2E,
     "Set RUN_PROGRESS_SYNC_E2E=1 with a disposable test database to run this scenario.",

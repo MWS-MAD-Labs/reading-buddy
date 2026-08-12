@@ -144,8 +144,8 @@ async function saveReadingPosition(
          $3,
          $4,
          $5,
-         $6,
-         CASE WHEN $6 = 'manual_physical' THEN NOW() ELSE NULL END
+         $6::VARCHAR(30),
+         CASE WHEN $6::VARCHAR(30) = 'manual_physical' THEN NOW() ELSE NULL END
        )
        ON CONFLICT (student_id, book_id)
        DO UPDATE SET
@@ -393,17 +393,12 @@ async function processDigitalReadingActivity(
     );
     xpAwarded += pageXp;
 
-    const profileResult = await queryWithContext(
-      user.userId,
-      `SELECT total_pages_read FROM profiles WHERE id = $1`,
-      [user.profileId],
-    );
-    const profile = profileResult.rows[0];
-
     await queryWithContext(
       user.userId,
-      `UPDATE profiles SET total_pages_read = $1 WHERE id = $2`,
-      [(profile?.total_pages_read ?? 0) + pagesAdvanced, user.profileId],
+      `UPDATE profiles
+       SET total_pages_read = COALESCE(total_pages_read, 0) + $1
+       WHERE id = $2`,
+      [pagesAdvanced, user.profileId],
     );
   } catch (err) {
     console.error("Failed to award page XP:", err);

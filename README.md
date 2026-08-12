@@ -15,7 +15,7 @@ Reading Buddy transforms traditional school libraries into interactive digital l
 
 ### For Students 🎓
 - **Interactive Reader:** 3D flip-book experience for PDFs and native EPUB rendering.
-- **Progress Tracking:** Automatic bookmarking and reading statistics.
+- **Progress Tracking:** Automatic digital bookmarks plus validated physical-book page updates that synchronize across the dashboard, reader, and journal.
 - **Gamification:** Earn XP, level up, and unlock 30+ achievement badges.
 - **Challenges:** Weekly reading goals and global leaderboards.
 
