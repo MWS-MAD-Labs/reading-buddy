@@ -44,6 +44,7 @@ ALTER TABLE class_students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE class_books ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_render_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE student_books ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reading_progress_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quiz_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
@@ -409,6 +410,22 @@ CREATE POLICY "student_badges_select_all_admin"
 CREATE POLICY "student_badges_insert_system"
   ON student_badges FOR INSERT
   WITH CHECK (true); -- System can award badges
+
+-- ============================================================================
+-- READING PROGRESS EVENT POLICIES
+-- ============================================================================
+
+CREATE POLICY "reading_progress_events_select_own"
+  ON reading_progress_events FOR SELECT
+  USING (student_id = get_current_profile_id());
+
+CREATE POLICY "reading_progress_events_select_staff"
+  ON reading_progress_events FOR SELECT
+  USING (get_current_user_role() IN ('TEACHER', 'LIBRARIAN', 'ADMIN'));
+
+CREATE POLICY "reading_progress_events_insert_own"
+  ON reading_progress_events FOR INSERT
+  WITH CHECK (student_id = get_current_profile_id());
 
 -- ============================================================================
 -- XP TRANSACTIONS POLICIES

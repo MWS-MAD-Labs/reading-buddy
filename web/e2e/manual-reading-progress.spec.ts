@@ -167,6 +167,10 @@ test.describe("Manual reading progress synchronization", () => {
         await client.query("DELETE FROM xp_transactions WHERE student_id = $1", [
           profileId,
         ]);
+        await client.query(
+          "DELETE FROM reading_progress_events WHERE student_id = $1",
+          [profileId],
+        );
         await client.query("DELETE FROM student_books WHERE student_id = $1", [
           profileId,
         ]);
@@ -198,7 +202,7 @@ test.describe("Manual reading progress synchronization", () => {
     }
   });
 
-  test("updates all views without rewards, supports corrections, and completes explicitly", async ({
+  test("updates all views with capped rewards, supports corrections, and completes explicitly", async ({
     page,
   }) => {
     await loginWithCredentials(page, testEmail, testPassword);
@@ -212,7 +216,8 @@ test.describe("Manual reading progress synchronization", () => {
     await page.getByRole("spinbutton", { name: "Page" }).fill("35");
     await page.getByRole("button", { name: "Save progress" }).click();
 
-    await expect(page.getByText("Progress updated to page 35.")).toBeVisible();
+    await expect(page.getByText(/Progress updated to page 35\./)).toBeVisible();
+    await expect(page.getByText(/earned 15 XP for 15 new physical-reading pages/i)).toBeVisible();
     await expect(
       page.getByText(/required reading checkpoint at page 35/i),
     ).toBeVisible();
@@ -252,10 +257,32 @@ test.describe("Manual reading progress synchronization", () => {
       [profileId],
     );
     expect(unchangedActivity.rows[0]).toMatchObject({
-      xp: 40,
+      xp: 55,
       reading_streak: 2,
       total_pages_read: 17,
       journal_count: "0",
+    });
+
+    const firstEvent = await pool.query<{
+      source: string;
+      previous_page: number;
+      current_page: number;
+      rewarded_pages: number;
+      xp_awarded: number;
+    }>(
+      `SELECT source, previous_page, current_page, rewarded_pages, xp_awarded
+       FROM reading_progress_events
+       WHERE student_id = $1 AND book_id = $2
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [profileId, bookId],
+    );
+    expect(firstEvent.rows[0]).toEqual({
+      source: "manual_physical",
+      previous_page: 20,
+      current_page: 35,
+      rewarded_pages: 15,
+      xp_awarded: 15,
     });
 
     await page.goto("/dashboard/student");
@@ -284,7 +311,7 @@ test.describe("Manual reading progress synchronization", () => {
     );
     expect(correctedActivity.rows[0]).toEqual({
       current_page: 30,
-      xp: 40,
+      xp: 55,
       reading_streak: 2,
       total_pages_read: 17,
     });

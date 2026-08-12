@@ -106,8 +106,16 @@ export function UpdateReadingProgressDialog({
         return;
       }
 
+      const rewardMessage =
+        result.data.xpAwarded > 0
+          ? ` You earned ${result.data.xpAwarded} XP for ${result.data.rewardedPages} new physical-reading page${result.data.rewardedPages === 1 ? "" : "s"}.${result.data.rewardStatus === "daily_cap_reached" ? " Today's 20-page physical-reading reward limit reduced this award." : ""}`
+          : result.data.rewardStatus === "daily_cap_reached"
+            ? " Your progress was saved, but today's 20-page physical-reading reward limit has been reached."
+            : result.data.rewardStatus === "already_rewarded"
+              ? " This page range was already recorded, so no additional XP was awarded."
+              : "";
       const message = result.data.changed
-        ? `Progress updated to page ${result.data.currentPage}.`
+        ? `Progress updated to page ${result.data.currentPage}.${rewardMessage}`
         : `Your progress is already saved at page ${result.data.currentPage}.`;
       setSuccess(message);
       setSavedPage(result.data.currentPage);

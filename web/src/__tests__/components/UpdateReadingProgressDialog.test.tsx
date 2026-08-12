@@ -33,6 +33,10 @@ const successfulResult = (currentPage: number, changed = true) => ({
     movedBackward: currentPage < 20,
     reachedFinalPage: currentPage === 100,
     isNewBook: false,
+    rewardedPages: changed && currentPage > 20 ? currentPage - 20 : 0,
+    xpAwarded: changed && currentPage > 20 ? currentPage - 20 : 0,
+    rewardStatus:
+      changed && currentPage > 20 ? ("awarded" as const) : ("not_applicable" as const),
   },
 });
 
@@ -140,7 +144,7 @@ describe("UpdateReadingProgressDialog", () => {
     expect(screen.getByRole("button", { name: "Working…" })).toBeDisabled();
     expect(updatePhysicalReadingProgress).toHaveBeenCalledTimes(1);
     resolveSave?.(successfulResult(30));
-    await screen.findByText("Progress updated to page 30.");
+    await screen.findByText(/Progress updated to page 30\./);
   });
 
   it("offers explicit completion after the final page and marks the book finished only after confirmation", async () => {
@@ -220,7 +224,7 @@ describe("UpdateReadingProgressDialog", () => {
     });
     await user.click(screen.getByRole("button", { name: "Save progress" }));
 
-    await screen.findByText("Progress updated to page 40.");
+    await screen.findByText(/Progress updated to page 40\./);
     expect(getPendingCheckpointForPage).toHaveBeenCalledWith({
       bookId: 1,
       currentPage: 40,
@@ -246,10 +250,52 @@ describe("UpdateReadingProgressDialog", () => {
     });
     await user.click(screen.getByRole("button", { name: "Save progress" }));
 
-    await screen.findByText("Progress updated to page 100.");
+    await screen.findByText(/Progress updated to page 100\./);
     expect(
       screen.queryByText("You reached the final page. Mark this book as finished?"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows capped and duplicate manual reward feedback", async () => {
+    const user = userEvent.setup();
+    vi.mocked(updatePhysicalReadingProgress)
+      .mockResolvedValueOnce({
+        ...successfulResult(30),
+        data: {
+          ...successfulResult(30).data,
+          rewardedPages: 2,
+          xpAwarded: 2,
+          rewardStatus: "daily_cap_reached",
+        },
+      })
+      .mockResolvedValueOnce({
+        ...successfulResult(35),
+        data: {
+          ...successfulResult(35).data,
+          previousPage: 30,
+          rewardedPages: 0,
+          xpAwarded: 0,
+          rewardStatus: "already_rewarded",
+        },
+      });
+    renderDialog();
+    await user.click(screen.getByRole("button", { name: "Update page" }));
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Page" }), {
+      target: { value: "30" },
+    });
+    await user.click(screen.getByRole("button", { name: "Save progress" }));
+    expect(
+      await screen.findByText(/reward limit reduced this award/),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Page" }), {
+      target: { value: "35" },
+    });
+    await user.click(screen.getByRole("button", { name: "Save progress" }));
+    expect(
+      await screen.findByText(/page range was already recorded/),
+    ).toBeInTheDocument();
   });
 
   it("displays same-page and server validation messages", async () => {

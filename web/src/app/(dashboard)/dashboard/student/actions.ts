@@ -11,7 +11,10 @@ import {
   XP_REWARDS,
 } from "@/lib/gamification";
 import { createJournalEntry } from "@/app/(dashboard)/dashboard/journal/journal-actions";
-import type { Badge } from "@/types/database";
+import type {
+  Badge,
+  ReadingProgressRewardStatus,
+} from "@/types/database";
 
 export type ReadingProgressSource = "digital_reader" | "manual_physical";
 
@@ -39,6 +42,9 @@ export type SaveReadingPositionResult = {
   movedBackward: boolean;
   reachedFinalPage: boolean;
   isNewBook: boolean;
+  rewardedPages: number;
+  xpAwarded: number;
+  rewardStatus: ReadingProgressRewardStatus;
 };
 
 export type ManualProgressErrorCode =
@@ -62,6 +68,8 @@ type DigitalActivityResult = {
   currentStreak: number;
   xpAwarded: number;
 };
+
+const MANUAL_REWARD_DAILY_PAGE_CAP = 20;
 
 async function saveReadingPosition(
   user: AuthenticatedUser,
@@ -110,6 +118,9 @@ async function saveReadingPosition(
           input.totalPages !== undefined &&
           previousPage === input.totalPages,
         isNewBook: false,
+        rewardedPages: 0,
+        xpAwarded: 0,
+        rewardStatus: "not_applicable",
       };
     }
 
@@ -170,6 +181,132 @@ async function saveReadingPosition(
       saved?.progress_percent === null || saved?.progress_percent === undefined
         ? null
         : Number(saved.progress_percent);
+    const pagesAdvanced = Math.max(
+      0,
+      input.currentPage - (previousPage ?? 0),
+    );
+    let rewardedPages = 0;
+    let xpAwarded = 0;
+    let rewardStatus: ReadingProgressRewardStatus = "not_applicable";
+
+    if (input.source === "manual_physical" && pagesAdvanced > 0) {
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext($1), -1)",
+        [user.profileId],
+      );
+
+      const rewardHistoryResult = await client.query<{
+        highest_page: number;
+        rewarded_today: number;
+      }>(
+        `SELECT
+           GREATEST(
+             $3::INTEGER,
+             COALESCE((
+               SELECT MAX(
+                 GREATEST(current_page, COALESCE(previous_page, current_page))
+               )
+               FROM reading_progress_events
+               WHERE student_id = $1 AND book_id = $2
+             ), 0)
+           )::INTEGER AS highest_page,
+           COALESCE((
+             SELECT SUM(rewarded_pages)
+             FROM reading_progress_events
+             WHERE student_id = $1
+               AND source = 'manual_physical'
+               AND created_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+               AND created_at < (date_trunc('day', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 day') AT TIME ZONE 'UTC'
+           ), 0)::INTEGER AS rewarded_today`,
+        [user.profileId, input.bookId, previousPage ?? 0],
+      );
+      const rewardHistory = rewardHistoryResult.rows[0];
+      const highestPage = Number(rewardHistory?.highest_page ?? previousPage ?? 0);
+      const newlyRewardablePages = Math.max(0, input.currentPage - highestPage);
+      const remainingDailyPages = Math.max(
+        0,
+        MANUAL_REWARD_DAILY_PAGE_CAP -
+          Number(rewardHistory?.rewarded_today ?? 0),
+      );
+
+      rewardedPages = Math.min(newlyRewardablePages, remainingDailyPages);
+      xpAwarded = rewardedPages * XP_REWARDS.PAGE_READ;
+
+      if (newlyRewardablePages === 0) {
+        rewardStatus = "already_rewarded";
+      } else if (remainingDailyPages === 0) {
+        rewardStatus = "daily_cap_reached";
+      } else if (rewardedPages < newlyRewardablePages) {
+        rewardStatus = "daily_cap_reached";
+      } else if (rewardedPages > 0) {
+        rewardStatus = "awarded";
+      } else {
+        rewardStatus = "not_applicable";
+      }
+
+      // The XP audit row is the database-backed idempotency claim. Profile XP
+      // changes only when that claim is inserted; later failures still roll the
+      // entire transaction back.
+      if (xpAwarded > 0) {
+        const xpTransactionResult = await client.query<{ id: string }>(
+          `INSERT INTO xp_transactions (
+             student_id, amount, source, source_id, description
+           )
+           VALUES ($1, $2, 'manual_page_read', $3, $4)
+           ON CONFLICT (student_id, source_id)
+             WHERE source = 'manual_page_read'
+           DO NOTHING
+           RETURNING id`,
+          [
+            user.profileId,
+            xpAwarded,
+            `manual-${input.bookId}-${input.currentPage}`,
+            `Recorded ${rewardedPages} new physical-reading page(s)`,
+          ],
+        );
+
+        if (xpTransactionResult.rows.length > 0) {
+          await client.query(
+            `UPDATE profiles
+             SET xp = xp + $1,
+                 level = calculate_level(xp + $1),
+                 updated_at = NOW()
+             WHERE id = $2`,
+            [xpAwarded, user.profileId],
+          );
+        } else {
+          rewardedPages = 0;
+          xpAwarded = 0;
+          rewardStatus = "already_rewarded";
+        }
+      }
+    }
+
+    await client.query(
+      `INSERT INTO reading_progress_events (
+         student_id,
+         book_id,
+         previous_page,
+         current_page,
+         source,
+         pages_advanced,
+         rewarded_pages,
+         xp_awarded,
+         reward_status
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        user.profileId,
+        input.bookId,
+        previousPage,
+        input.currentPage,
+        input.source,
+        pagesAdvanced,
+        rewardedPages,
+        xpAwarded,
+        rewardStatus,
+      ],
+    );
 
     return {
       previousPage,
@@ -185,6 +322,9 @@ async function saveReadingPosition(
         input.totalPages !== undefined &&
         input.currentPage === input.totalPages,
       isNewBook: saved?.is_new ?? previousPage === null,
+      rewardedPages,
+      xpAwarded,
+      rewardStatus,
     };
   });
 }

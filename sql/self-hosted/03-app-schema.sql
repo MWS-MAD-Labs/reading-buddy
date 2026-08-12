@@ -155,6 +155,28 @@ CREATE TABLE IF NOT EXISTS student_books (
     CHECK (progress_source IN ('digital_reader', 'manual_physical'))
 );
 
+-- Append-only reading progress history
+CREATE TABLE IF NOT EXISTS reading_progress_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  previous_page INTEGER,
+  current_page INTEGER NOT NULL,
+  source VARCHAR(30) NOT NULL,
+  pages_advanced INTEGER NOT NULL DEFAULT 0,
+  rewarded_pages INTEGER NOT NULL DEFAULT 0,
+  xp_awarded INTEGER NOT NULL DEFAULT 0,
+  reward_status VARCHAR(30) NOT NULL DEFAULT 'not_applicable',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT reading_progress_events_source_check
+    CHECK (source IN ('digital_reader', 'manual_physical')),
+  CONSTRAINT reading_progress_events_pages_check
+    CHECK (pages_advanced >= 0 AND rewarded_pages >= 0 AND rewarded_pages <= pages_advanced),
+  CONSTRAINT reading_progress_events_xp_check CHECK (xp_awarded >= 0),
+  CONSTRAINT reading_progress_events_reward_status_check
+    CHECK (reward_status IN ('awarded', 'daily_cap_reached', 'already_rewarded', 'not_applicable'))
+);
+
 -- Quizzes table
 CREATE TABLE IF NOT EXISTS quizzes (
   id SERIAL PRIMARY KEY,
@@ -343,6 +365,11 @@ CREATE INDEX IF NOT EXISTS idx_books_file_format ON books(file_format);
 CREATE INDEX IF NOT EXISTS idx_student_books_student ON student_books(student_id);
 CREATE INDEX IF NOT EXISTS idx_student_books_book ON student_books(book_id);
 
+-- Reading progress event indexes
+CREATE INDEX IF NOT EXISTS idx_reading_progress_events_student_created ON reading_progress_events(student_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reading_progress_events_book_created ON reading_progress_events(book_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reading_progress_events_manual_daily_rewards ON reading_progress_events(student_id, created_at) WHERE source = 'manual_physical' AND rewarded_pages > 0;
+
 -- Quizzes indexes
 CREATE INDEX IF NOT EXISTS idx_quizzes_book ON quizzes(book_id);
 CREATE INDEX IF NOT EXISTS idx_quizzes_type ON quizzes(quiz_type);
@@ -373,6 +400,9 @@ CREATE INDEX IF NOT EXISTS idx_student_badges_book ON student_badges(book_id) WH
 
 -- XP transactions indexes
 CREATE INDEX IF NOT EXISTS idx_xp_transactions_student ON xp_transactions(student_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_xp_transactions_manual_source_id
+  ON xp_transactions(student_id, source_id)
+  WHERE source = 'manual_page_read';
 
 -- Challenge indexes
 CREATE INDEX IF NOT EXISTS idx_challenges_active ON reading_challenges(is_active, end_date) WHERE is_active = true;
@@ -390,6 +420,7 @@ COMMENT ON TABLE profiles IS 'User profiles linked to NextAuth users table';
 COMMENT ON COLUMN profiles.user_id IS 'Reference to NextAuth users.id';
 COMMENT ON TABLE books IS 'Book catalog with multi-format support';
 COMMENT ON TABLE student_books IS 'Student reading progress tracking';
+COMMENT ON TABLE reading_progress_events IS 'Append-only source and reward audit history for reading progress changes';
 COMMENT ON TABLE quizzes IS 'Quiz definitions for books';
 COMMENT ON TABLE quiz_attempts IS 'Student quiz submissions and scores';
 COMMENT ON TABLE badges IS 'Achievement badge definitions';

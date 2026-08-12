@@ -167,6 +167,26 @@ export interface StudentBookWithDetails extends StudentBook {
   class: Pick<Class, "id" | "name" | "code"> | null;
 }
 
+export type ReadingProgressRewardStatus =
+  | "awarded"
+  | "daily_cap_reached"
+  | "already_rewarded"
+  | "not_applicable";
+
+export interface ReadingProgressEvent {
+  id: string;
+  student_id: string;
+  book_id: number;
+  previous_page: number | null;
+  current_page: number;
+  source: ReadingProgressSource;
+  pages_advanced: number;
+  rewarded_pages: number;
+  xp_awarded: number;
+  reward_status: ReadingProgressRewardStatus;
+  created_at: string;
+}
+
 // ============================================================================
 // Reading Entries
 // ============================================================================
@@ -320,6 +340,7 @@ export interface BadgeProgress {
 
 export type XPSource =
   | "page_read"
+  | "manual_page_read"
   | "book_completed"
   | "quiz_completed"
   | "quiz_perfect"

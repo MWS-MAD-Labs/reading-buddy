@@ -1,12 +1,12 @@
 # Offline Reading Progress Synchronization
 
-**Status:** In progress — Phase 2 complete
+**Status:** Complete — Phase 4 implemented
 
 **Audience:** Product, frontend, backend, database, and QA engineers
 
 **Primary owner:** Reading progress domain
 
-**Last updated:** 2026-08-11
+**Last updated:** 2026-08-12
 
 ## 1. Purpose
 
@@ -118,7 +118,7 @@ For EPUB files, the UI must warn that a printed page and a reflowable EPUB locat
 
 A page greater than the saved page is accepted after validation.
 
-For the MVP, manual updates do not award page XP, increment total pages read, or update reading streaks. This prevents unverified manual input from changing competitive or reward-related data.
+Manual updates can award page XP under the Phase 4 policy: only pages above the book's historical high-water mark qualify, and rewards are capped at 20 manual pages per student per UTC day. Manual updates still do not increment `profiles.total_pages_read`, update reading streaks, award page-count badges, or create reading-session journal entries.
 
 ### 5.4 Same-page updates
 
@@ -356,11 +356,11 @@ The schema change must be represented in all active installation paths:
 
 The migration must be idempotent and safe for existing rows.
 
-### 7.5 Optional event history
+### 7.5 Event history
 
-An append-only event table is not required for the MVP. It becomes recommended if manual reading later awards XP, teachers need an audit history, or weekly physical-reading analytics are introduced.
+Phase 4 adds an append-only event table because manual reading now awards capped XP and teachers consume the audit history.
 
-Suggested future schema:
+Implemented schema:
 
 ```sql
 CREATE TABLE IF NOT EXISTS reading_progress_events (
@@ -370,13 +370,17 @@ CREATE TABLE IF NOT EXISTS reading_progress_events (
   previous_page INTEGER,
   current_page INTEGER NOT NULL,
   source VARCHAR(30) NOT NULL,
+  pages_advanced INTEGER NOT NULL DEFAULT 0,
+  rewarded_pages INTEGER NOT NULL DEFAULT 0,
+  xp_awarded INTEGER NOT NULL DEFAULT 0,
+  reward_status VARCHAR(30) NOT NULL DEFAULT 'not_applicable',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT reading_progress_events_source_check
     CHECK (source IN ('digital_reader', 'manual_physical'))
 );
 ```
 
-Do not add this table until a feature consumes the history.
+Changed digital and manual saves create events. Same-page manual submissions remain no-ops and do not create events.
 
 ## 8. Validation and authorization
 
@@ -610,7 +614,7 @@ Use the actual journal route present in the application. Revalidation is unneces
 
 ## 14. Gamification and journal policy
 
-### 14.1 MVP policy
+### 14.1 Current policy
 
 | Side effect | Digital reader | Manual physical update |
 |---|---:|---:|
@@ -618,7 +622,7 @@ Use the actual journal route present in the application. Revalidation is unneces
 | Save progress percentage | Yes | Yes |
 | Save EPUB CFI | When supplied | Clear stale value |
 | Update reading streak | Existing behavior | No |
-| Award page XP | Existing behavior | No |
+| Award page XP | Existing behavior | Event-backed, high-water protected, maximum 20 rewarded pages per UTC day |
 | Increment total pages read | Existing behavior | No |
 | Evaluate page badges | Existing behavior | No |
 | Mark complete automatically | No | No |
@@ -626,16 +630,17 @@ Use the actual journal route present in the application. Revalidation is unneces
 
 A manual progress journal entry may be added later, but it must be explicitly labelled `manual_physical` and must not be interpreted as verified reading activity.
 
-### 14.2 Future gamification
+### 14.2 Reward safeguards
 
-If manual physical reading later earns rewards, implement it using append-only, database-backed events with idempotency keys and abuse controls. Do not re-enable rewards by calculating from `student_books.current_page` alone.
+Manual physical reading rewards use append-only, database-backed events rather than recalculating from `student_books.current_page` alone.
 
-Potential controls include:
+Implemented controls include:
 
-- maximum rewarded manual pages per day;
-- one reward event per book/page range;
-- teacher-visible source labels; and
-- correction events that do not reverse historical rewards automatically.
+- maximum 20 rewarded manual pages per student per UTC day;
+- reward eligibility only above the book's historical high-water mark;
+- student-wide and student/book transaction locks;
+- teacher-visible source and reward labels; and
+- correction events that do not reverse historical rewards.
 
 ## 15. Implementation sequence
 
@@ -696,12 +701,25 @@ Implementation notes:
 - The opt-in Playwright scenario seeds isolated data and removes dependent quiz, journal, gamification, progress, profile, book, and user records in a reverse-dependency transaction.
 - Twenty-nine focused server-action and component tests, TypeScript type-check, changed-file ESLint, `git diff --check`, and Playwright test discovery passed. The authenticated Playwright scenario is opt-in with `RUN_PROGRESS_SYNC_E2E=1` and could not be executed locally because no Compose services were running and the configured external database rejected the available credentials.
 
-### Phase 4: Optional analytics and rewards
+### Phase 4: Optional analytics and rewards — Complete
 
-1. Add an event table only when required.
-2. Define manual-reading reward policy.
-3. Add teacher-facing source/history views.
-4. Add abuse prevention and idempotent reward processing.
+**Completed:** 2026-08-11
+
+- [x] Add an append-only event table consumed by history and rewards.
+- [x] Define and implement the manual-reading reward policy.
+- [x] Add teacher-facing source and classroom history views.
+- [x] Add abuse prevention and idempotent reward processing.
+
+Implementation notes:
+
+- Every changed save writes a `reading_progress_events` row with source, page movement, reward status, rewarded pages, and XP awarded.
+- Manual progress earns the existing per-page XP only for pages above the book's historical high-water mark. Digital and manual history both contribute, and both `previous_page` and `current_page` event endpoints preserve the high-water mark across backward corrections.
+- Manual rewards are capped at 20 pages per student per UTC day across all books. Student-wide and student/book advisory locks serialize cap and high-water calculations.
+- Reward XP, the XP audit row, the canonical progress update, and the progress event are committed atomically. A partial unique index on `(student_id, source_id)` for `manual_page_read` transactions provides a database-level duplicate guard; profile XP changes only after the idempotency claim succeeds, and level calculation uses the canonical `calculate_level()` database function.
+- Manual saves still do not affect streaks, `profiles.total_pages_read`, page-count badges, or reading-session journals.
+- Classroom overviews show current progress and the 25 most recent source-labelled events only for books assigned to that classroom, preventing unrelated student reading activity from appearing in the class view.
+- Student and teacher views disclose when the 20-page daily cap partially reduces or fully prevents a manual reward.
+- Final focused validation passed with 34 server-action and component tests, TypeScript type-check, changed-file ESLint, editor diagnostics, and `git diff --check`. The authenticated Playwright scenario remains opt-in and was updated but not executed locally.
 
 ## 16. Testing requirements
 
@@ -726,7 +744,7 @@ Required cases:
 13. Identical page is a no-op.
 14. Backward update succeeds.
 15. Backward update does not subtract historical statistics.
-16. Manual update does not call `awardXP()`.
+16. Manual reward processing is database-backed, high-water-mark protected, and capped at 20 pages per UTC day.
 17. Manual update does not call `updateReadingStreak()`.
 18. Manual update does not increment `profiles.total_pages_read`.
 19. Digital updates continue to use `digital_reader`.
@@ -775,7 +793,7 @@ The MVP is accepted when all of the following are true. Phase 3 completion and c
 - [x] Manual updates clear stale EPUB CFI data.
 - [x] Same-page submissions are idempotent.
 - [x] Backward corrections require client confirmation and are accepted by the server.
-- [x] Manual updates do not award XP, alter streaks, or increment total pages in the MVP.
+- [x] Manual updates award only capped, event-backed page XP and do not alter streaks or increment total pages.
 - [x] Entering the final page does not automatically complete the book.
 - [x] The student can explicitly mark the book complete after a prompt.
 - [x] Existing digital-reader progress still saves successfully.
@@ -802,8 +820,8 @@ Development is complete when:
 
 These decisions are intentionally deferred and must not block the MVP:
 
-1. Should verified physical reading earn XP in a later release?
-2. Should teachers see manual versus digital progress sources?
+1. Should a future teacher-verification workflow allow a higher or classroom-specific manual reward cap?
+2. Should teacher history support date, source, student, or book filters?
 3. Should manual updates create journal entries by default?
 4. Should some classrooms require checkpoint completion immediately after a manual update?
 5. Is edition-level metadata needed to distinguish physical and digital page counts?

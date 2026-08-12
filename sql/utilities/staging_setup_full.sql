@@ -228,6 +228,27 @@ CREATE TABLE student_books (
 );
 
 -- Quizzes table
+CREATE TABLE reading_progress_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  previous_page INTEGER,
+  current_page INTEGER NOT NULL,
+  source VARCHAR(30) NOT NULL,
+  pages_advanced INTEGER NOT NULL DEFAULT 0,
+  rewarded_pages INTEGER NOT NULL DEFAULT 0,
+  xp_awarded INTEGER NOT NULL DEFAULT 0,
+  reward_status VARCHAR(30) NOT NULL DEFAULT 'not_applicable',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT reading_progress_events_source_check
+    CHECK (source IN ('digital_reader', 'manual_physical')),
+  CONSTRAINT reading_progress_events_pages_check
+    CHECK (pages_advanced >= 0 AND rewarded_pages >= 0 AND rewarded_pages <= pages_advanced),
+  CONSTRAINT reading_progress_events_xp_check CHECK (xp_awarded >= 0),
+  CONSTRAINT reading_progress_events_reward_status_check
+    CHECK (reward_status IN ('awarded', 'daily_cap_reached', 'already_rewarded', 'not_applicable'))
+);
+
 CREATE TABLE quizzes (
   id SERIAL PRIMARY KEY,
   book_id INT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
@@ -325,6 +346,17 @@ CREATE TABLE student_badges (
   CONSTRAINT unique_student_badge_book UNIQUE(student_id, badge_id, book_id)
 );
 
+-- XP transaction audit trail
+CREATE TABLE xp_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL,
+  source VARCHAR(50) NOT NULL,
+  source_id TEXT,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Login broadcasts
 CREATE TABLE login_broadcasts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -354,6 +386,9 @@ CREATE TABLE weekly_challenge_completions (
 CREATE INDEX idx_books_text_extracted ON books(text_extracted_at) WHERE text_extracted_at IS NOT NULL;
 CREATE INDEX idx_books_extraction_failed ON books(text_extraction_error) WHERE text_extraction_error IS NOT NULL;
 CREATE INDEX idx_books_file_format ON books(file_format);
+CREATE INDEX idx_reading_progress_events_student_created ON reading_progress_events(student_id, created_at DESC);
+CREATE INDEX idx_reading_progress_events_book_created ON reading_progress_events(book_id, created_at DESC);
+CREATE INDEX idx_reading_progress_events_manual_daily_rewards ON reading_progress_events(student_id, created_at) WHERE source = 'manual_physical' AND rewarded_pages > 0;
 CREATE INDEX idx_quizzes_type ON quizzes(quiz_type);
 CREATE INDEX idx_quizzes_checkpoint ON quizzes(book_id, checkpoint_page) WHERE quiz_type = 'checkpoint';
 CREATE INDEX idx_quizzes_page_range ON quizzes(book_id, page_range_start, page_range_end) WHERE page_range_start IS NOT NULL;
@@ -367,6 +402,11 @@ CREATE INDEX idx_badges_active ON badges(is_active) WHERE is_active = true;
 CREATE INDEX idx_student_badges_student ON student_badges(student_id, earned_at DESC);
 CREATE INDEX idx_student_badges_badge ON student_badges(badge_id);
 CREATE INDEX idx_student_badges_book ON student_badges(book_id) WHERE book_id IS NOT NULL;
+CREATE INDEX idx_xp_transactions_student
+  ON xp_transactions(student_id, created_at DESC);
+CREATE UNIQUE INDEX idx_xp_transactions_manual_source_id
+  ON xp_transactions(student_id, source_id)
+  WHERE source = 'manual_page_read';
 CREATE INDEX idx_profiles_xp ON profiles(xp DESC);
 CREATE INDEX idx_profiles_level ON profiles(level DESC);
 CREATE INDEX idx_profiles_reading_streak ON profiles(reading_streak DESC);

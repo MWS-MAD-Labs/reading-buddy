@@ -46,7 +46,11 @@ const queryResult = <TRow extends Record<string, unknown>>(rows: TRow[]) =>
     fields: [],
   }) as unknown as Awaited<ReturnType<typeof queryWithContext>>;
 
-const mockProgressTransaction = (previousPages: Array<number | null>) => {
+const mockProgressTransaction = (
+  previousPages: Array<number | null>,
+  rewardHistory: Array<{ highest_page: number; rewarded_today: number }> = [],
+  xpClaims: boolean[] = [],
+) => {
   const transactionQueries: Array<{ sql: string; params: unknown[] }> = [];
   let savedPage: number | null = previousPages[0] ?? null;
 
@@ -76,6 +80,21 @@ const mockProgressTransaction = (previousPages: Array<number | null>) => {
                 is_new: previousPage === null,
               },
             ]);
+          }
+
+          if (sql.includes("AS highest_page")) {
+            return queryResult([
+              rewardHistory.shift() ?? {
+                highest_page: previousPage ?? 0,
+                rewarded_today: 0,
+              },
+            ]);
+          }
+
+          if (sql.includes("INSERT INTO xp_transactions")) {
+            return queryResult(
+              (xpClaims.shift() ?? true) ? [{ id: "xp-transaction-1" }] : [],
+            );
           }
 
           return queryResult([]);
@@ -356,7 +375,7 @@ describe("updatePhysicalReadingProgress", () => {
     });
   });
 
-  it("calculates percentage, clears EPUB position, and skips reward side effects", async () => {
+  it("calculates percentage, clears EPUB position, and awards only event-backed manual XP", async () => {
     const transactionQueries = mockProgressTransaction([20]);
     vi.mocked(queryWithContext).mockResolvedValue(
       queryResult([{ id: 3, page_count: 80 }]),
@@ -382,6 +401,9 @@ describe("updatePhysicalReadingProgress", () => {
         movedBackward: false,
         reachedFinalPage: false,
         isNewBook: false,
+        rewardedPages: 10,
+        xpAwarded: 10,
+        rewardStatus: "awarded",
       },
     });
     const upsert = transactionQueries.find(({ sql }) =>
@@ -399,6 +421,185 @@ describe("updatePhysicalReadingProgress", () => {
     expect(awardXP).not.toHaveBeenCalled();
     expect(updateReadingStreak).not.toHaveBeenCalled();
     expect(evaluateBadges).not.toHaveBeenCalled();
+    expect(
+      transactionQueries.find(({ sql }) =>
+        sql.includes("INSERT INTO reading_progress_events"),
+      )?.params,
+    ).toEqual([
+      "profile-1",
+      3,
+      20,
+      30,
+      "manual_physical",
+      10,
+      10,
+      10,
+      "awarded",
+    ]);
+    expect(
+      transactionQueries.some(({ sql }) =>
+        sql.includes("INSERT INTO xp_transactions"),
+      ),
+    ).toBe(true);
+  });
+
+  it("caps manual rewards per UTC day", async () => {
+    const transactionQueries = mockProgressTransaction(
+      [10],
+      [{ highest_page: 10, rewarded_today: 18 }],
+    );
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ id: 8, page_count: 100 }]),
+    );
+
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+    const result = await updatePhysicalReadingProgress({
+      bookId: 8,
+      currentPage: 20,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        rewardedPages: 2,
+        xpAwarded: 2,
+        rewardStatus: "daily_cap_reached",
+      },
+    });
+    expect(
+      transactionQueries.find(({ sql }) => sql.includes("UPDATE profiles"))?.sql,
+    ).toContain("level = calculate_level(xp + $1)");
+    expect(
+      transactionQueries.find(({ sql }) =>
+        sql.includes("INSERT INTO xp_transactions"),
+      )?.params,
+    ).toEqual([
+      "profile-1",
+      2,
+      "manual-8-20",
+      "Recorded 2 new physical-reading page(s)",
+    ]);
+  });
+
+  it("does not update profile XP when the database idempotency claim conflicts", async () => {
+    const transactionQueries = mockProgressTransaction(
+      [10],
+      [{ highest_page: 10, rewarded_today: 0 }],
+      [false],
+    );
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ id: 10, page_count: 100 }]),
+    );
+
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+    const result = await updatePhysicalReadingProgress({
+      bookId: 10,
+      currentPage: 20,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        rewardedPages: 0,
+        xpAwarded: 0,
+        rewardStatus: "already_rewarded",
+      },
+    });
+    expect(
+      transactionQueries.some(({ sql }) => sql.includes("UPDATE profiles")),
+    ).toBe(false);
+    expect(
+      transactionQueries.find(({ sql }) =>
+        sql.includes("INSERT INTO reading_progress_events"),
+      )?.params,
+    ).toEqual([
+      "profile-1",
+      10,
+      10,
+      20,
+      "manual_physical",
+      10,
+      0,
+      0,
+      "already_rewarded",
+    ]);
+  });
+
+  it("preserves the high-water mark across a backward correction", async () => {
+    const transactionQueries = mockProgressTransaction(
+      [50, 20],
+      [{ highest_page: 50, rewarded_today: 0 }],
+    );
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ id: 11, page_count: 100 }]),
+    );
+
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await updatePhysicalReadingProgress({ bookId: 11, currentPage: 20 });
+    const result = await updatePhysicalReadingProgress({
+      bookId: 11,
+      currentPage: 40,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        previousPage: 20,
+        currentPage: 40,
+        rewardedPages: 0,
+        xpAwarded: 0,
+        rewardStatus: "already_rewarded",
+      },
+    });
+    expect(
+      transactionQueries.find(({ sql }) => sql.includes("AS highest_page"))?.sql,
+    ).toContain(
+      "GREATEST(current_page, COALESCE(previous_page, current_page))",
+    );
+    expect(
+      transactionQueries.some(({ sql }) =>
+        sql.includes("INSERT INTO xp_transactions"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not reward pages below the historical high-water mark", async () => {
+    const transactionQueries = mockProgressTransaction(
+      [15],
+      [{ highest_page: 30, rewarded_today: 0 }],
+    );
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ id: 9, page_count: 100 }]),
+    );
+
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+    const result = await updatePhysicalReadingProgress({
+      bookId: 9,
+      currentPage: 25,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        rewardedPages: 0,
+        xpAwarded: 0,
+        rewardStatus: "already_rewarded",
+      },
+    });
+    expect(
+      transactionQueries.some(({ sql }) =>
+        sql.includes("INSERT INTO xp_transactions"),
+      ),
+    ).toBe(false);
   });
 
   it("stores null percentage when the page count is unknown", async () => {
