@@ -49,9 +49,13 @@ const buildYearOptions = (values: Array<number | null>) =>
 
 type LibraryCollectionProps = {
   books: LibraryBook[];
+  canUpdateProgress?: boolean;
 };
 
-export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
+export const LibraryCollection = ({
+  books,
+  canUpdateProgress = false,
+}: LibraryCollectionProps) => {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [authorFilter, setAuthorFilter] = useState<FilterValue>("ALL");
@@ -303,6 +307,7 @@ export const LibraryCollection = ({ books }: LibraryCollectionProps) => {
           bookId={selectedBookId}
           onClose={() => setSelectedBookId(null)}
           onReadBook={handleReadBook}
+          canUpdateProgress={canUpdateProgress}
         />
       )}
     </section>
