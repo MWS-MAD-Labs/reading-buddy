@@ -3,7 +3,6 @@
 import { FormEvent, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  getPendingCheckpointForPage,
   markBookAsCompleted,
   updatePhysicalReadingProgress,
   type SaveReadingPositionResult,
@@ -101,6 +100,12 @@ export function UpdateReadingProgressDialog({
       });
 
       if (!result.success) {
+        if (result.code === "CHECKPOINT_REQUIRED") {
+          setPendingCheckpoint(result.checkpoint);
+          setPendingPage(null);
+        } else {
+          setPendingCheckpoint(null);
+        }
         setError(result.message);
         requestAnimationFrame(() => messageRef.current?.focus());
         return;
@@ -121,28 +126,10 @@ export function UpdateReadingProgressDialog({
       setSavedPage(result.data.currentPage);
       setPage(String(result.data.currentPage));
       setPendingPage(null);
+      setPendingCheckpoint(null);
       setShowCompletionPrompt(result.data.reachedFinalPage && !completed);
       onProgressUpdated?.(result.data);
       router.refresh();
-
-      try {
-        const checkpoint = await getPendingCheckpointForPage({
-          bookId,
-          currentPage: result.data.currentPage,
-        });
-        setPendingCheckpoint(
-          checkpoint.checkpointRequired
-            ? {
-                quizId: checkpoint.quizId,
-                checkpointPage: checkpoint.checkpointPage,
-              }
-            : null,
-        );
-      } catch (checkpointError) {
-        console.error("Failed to check reading checkpoint:", checkpointError);
-        setPendingCheckpoint(null);
-      }
-
       requestAnimationFrame(() => messageRef.current?.focus());
     } catch {
       setError("We could not save your progress. Please try again.");
@@ -322,9 +309,8 @@ export function UpdateReadingProgressDialog({
               {pendingCheckpoint && (
                 <div className="space-y-3 rounded-2xl border border-[#D6A13A]/40 bg-[#fff8e8] px-4 py-3">
                   <p className="text-sm font-bold text-[#7a5311]">
-                    You reached a required reading checkpoint at page{" "}
-                    {pendingCheckpoint.checkpointPage}. Take the quiz when you are
-                    ready.
+                    Your progress was not updated. Complete the required quiz at page{" "}
+                    {pendingCheckpoint.checkpointPage}, then try saving this page again.
                   </p>
                   <Button
                     type="button"

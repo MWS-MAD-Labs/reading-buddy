@@ -154,13 +154,21 @@ After a final-page update, the UI asks whether the student wants to mark the boo
 
 ### 5.7 Required checkpoint quizzes
 
-Manual synchronization must not force an immediate redirect. After a successful update, the application may query `getPendingCheckpointForPage()` and show a message with a **Start quiz** action.
+A forward manual update must not save beyond an unanswered required checkpoint. The server checks for required checkpoints inside the same transaction that reads the current page and would write the new page.
+
+Rules:
+
+- Select the earliest unanswered required checkpoint at or before the requested page.
+- Return `CHECKPOINT_REQUIRED` before changing `student_books` or creating progress/reward events.
+- Show the blocking checkpoint and a **Start quiz** action in the progress dialog.
+- Treat a submitted quiz attempt with a non-null server-calculated score as completed. The quiz action loads the stored questions, requires exactly one valid answer per question, calculates the score from stored `answerIndex` values, and ignores any client-supplied score metadata.
+- After completing the quiz, the reader retries the requested page update.
+- If several checkpoints were crossed, enforce them sequentially. A jump to page 35 with checkpoints at pages 10, 20, and 30 requires page 10 first, then page 20, then page 30.
+- Backward corrections remain allowed and do not require retaking checkpoints.
 
 Example:
 
-> You reached a required reading checkpoint. Take the quiz when you are ready.
-
-The first implementation should preserve the existing automatic reader behavior unless product requirements explicitly change it.
+> Your progress was not updated. Complete the required quiz at page 10, then try saving this page again.
 
 ## 6. Proposed architecture
 
@@ -172,10 +180,14 @@ flowchart TD
     D --> E[Authenticate reader]
     E --> F[Load book and current progress]
     F --> G[Validate page]
-    G --> H[Persist canonical position]
-    H --> I[Return previous and current state]
-    I --> J[Refresh dashboard and reader routes]
-    J --> K[Optional completion or checkpoint prompt]
+    G --> H{Unanswered required checkpoint?}
+    H -->|Yes| I[Return CHECKPOINT_REQUIRED without saving]
+    I --> J[Reader completes earliest quiz]
+    J --> C
+    H -->|No| K[Persist canonical position]
+    K --> L[Return previous and current state]
+    L --> M[Refresh dashboard and reader routes]
+    M --> N[Optional completion prompt]
 ```
 
 ### 6.1 Separation of responsibilities
@@ -266,17 +278,19 @@ This action:
 
 1. Authenticates the current user and requires a profile ID.
 2. Loads the book's `id` and `page_count` from PostgreSQL.
-3. Loads the current profile's `student_books` row.
+3. Loads and locks the current profile's `student_books` row.
 4. Validates the submitted page.
-5. Calculates `progress_percent` on the server.
-6. Upserts the canonical `student_books` row.
-7. Clears stale `epub_cfi` when the manual page becomes canonical.
-8. Sets the progress source and manual synchronization timestamp.
-9. Applies capped, event-backed manual XP only when the authenticated profile role is `STUDENT`.
-10. Saves non-student progress with zero rewarded pages and zero XP.
-11. Does not update streaks, total-pages counters, badges, or reading-session journals for manual updates.
-12. Revalidates all routes that display this progress.
-13. Returns structured state for success, no-op, checkpoint, and completion UI.
+5. For a forward update, checks the earliest unanswered required checkpoint at or before the requested page.
+6. Returns `CHECKPOINT_REQUIRED` without writing progress when a blocking checkpoint exists.
+7. Calculates `progress_percent` on the server after checkpoint validation succeeds.
+8. Upserts the canonical `student_books` row.
+9. Clears stale `epub_cfi` when the manual page becomes canonical.
+10. Sets the progress source and manual synchronization timestamp.
+11. Applies capped, event-backed manual XP only when the authenticated profile role is `STUDENT`.
+12. Saves non-student progress with zero rewarded pages and zero XP.
+13. Does not update streaks, total-pages counters, badges, or reading-session journals for manual updates.
+14. Revalidates all routes that display this progress.
+15. Returns structured state for success, no-op, checkpoint, and completion UI.
 
 ## 7. Database design
 
@@ -427,8 +441,13 @@ type ManualProgressResult =
         | "BOOK_NOT_FOUND"
         | "INVALID_PAGE"
         | "PAGE_EXCEEDS_BOOK"
+        | "CHECKPOINT_REQUIRED"
         | "SAVE_FAILED";
       message: string;
+      checkpoint?: {
+        quizId: number;
+        checkpointPage: number;
+      };
     };
 ```
 
@@ -557,7 +576,18 @@ Final page:
 
 > You reached the final page. Mark this book as finished?
 
-### 11.6 Accessibility
+### 11.6 Blocking checkpoint state
+
+When the server returns `CHECKPOINT_REQUIRED`:
+
+- keep the displayed saved page unchanged;
+- do not show success, completion, or reward messages;
+- explain that the requested page was not saved;
+- show the earliest blocking checkpoint page;
+- provide a **Start quiz** action; and
+- require the reader to retry the page update after submitting the quiz.
+
+### 11.7 Accessibility
 
 - Use an accessible dialog primitive already present in the UI system when available.
 - Give the numeric input a visible label.
@@ -656,6 +686,17 @@ Implemented controls include:
 - The modal reuses `UpdateReadingProgressDialog` rather than maintaining a separate progress form.
 - Book details include the current profile's saved page, total pages, file format, and completion state.
 - Non-student profiles can save and resume progress but receive no XP, streak, badge, journal, or student-total side effects from digital or manual progress saves.
+
+### 14.4 Required checkpoint enforcement
+
+**Completed:** 2026-08-13
+
+- Forward manual updates are checked for unanswered required quizzes before progress is written.
+- The earliest blocking checkpoint is returned, so multiple checkpoints are completed in page order.
+- `student_books`, reading progress events, and XP records remain unchanged while a checkpoint blocks the update.
+- The shared update dialog displays the blocking quiz and keeps the previous saved page visible.
+- After submitting the quiz, the reader retries the page update; the next unanswered checkpoint is enforced if applicable.
+- Quiz completion cannot be forged with a client-supplied score because `submitQuizAttempt()` accepts only the quiz ID and answers as input and computes the stored attempt score on the server.
 
 ## 15. Implementation sequence
 

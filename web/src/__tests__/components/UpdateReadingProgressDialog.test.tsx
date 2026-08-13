@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  getPendingCheckpointForPage,
   markBookAsCompleted,
   updatePhysicalReadingProgress,
 } from "@/app/(dashboard)/dashboard/student/actions";
@@ -16,7 +15,6 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/app/(dashboard)/dashboard/student/actions", () => ({
-  getPendingCheckpointForPage: vi.fn(),
   markBookAsCompleted: vi.fn(),
   updatePhysicalReadingProgress: vi.fn(),
 }));
@@ -55,9 +53,6 @@ const renderDialog = (props: Partial<React.ComponentProps<typeof UpdateReadingPr
 describe("UpdateReadingProgressDialog", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(getPendingCheckpointForPage).mockResolvedValue({
-      checkpointRequired: false,
-    });
     vi.mocked(markBookAsCompleted).mockResolvedValue({
       success: true,
       newBadges: [],
@@ -179,43 +174,41 @@ describe("UpdateReadingProgressDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("surfaces a pending checkpoint without navigating until Start quiz is selected", async () => {
+  it("blocks the page update and requires the checkpoint quiz first", async () => {
     const user = userEvent.setup();
-    vi.mocked(updatePhysicalReadingProgress).mockResolvedValue(
-      successfulResult(65),
-    );
-    vi.mocked(getPendingCheckpointForPage).mockResolvedValue({
-      checkpointRequired: true,
-      quizId: 9,
-      checkpointPage: 50,
+    vi.mocked(updatePhysicalReadingProgress).mockResolvedValue({
+      success: false,
+      code: "CHECKPOINT_REQUIRED",
+      message: "Complete the required quiz at page 10 before updating your progress.",
+      checkpoint: { quizId: 9, checkpointPage: 10 },
     });
-    renderDialog();
+    renderDialog({ currentPage: 5 });
     await user.click(screen.getByRole("button", { name: "Update page" }));
 
     fireEvent.change(screen.getByRole("spinbutton", { name: "Page" }), {
-      target: { value: "65" },
+      target: { value: "35" },
     });
     await user.click(screen.getByRole("button", { name: "Save progress" }));
 
     expect(
-      await screen.findByText(/required reading checkpoint at page 50/i),
+      await screen.findByText(/Your progress was not updated/i),
     ).toBeInTheDocument();
+    expect(screen.getByText("Current saved page: 5 of 100")).toBeInTheDocument();
+    expect(screen.queryByText(/Progress updated to page 35\./)).not.toBeInTheDocument();
+    expect(refresh).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Start quiz" }));
     expect(push).toHaveBeenCalledWith(
-      "/dashboard/student/quiz/9?bookId=1&page=50",
+      "/dashboard/student/quiz/9?bookId=1&page=10",
     );
   });
 
-  it("does not show checkpoint messaging when no checkpoint is pending", async () => {
+  it("saves normally when no checkpoint blocks the requested page", async () => {
     const user = userEvent.setup();
     vi.mocked(updatePhysicalReadingProgress).mockResolvedValue(
       successfulResult(40),
     );
-    vi.mocked(getPendingCheckpointForPage).mockResolvedValue({
-      checkpointRequired: false,
-    });
     renderDialog();
     await user.click(screen.getByRole("button", { name: "Update page" }));
 
@@ -225,13 +218,6 @@ describe("UpdateReadingProgressDialog", () => {
     await user.click(screen.getByRole("button", { name: "Save progress" }));
 
     await screen.findByText(/Progress updated to page 40\./);
-    expect(getPendingCheckpointForPage).toHaveBeenCalledWith({
-      bookId: 1,
-      currentPage: 40,
-    });
-    expect(
-      screen.queryByText(/required reading checkpoint/i),
-    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Start quiz" }),
     ).not.toBeInTheDocument();

@@ -34,7 +34,7 @@ export const QuizPlayer = ({
   classId,
 }: QuizPlayerProps) => {
   const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(
-    quizData.questions.map((_: any) => null),
+    quizData.questions.map(() => null),
   );
   const [status, setStatus] = useState<"idle" | "submitting" | "completed">(
     "idle",
@@ -58,27 +58,12 @@ export const QuizPlayer = ({
     setStatus("submitting");
     setError(null);
 
-    const correctAnswers = quizData.questions.reduce(
-      (total, question, index) => {
-        return (
-          total + (question.answerIndex === selectedAnswers[index] ? 1 : 0)
-        );
-      },
-      0,
-    );
-
-    const computedScore = Math.round(
-      (correctAnswers / quizData.questions.length) * 100,
-    );
-
     try {
-      await submitQuizAttempt({
+      const result = await submitQuizAttempt({
         quizId,
-        answers: selectedAnswers.map((answer: any) => Number(answer)),
-        score: correctAnswers,
-        totalQuestions: quizData.questions.length,
+        answers: selectedAnswers.map((answer) => Number(answer)),
       });
-      setScore(computedScore);
+      setScore(result.scorePercent);
       setStatus("completed");
     } catch (err) {
       const message =

@@ -31,7 +31,23 @@ type SaveReadingPositionInput = {
   progressPercent?: number | null;
   source: ReadingProgressSource;
   totalPages?: number | null;
+  enforceRequiredCheckpoints?: boolean;
 };
+
+type RequiredCheckpoint = {
+  quizId: number;
+  checkpointPage: number;
+};
+
+class RequiredCheckpointError extends Error {
+  checkpoint: RequiredCheckpoint;
+
+  constructor(checkpoint: RequiredCheckpoint) {
+    super(`Complete the required quiz at page ${checkpoint.checkpointPage} before updating your progress.`);
+    this.name = "RequiredCheckpointError";
+    this.checkpoint = checkpoint;
+  }
+}
 
 export type SaveReadingPositionResult = {
   previousPage: number | null;
@@ -53,14 +69,21 @@ export type ManualProgressErrorCode =
   | "BOOK_NOT_FOUND"
   | "INVALID_PAGE"
   | "PAGE_EXCEEDS_BOOK"
+  | "CHECKPOINT_REQUIRED"
   | "SAVE_FAILED";
 
 export type ManualProgressResult =
   | { success: true; data: SaveReadingPositionResult }
   | {
       success: false;
-      code: ManualProgressErrorCode;
+      code: Exclude<ManualProgressErrorCode, "CHECKPOINT_REQUIRED">;
       message: string;
+    }
+  | {
+      success: false;
+      code: "CHECKPOINT_REQUIRED";
+      message: string;
+      checkpoint: RequiredCheckpoint;
     };
 
 type DigitalActivityResult = {
@@ -96,6 +119,41 @@ async function saveReadingPosition(
     );
     const previous = previousResult.rows[0];
     const previousPage = previous?.current_page ?? null;
+
+    if (
+      input.enforceRequiredCheckpoints &&
+      input.currentPage > (previousPage ?? 0)
+    ) {
+      const checkpointResult = await client.query<{
+        quiz_id: number;
+        page_number: number;
+      }>(
+        `SELECT qc.quiz_id, qc.page_number
+         FROM quiz_checkpoints qc
+         WHERE qc.book_id = $1
+           AND qc.is_required = true
+           AND qc.quiz_id IS NOT NULL
+           AND qc.page_number <= $2
+           AND NOT EXISTS (
+             SELECT 1
+             FROM quiz_attempts qa
+             WHERE qa.quiz_id = qc.quiz_id
+               AND qa.student_id = $3
+               AND qa.score IS NOT NULL
+           )
+         ORDER BY qc.page_number ASC
+         LIMIT 1`,
+        [input.bookId, input.currentPage, user.profileId],
+      );
+      const checkpoint = checkpointResult.rows[0];
+
+      if (checkpoint) {
+        throw new RequiredCheckpointError({
+          quizId: checkpoint.quiz_id,
+          checkpointPage: checkpoint.page_number,
+        });
+      }
+    }
 
     if (
       input.source === "manual_physical" &&
@@ -595,6 +653,7 @@ export const updatePhysicalReadingProgress = async (input: {
         progressPercent,
         source: "manual_physical",
         totalPages,
+        enforceRequiredCheckpoints: true,
       },
     );
 
@@ -603,6 +662,15 @@ export const updatePhysicalReadingProgress = async (input: {
 
     return { success: true, data };
   } catch (error) {
+    if (error instanceof RequiredCheckpointError) {
+      return {
+        success: false,
+        code: "CHECKPOINT_REQUIRED",
+        message: error.message,
+        checkpoint: error.checkpoint,
+      };
+    }
+
     console.error("Failed to update physical reading progress:", error);
     return {
       success: false,
@@ -693,8 +761,8 @@ export const getPendingCheckpointForPage = async (input: {
     throw new Error("You must be signed in to check checkpoints.");
   }
 
-  // Find the latest required checkpoint at or before the current page that
-  // does not yet have a submitted attempt for this student.
+  // Find the earliest required checkpoint at or before the current page that
+  // does not yet have a submitted attempt for this profile.
   // TODO: Add class-based filtering once class quiz assignments are required.
   const checkpointResult = await queryWithContext(
     user.userId,
@@ -711,7 +779,7 @@ export const getPendingCheckpointForPage = async (input: {
            AND qa.student_id = $3
            AND qa.score IS NOT NULL
        )
-     ORDER BY qc.page_number DESC
+     ORDER BY qc.page_number ASC
      LIMIT 1`,
     [input.bookId, input.currentPage, user.profileId],
   );

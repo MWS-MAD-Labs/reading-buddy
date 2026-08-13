@@ -218,13 +218,51 @@ test.describe("Manual reading progress synchronization", () => {
     await page.getByRole("spinbutton", { name: "Page" }).fill("35");
     await page.getByRole("button", { name: "Save progress" }).click();
 
+    await expect(page.getByText(/Your progress was not updated/i)).toBeVisible();
+    await expect(page.getByText("Current saved page: 20 of 100")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start quiz" })).toBeVisible();
+
+    const blockedProgress = await pool.query<{
+      current_page: number;
+      event_count: string;
+    }>(
+      `SELECT
+         sb.current_page,
+         (
+           SELECT COUNT(*)
+           FROM reading_progress_events rpe
+           WHERE rpe.student_id = sb.student_id AND rpe.book_id = sb.book_id
+         ) AS event_count
+       FROM student_books sb
+       WHERE sb.student_id = $1 AND sb.book_id = $2`,
+      [profileId, bookId],
+    );
+    expect(blockedProgress.rows[0]).toEqual({
+      current_page: 20,
+      event_count: "0",
+    });
+
+    await page.getByRole("button", { name: "Start quiz" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/dashboard/student/quiz/${quizId}\\?bookId=${bookId}&page=35`),
+    );
+    await page.getByRole("button", { name: /Yes/ }).click();
+    await page.getByRole("button", { name: /Submit My Answers/ }).click();
+    await expect(page.getByText("100%")).toBeVisible();
+
+    const afterQuiz = await pool.query<{ xp: number }>(
+      "SELECT xp FROM profiles WHERE id = $1",
+      [profileId],
+    );
+    const xpAfterQuiz = afterQuiz.rows[0].xp;
+
+    await page.goto("/dashboard/student");
+    await expect(bookCard.getByText("Current page: 20 of 100")).toBeVisible();
+    await bookCard.getByRole("button", { name: "Update page" }).click();
+    await page.getByRole("spinbutton", { name: "Page" }).fill("35");
+    await page.getByRole("button", { name: "Save progress" }).click();
     await expect(page.getByText(/Progress updated to page 35\./)).toBeVisible();
     await expect(page.getByText(/earned 15 XP for 15 new physical-reading pages/i)).toBeVisible();
-    await expect(
-      page.getByText(/required reading checkpoint at page 35/i),
-    ).toBeVisible();
-    await expect(page).toHaveURL(/\/dashboard\/student$/);
-    await expect(page.getByRole("button", { name: "Start quiz" })).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).click();
 
     await expect(bookCard.getByText("Current page: 35 of 100")).toBeVisible();
@@ -259,7 +297,7 @@ test.describe("Manual reading progress synchronization", () => {
       [profileId],
     );
     expect(unchangedActivity.rows[0]).toMatchObject({
-      xp: 55,
+      xp: xpAfterQuiz + 15,
       reading_streak: 2,
       total_pages_read: 17,
       journal_count: "0",
@@ -313,7 +351,7 @@ test.describe("Manual reading progress synchronization", () => {
     );
     expect(correctedActivity.rows[0]).toEqual({
       current_page: 30,
-      xp: 55,
+      xp: xpAfterQuiz + 15,
       reading_streak: 2,
       total_pages_read: 17,
     });

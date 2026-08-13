@@ -50,6 +50,7 @@ const mockProgressTransaction = (
   previousPages: Array<number | null>,
   rewardHistory: Array<{ highest_page: number; rewarded_today: number }> = [],
   xpClaims: boolean[] = [],
+  checkpoints: Array<{ quiz_id: number; page_number: number }> = [],
 ) => {
   const transactionQueries: Array<{ sql: string; params: unknown[] }> = [];
   let savedPage: number | null = previousPages[0] ?? null;
@@ -69,6 +70,11 @@ const mockProgressTransaction = (
             return queryResult(
               previousPage === null ? [] : [{ current_page: previousPage }],
             );
+          }
+
+          if (sql.includes("FROM quiz_checkpoints")) {
+            const checkpoint = checkpoints.shift();
+            return queryResult(checkpoint ? [checkpoint] : []);
           }
 
           if (sql.includes("INSERT INTO student_books")) {
@@ -415,6 +421,64 @@ describe("updatePhysicalReadingProgress", () => {
     ]);
   });
 
+  it("blocks at the earliest unanswered required checkpoint before saving", async () => {
+    const transactionQueries = mockProgressTransaction(
+      [5],
+      [],
+      [],
+      [{ quiz_id: 10, page_number: 10 }],
+    );
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ id: 1, page_count: 100 }]),
+    );
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await expect(
+      updatePhysicalReadingProgress({ bookId: 1, currentPage: 35 }),
+    ).resolves.toEqual({
+      success: false,
+      code: "CHECKPOINT_REQUIRED",
+      message:
+        "Complete the required quiz at page 10 before updating your progress.",
+      checkpoint: { quizId: 10, checkpointPage: 10 },
+    });
+    expect(
+      transactionQueries.some(({ sql }) => sql.includes("INSERT INTO student_books")),
+    ).toBe(false);
+    const checkpointQuery = transactionQueries.find(({ sql }) =>
+      sql.includes("FROM quiz_checkpoints"),
+    );
+    expect(checkpointQuery?.sql).toContain("ORDER BY qc.page_number ASC");
+    expect(checkpointQuery?.params).toEqual([1, 35, "profile-1"]);
+  });
+
+  it("allows backward corrections without checkpoint enforcement", async () => {
+    const transactionQueries = mockProgressTransaction(
+      [40],
+      [],
+      [],
+      [{ quiz_id: 10, page_number: 10 }],
+    );
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ id: 1, page_count: 100 }]),
+    );
+    const { updatePhysicalReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await expect(
+      updatePhysicalReadingProgress({ bookId: 1, currentPage: 35 }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: { currentPage: 35, movedBackward: true },
+    });
+    expect(
+      transactionQueries.some(({ sql }) => sql.includes("FROM quiz_checkpoints")),
+    ).toBe(false);
+  });
+
   it("validates the submitted page before querying the book", async () => {
     const { updatePhysicalReadingProgress } = await import(
       "@/app/(dashboard)/dashboard/student/actions"
@@ -759,9 +823,9 @@ describe("getPendingCheckpointForPage", () => {
     } as Awaited<ReturnType<typeof getCurrentUser>>);
   });
 
-  it("queries for the latest checkpoint without a completed attempt", async () => {
+  it("queries for the earliest checkpoint without a completed attempt", async () => {
     vi.mocked(queryWithContext).mockResolvedValue(
-      queryResult([{ quiz_id: 12, page_number: 50 }]),
+      queryResult([{ quiz_id: 12, page_number: 10 }]),
     );
     const { getPendingCheckpointForPage } = await import(
       "@/app/(dashboard)/dashboard/student/actions"
@@ -772,7 +836,7 @@ describe("getPendingCheckpointForPage", () => {
     ).resolves.toEqual({
       checkpointRequired: true,
       quizId: 12,
-      checkpointPage: 50,
+      checkpointPage: 10,
     });
 
     expect(queryWithContext).toHaveBeenCalledWith(
@@ -781,6 +845,9 @@ describe("getPendingCheckpointForPage", () => {
       [3, 65, "profile-1"],
     );
     expect(queryWithContext).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(queryWithContext).mock.calls[0]?.[1]).toContain(
+      "ORDER BY qc.page_number ASC",
+    );
   });
 });
 
