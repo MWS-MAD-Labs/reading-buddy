@@ -153,6 +153,39 @@ describe("recordReadingProgress", () => {
     });
   });
 
+  it("saves non-student digital progress without student gamification", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue({
+      userId: "user-1",
+      profileId: "profile-1",
+      role: "TEACHER",
+    } as Awaited<ReturnType<typeof getCurrentUser>>);
+    const transactionQueries = mockProgressTransaction([10]);
+
+    const { recordReadingProgress } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+    const result = await recordReadingProgress({
+      bookId: 42,
+      currentPage: 12,
+      progressPercent: 50,
+    });
+
+    expect(result).toEqual({
+      success: true,
+      streakUpdated: false,
+      currentStreak: 0,
+      xpAwarded: 0,
+    });
+    expect(
+      transactionQueries.some(({ sql }) => sql.includes("INSERT INTO student_books")),
+    ).toBe(true);
+    expect(createJournalEntry).not.toHaveBeenCalled();
+    expect(updateReadingStreak).not.toHaveBeenCalled();
+    expect(awardXP).not.toHaveBeenCalled();
+    expect(evaluateBadges).not.toHaveBeenCalled();
+    expect(queryWithContext).not.toHaveBeenCalled();
+  });
+
   it("writes digital position fields and source in one transaction", async () => {
     const transactionQueries = mockProgressTransaction([10]);
     vi.mocked(queryWithContext).mockResolvedValue(queryResult([]));
@@ -326,20 +359,60 @@ describe("updatePhysicalReadingProgress", () => {
     } as Awaited<ReturnType<typeof getCurrentUser>>);
   });
 
-  it("rejects authenticated non-student profiles when the role is available", async () => {
+  it("allows non-student profiles to save progress without student rewards", async () => {
     vi.mocked(getCurrentUser).mockResolvedValue({
       userId: "user-1",
       profileId: "profile-1",
       role: "TEACHER",
     } as Awaited<ReturnType<typeof getCurrentUser>>);
+    const transactionQueries = mockProgressTransaction([20]);
+    vi.mocked(queryWithContext).mockResolvedValue(
+      queryResult([{ id: 1, page_count: 100 }]),
+    );
     const { updatePhysicalReadingProgress } = await import(
       "@/app/(dashboard)/dashboard/student/actions"
     );
 
     await expect(
-      updatePhysicalReadingProgress({ bookId: 1, currentPage: 5 }),
-    ).resolves.toMatchObject({ success: false, code: "FORBIDDEN" });
-    expect(queryWithContext).not.toHaveBeenCalled();
+      updatePhysicalReadingProgress({ bookId: 1, currentPage: 30 }),
+    ).resolves.toEqual({
+      success: true,
+      data: {
+        previousPage: 20,
+        currentPage: 30,
+        totalPages: 100,
+        progressPercent: 30,
+        source: "manual_physical",
+        changed: true,
+        movedBackward: false,
+        reachedFinalPage: false,
+        isNewBook: false,
+        rewardedPages: 0,
+        xpAwarded: 0,
+        rewardStatus: "not_applicable",
+      },
+    });
+    expect(
+      transactionQueries.some(({ sql }) => sql.includes("INSERT INTO student_books")),
+    ).toBe(true);
+    expect(
+      transactionQueries.some(({ sql }) => sql.includes("INSERT INTO xp_transactions")),
+    ).toBe(false);
+    expect(
+      transactionQueries.find(({ sql }) =>
+        sql.includes("INSERT INTO reading_progress_events"),
+      )?.params,
+    ).toEqual([
+      "profile-1",
+      1,
+      20,
+      30,
+      "manual_physical",
+      10,
+      0,
+      0,
+      "not_applicable",
+    ]);
   });
 
   it("validates the submitted page before querying the book", async () => {

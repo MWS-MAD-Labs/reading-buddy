@@ -21,6 +21,7 @@ export type ReadingProgressSource = "digital_reader" | "manual_physical";
 type AuthenticatedUser = {
   userId: string;
   profileId: string;
+  canEarnReadingRewards: boolean;
 };
 
 type SaveReadingPositionInput = {
@@ -49,7 +50,6 @@ export type SaveReadingPositionResult = {
 
 export type ManualProgressErrorCode =
   | "UNAUTHENTICATED"
-  | "FORBIDDEN"
   | "BOOK_NOT_FOUND"
   | "INVALID_PAGE"
   | "PAGE_EXCEEDS_BOOK"
@@ -189,7 +189,11 @@ async function saveReadingPosition(
     let xpAwarded = 0;
     let rewardStatus: ReadingProgressRewardStatus = "not_applicable";
 
-    if (input.source === "manual_physical" && pagesAdvanced > 0) {
+    if (
+      user.canEarnReadingRewards &&
+      input.source === "manual_physical" &&
+      pagesAdvanced > 0
+    ) {
       await client.query(
         "SELECT pg_advisory_xact_lock(hashtext($1), -1)",
         [user.profileId],
@@ -334,6 +338,14 @@ async function processDigitalReadingActivity(
   bookId: number,
   result: SaveReadingPositionResult,
 ): Promise<DigitalActivityResult> {
+  if (!user.canEarnReadingRewards) {
+    return {
+      streakUpdated: false,
+      currentStreak: 0,
+      xpAwarded: 0,
+    };
+  }
+
   let xpAwarded = 0;
   let streakResult = { currentStreak: 0, isNewStreak: false };
   const pagesAdvanced = Math.max(
@@ -437,6 +449,7 @@ export const recordReadingProgress = async (input: {
   const authenticatedUser: AuthenticatedUser = {
     userId: user.userId,
     profileId: user.profileId,
+    canEarnReadingRewards: !user.role || user.role === "STUDENT",
   };
   const resolvedPage =
     typeof input.currentPage === "number" && input.currentPage > 0
@@ -496,13 +509,6 @@ export const updatePhysicalReadingProgress = async (input: {
     };
   }
 
-  if (user.role && user.role !== "STUDENT") {
-    return {
-      success: false,
-      code: "FORBIDDEN",
-      message: "Only student accounts can update reading progress.",
-    };
-  }
 
   if (!Number.isInteger(input.bookId) || input.bookId < 1) {
     return {
@@ -577,7 +583,11 @@ export const updatePhysicalReadingProgress = async (input: {
 
   try {
     const data = await saveReadingPosition(
-      { userId: user.userId, profileId: user.profileId },
+      {
+        userId: user.userId,
+        profileId: user.profileId,
+        canEarnReadingRewards: !user.role || user.role === "STUDENT",
+      },
       {
         bookId: input.bookId,
         currentPage: input.currentPage,

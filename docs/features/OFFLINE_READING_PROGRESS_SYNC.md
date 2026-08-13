@@ -81,7 +81,8 @@ A manual physical-page form must therefore not call the current action unchanged
 ### 4.1 Goals
 
 - Reuse `student_books` as the canonical latest reading position.
-- Let a student update a physical-book page from **My Readings**.
+- Let students update a physical-book page from **My Readings**.
+- Let any authenticated library reader update their saved page from the book details modal.
 - Validate the page on the server against trusted book metadata.
 - Distinguish digital-reader updates from manual physical-book updates.
 - Prevent stale EPUB CFI data from overriding a manual update.
@@ -118,7 +119,9 @@ For EPUB files, the UI must warn that a printed page and a reflowable EPUB locat
 
 A page greater than the saved page is accepted after validation.
 
-Manual updates can award page XP under the Phase 4 policy: only pages above the book's historical high-water mark qualify, and rewards are capped at 20 manual pages per student per UTC day. Manual updates still do not increment `profiles.total_pages_read`, update reading streaks, award page-count badges, or create reading-session journal entries.
+Manual updates from student profiles can award page XP under the Phase 4 policy: only pages above the book's historical high-water mark qualify, and rewards are capped at 20 manual pages per student per UTC day. Manual updates still do not increment `profiles.total_pages_read`, update reading streaks, award page-count badges, or create reading-session journal entries.
+
+Authenticated non-student profiles may save and resume reading progress, but their manual or digital progress does not award XP, update streaks, evaluate badges, create reading journal entries, or increment student reading totals.
 
 ### 5.4 Same-page updates
 
@@ -163,10 +166,10 @@ The first implementation should preserve the existing automatic reader behavior 
 
 ```mermaid
 flowchart TD
-    A[Student selects Update page] --> B[Manual progress dialog]
+    A[Authenticated reader selects Update page] --> B[Manual progress dialog]
     B --> C[Client validates input]
     C --> D[updatePhysicalReadingProgress]
-    D --> E[Authenticate student]
+    D --> E[Authenticate reader]
     E --> F[Load book and current progress]
     F --> G[Validate page]
     G --> H[Persist canonical position]
@@ -261,18 +264,19 @@ export async function updatePhysicalReadingProgress(
 
 This action:
 
-1. Authenticates the current user.
-2. Verifies that the profile is a student if role enforcement is available in the current authentication contract.
-3. Loads the book's `id`, `page_count`, and `file_format` from PostgreSQL.
-4. Loads the student's current `student_books` row.
-5. Validates the submitted page.
-6. Calculates `progress_percent` on the server.
-7. Upserts the canonical `student_books` row.
-8. Clears stale `epub_cfi` when the manual page becomes canonical.
-9. Sets the progress source and manual synchronization timestamp.
-10. Does not run page XP, streak, or total-pages side effects.
-11. Revalidates all routes that display this progress.
-12. Returns structured state for success, no-op, checkpoint, and completion UI.
+1. Authenticates the current user and requires a profile ID.
+2. Loads the book's `id` and `page_count` from PostgreSQL.
+3. Loads the current profile's `student_books` row.
+4. Validates the submitted page.
+5. Calculates `progress_percent` on the server.
+6. Upserts the canonical `student_books` row.
+7. Clears stale `epub_cfi` when the manual page becomes canonical.
+8. Sets the progress source and manual synchronization timestamp.
+9. Applies capped, event-backed manual XP only when the authenticated profile role is `STUDENT`.
+10. Saves non-student progress with zero rewarded pages and zero XP.
+11. Does not update streaks, total-pages counters, badges, or reading-session journals for manual updates.
+12. Revalidates all routes that display this progress.
+13. Returns structured state for success, no-op, checkpoint, and completion UI.
 
 ## 7. Database design
 
@@ -397,10 +401,11 @@ All authoritative validation occurs in the server action.
 
 ### 8.2 Authorization
 
-- The action uses the authenticated user's `profileId` as `student_id`.
-- The client must never submit a `studentId`.
+- The action uses the authenticated user's `profileId` as the profile key stored in `student_books.student_id`.
+- The client must never submit a `studentId` or another profile identifier.
 - Queries and writes must run through `queryWithContext()` using the authenticated `userId`.
-- A student can update only their own `student_books` record.
+- Every authenticated profile can update only its own `student_books` record.
+- Student profiles are eligible for the configured reading rewards; staff profiles save position only.
 - If catalog access restrictions are enforced elsewhere, the action must apply the same rule before creating a new `student_books` row.
 
 ### 8.3 Error contract
@@ -419,7 +424,6 @@ type ManualProgressResult =
       success: false;
       code:
         | "UNAUTHENTICATED"
-        | "FORBIDDEN"
         | "BOOK_NOT_FOUND"
         | "INVALID_PAGE"
         | "PAGE_EXCEEDS_BOOK"
@@ -465,11 +469,12 @@ A future edition-aware implementation may store separate `physical_current_page`
 
 ### 11.1 Entry point
 
-Add **Update page** to each book card in the **My Readings** section of:
+Expose **Update page** from both reading entry points:
 
-`web/src/app/(dashboard)/dashboard/student/page.tsx`
+- each book card in the **My Readings** section of `web/src/app/(dashboard)/dashboard/student/page.tsx`; and
+- beside **Read Book** in the library book-details modal implemented by `web/src/components/dashboard/BookDetailsModal.tsx`.
 
-Keep **Continue reading** as the primary digital-reader action.
+The library modal uses the same `UpdateReadingProgressDialog` as the student dashboard. It initializes from the current profile's saved page, or page `1` when no progress row exists. Keep **Continue reading** or **Read Book** as the primary digital-reader action.
 
 The card should display:
 
@@ -616,19 +621,19 @@ Use the actual journal route present in the application. Revalidation is unneces
 
 ### 14.1 Current policy
 
-| Side effect | Digital reader | Manual physical update |
-|---|---:|---:|
-| Save canonical page | Yes | Yes |
-| Save progress percentage | Yes | Yes |
-| Save EPUB CFI | When supplied | Clear stale value |
-| Update reading streak | Existing behavior | No |
-| Award page XP | Existing behavior | Event-backed, high-water protected, maximum 20 rewarded pages per UTC day |
-| Increment total pages read | Existing behavior | No |
-| Evaluate page badges | Existing behavior | No |
-| Mark complete automatically | No | No |
-| Create reading-session journal entry | Existing behavior | No by default |
+| Side effect | Student digital reader | Student manual update | Non-student digital/manual progress |
+|---|---:|---:|---:|
+| Save canonical page | Yes | Yes | Yes |
+| Save progress percentage | Yes | Yes | Yes |
+| Save EPUB CFI | When supplied | Clear stale value | Same source-aware behavior |
+| Update reading streak | Existing behavior | No | No |
+| Award page XP | Existing behavior | Event-backed, high-water protected, maximum 20 rewarded pages per UTC day | No |
+| Increment total pages read | Existing behavior | No | No |
+| Evaluate page badges | Existing behavior | No | No |
+| Mark complete automatically | No | No | No |
+| Create reading-session journal entry | Existing behavior | No by default | No |
 
-A manual progress journal entry may be added later, but it must be explicitly labelled `manual_physical` and must not be interpreted as verified reading activity.
+A manual progress journal entry may be added later, but it must be explicitly labelled `manual_physical` and must not be interpreted as verified reading activity. Staff progress is position-only and must not contribute to student analytics, leaderboards, streaks, badges, or reward totals.
 
 ### 14.2 Reward safeguards
 
@@ -640,7 +645,17 @@ Implemented controls include:
 - reward eligibility only above the book's historical high-water mark;
 - student-wide and student/book transaction locks;
 - teacher-visible source and reward labels; and
-- correction events that do not reverse historical rewards.
+- correction events that do not reverse historical rewards; and
+- role-aware reward eligibility so authenticated staff can save progress without student gamification side effects.
+
+### 14.3 Library progress entry point
+
+**Completed:** 2026-08-13
+
+- The library book-details modal shows **Update page** beside **Read Book** for authenticated readers.
+- The modal reuses `UpdateReadingProgressDialog` rather than maintaining a separate progress form.
+- Book details include the current profile's saved page, total pages, file format, and completion state.
+- Non-student profiles can save and resume progress but receive no XP, streak, badge, journal, or student-total side effects from digital or manual progress saves.
 
 ## 15. Implementation sequence
 
