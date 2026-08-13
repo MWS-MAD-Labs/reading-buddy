@@ -249,6 +249,9 @@ CREATE TABLE IF NOT EXISTS quizzes (
   quiz_type VARCHAR(50) DEFAULT 'classroom',
   checkpoint_page INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW(),
+  status VARCHAR(50) NOT NULL DEFAULT 'draft',
+  is_published BOOLEAN NOT NULL DEFAULT FALSE,
+  tags TEXT[],
   CONSTRAINT quizzes_quiz_type_check CHECK (quiz_type IN ('checkpoint', 'classroom'))
 );
 

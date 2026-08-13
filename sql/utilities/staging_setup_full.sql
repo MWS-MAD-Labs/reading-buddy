@@ -320,6 +320,9 @@ CREATE TABLE quizzes (
   quiz_type VARCHAR(50) DEFAULT 'classroom',
   checkpoint_page INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW(),
+  status VARCHAR(50) NOT NULL DEFAULT 'draft',
+  is_published BOOLEAN NOT NULL DEFAULT FALSE,
+  tags TEXT[],
   CONSTRAINT quizzes_quiz_type_check CHECK (quiz_type IN ('checkpoint', 'classroom'))
 );
 
@@ -558,11 +561,17 @@ SELECT
   q.quiz_type,
   q.checkpoint_page,
   q.created_at,
+  q.status,
+  q.is_published,
+  q.tags,
   COUNT(DISTINCT qa.id) AS total_attempts,
   COUNT(DISTINCT qa.student_id) AS unique_students,
+  COUNT(DISTINCT qa.id) AS attempt_count,
   ROUND(AVG(qa.score), 2) AS average_score,
+  ROUND(AVG(qa.score), 2) AS avg_score,
   MAX(qa.score) AS highest_score,
   MIN(qa.score) AS lowest_score,
+  MAX(qa.submitted_at) AS last_attempted_at,
   CASE
     WHEN COUNT(qa.id) = 0 THEN 'no_attempts'
     WHEN AVG(qa.score) >= 80 THEN 'high_performance'
@@ -590,7 +599,10 @@ GROUP BY
   q.page_range_end,
   q.quiz_type,
   q.checkpoint_page,
-  q.created_at;
+  q.created_at,
+  q.status,
+  q.is_published,
+  q.tags;
 
 GRANT SELECT ON public.quiz_statistics TO authenticated;
 
