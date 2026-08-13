@@ -23,11 +23,23 @@ export const dynamic = "force-dynamic";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-export default async function LibrarianPage() {
+type LibrarianPageProps = {
+  searchParams?: Promise<{ quizBookId?: string }>;
+};
+
+export default async function LibrarianPage({ searchParams }: LibrarianPageProps) {
   // Only ADMIN and LIBRARIAN users can access this page
   await requireRole(["ADMIN", "LIBRARIAN"]);
 
   const user = await getCurrentUser();
+  const awaitedSearchParams = searchParams ? await searchParams : undefined;
+  const parsedQuizBookId = awaitedSearchParams?.quizBookId
+    ? Number.parseInt(awaitedSearchParams.quizBookId, 10)
+    : undefined;
+  const quizBookId =
+    parsedQuizBookId && Number.isInteger(parsedQuizBookId) && parsedQuizBookId > 0
+      ? parsedQuizBookId
+      : undefined;
   const statsResult = user.userId ? await getLibrarianStats(user.userId) : null;
 
   // Get all books with their access levels
@@ -175,6 +187,7 @@ export default async function LibrarianPage() {
         books={managedBooks}
         genreOptions={genreOptions}
         languageOptions={languageOptions}
+        initialQuizBookId={quizBookId}
       />
     </div>
   );

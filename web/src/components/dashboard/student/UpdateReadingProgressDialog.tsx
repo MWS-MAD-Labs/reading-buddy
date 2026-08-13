@@ -319,7 +319,7 @@ export function UpdateReadingProgressDialog({
                     disabled={isPending}
                     onClick={() =>
                       router.push(
-                        `/dashboard/student/quiz/${pendingCheckpoint.quizId}?bookId=${bookId}&page=${pendingCheckpoint.checkpointPage}`,
+                        `/dashboard/student/quiz/${pendingCheckpoint.quizId}?origin=progress-update&bookId=${bookId}&page=${pendingCheckpoint.checkpointPage}&targetPage=${page}`,
                       )
                     }
                   >

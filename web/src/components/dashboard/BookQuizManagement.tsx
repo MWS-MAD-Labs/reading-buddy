@@ -422,7 +422,7 @@ export const BookQuizManagement = ({
 
                 <div className="flex flex-wrap gap-1">
                   <Link
-                    href={`/dashboard/student/quiz/${quiz.id}`}
+                    href={`/dashboard/student/quiz/${quiz.id}?origin=librarian-preview&bookId=${bookId}`}
                     className={cn(
                       buttonVariants({ variant: "neutral", size: "sm" }),
                       "min-h-8 px-3 py-1 text-xs no-underline",

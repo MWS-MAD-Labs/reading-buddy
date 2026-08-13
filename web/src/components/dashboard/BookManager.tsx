@@ -140,6 +140,7 @@ type BookManagerProps = {
   onAddBookClick?: () => void;
   onEditBookClick?: (book: ManagedBookRecord) => void;
   isAddPanelOpen?: boolean;
+  initialQuizBookId?: number;
 };
 
 export const BookManager = ({
@@ -149,6 +150,7 @@ export const BookManager = ({
   onAddBookClick,
   onEditBookClick,
   isAddPanelOpen = false,
+  initialQuizBookId,
 }: BookManagerProps) => {
   const router = useRouter();
   const [feedback, setFeedback] = useState<{
@@ -157,7 +159,9 @@ export const BookManager = ({
   } | null>(null);
   const [deletePendingId, setDeletePendingId] = useState<number | null>(null);
   const [quizManagementBook, setQuizManagementBook] =
-    useState<ManagedBookRecord | null>(null);
+    useState<ManagedBookRecord | null>(
+      () => books.find((book) => book.id === initialQuizBookId) ?? null,
+    );
   const [searchTerm, setSearchTerm] = useState("");
   const [genreFilter, setGenreFilter] = useState<string>("ALL");
   const [languageFilter, setLanguageFilter] = useState<string>("ALL");
@@ -836,7 +840,12 @@ export const BookManager = ({
               </div>
               <Button
                 type="button"
-                onClick={() => setQuizManagementBook(null)}
+                onClick={() => {
+                  setQuizManagementBook(null);
+                  if (initialQuizBookId) {
+                    router.replace("/dashboard/librarian");
+                  }
+                }}
                 variant="neutral"
                 size="sm"
               >

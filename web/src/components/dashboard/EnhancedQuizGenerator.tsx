@@ -54,7 +54,9 @@ export const EnhancedQuizGenerator = ({ books }: EnhancedQuizGeneratorProps) => 
         questionCount,
       });
 
-      setQuizLink(`/dashboard/student/quiz/${result.quizId}`);
+      setQuizLink(
+        `/dashboard/student/quiz/${result.quizId}?origin=librarian-preview&bookId=${bookId}`,
+      );
       setContentSource(result.contentSource);
       setStatus('success');
     } catch (err) {

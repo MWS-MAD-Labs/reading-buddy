@@ -177,7 +177,7 @@ export function UnifiedBookReader({
 
               if (checkpoint.checkpointRequired && checkpoint.quizId) {
                 router.push(
-                  `/dashboard/student/quiz/${checkpoint.quizId}?bookId=${bookId}&page=${payload.page}`,
+                  `/dashboard/student/quiz/${checkpoint.quizId}?origin=reading&bookId=${bookId}&page=${payload.page}`,
                 );
               }
             } catch (err) {

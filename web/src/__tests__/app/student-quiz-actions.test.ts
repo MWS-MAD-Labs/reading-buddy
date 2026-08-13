@@ -141,4 +141,28 @@ describe("submitQuizAttempt", () => {
       2,
     );
   });
+
+  it("scores librarian previews without recording an attempt or awarding XP", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue({
+      userId: "user-1",
+      profileId: "profile-1",
+      role: "LIBRARIAN",
+    } as Awaited<ReturnType<typeof getCurrentUser>>);
+    vi.mocked(query).mockResolvedValueOnce(queryResult([storedQuiz]));
+    const { submitQuizAttempt } = await import(
+      "@/app/(dashboard)/dashboard/student/quiz/actions"
+    );
+
+    await expect(
+      submitQuizAttempt({ quizId: 9, answers: [0, 2], preview: true }),
+    ).resolves.toEqual({
+      success: true,
+      newBadges: [],
+      xpAwarded: 0,
+      scorePercent: 100,
+    });
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(onQuizCompleted).not.toHaveBeenCalled();
+  });
 });

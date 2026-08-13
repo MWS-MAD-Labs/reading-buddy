@@ -358,7 +358,7 @@ export default async function StudentClassroomPage({
                         </div>
                       ) : (
                         <Link
-                          href={`/dashboard/student/quiz/${quiz.id}`}
+                          href={`/dashboard/student/quiz/${quiz.id}?origin=classroom`}
                           className="rounded-full bg-gradient-to-r from-purple-500 to-pink-400 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-105"
                         >
                           Take quiz

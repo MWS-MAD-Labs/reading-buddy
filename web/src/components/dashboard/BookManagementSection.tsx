@@ -12,12 +12,14 @@ type BookManagementSectionProps = {
   books: ManagedBookRecord[];
   genreOptions: string[];
   languageOptions: string[];
+  initialQuizBookId?: number;
 };
 
 export const BookManagementSection = ({
   books,
   genreOptions,
   languageOptions,
+  initialQuizBookId,
 }: BookManagementSectionProps) => {
   const [showUploader, setShowUploader] = useState(false);
   const [editingBook, setEditingBook] = useState<ManagedBookRecord | null>(
@@ -48,6 +50,7 @@ export const BookManagementSection = ({
         onAddBookClick={() => setShowUploader(true)}
         onEditBookClick={(book) => setEditingBook(book)}
         isAddPanelOpen={showUploader}
+        initialQuizBookId={initialQuizBookId}
       />
       {showUploader ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241718]/45 px-4 py-8 backdrop-blur-sm">

@@ -200,7 +200,7 @@ describe("UpdateReadingProgressDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Start quiz" }));
     expect(push).toHaveBeenCalledWith(
-      "/dashboard/student/quiz/9?bookId=1&page=10",
+      "/dashboard/student/quiz/9?origin=progress-update&bookId=1&page=10&targetPage=35",
     );
   });
 

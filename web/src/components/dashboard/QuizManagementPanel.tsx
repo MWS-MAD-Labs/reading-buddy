@@ -253,7 +253,7 @@ export const QuizManagementPanel = ({ bookGroups }: QuizManagementPanelProps) =>
                     {/* Actions */}
                     <div className="flex flex-wrap gap-2">
                       <Link
-                        href={`/dashboard/student/quiz/${quiz.id}`}
+                        href={`/dashboard/student/quiz/${quiz.id}?origin=librarian-preview&bookId=${group.bookId}`}
                         className="rounded-lg border-2 border-blue-300 bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-200"
                       >
                         👁️ Preview

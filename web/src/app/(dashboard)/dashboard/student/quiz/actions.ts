@@ -18,6 +18,7 @@ type StoredQuizPayload = {
 export const submitQuizAttempt = async (input: {
   quizId: number;
   answers: number[];
+  preview?: boolean;
 }): Promise<{
   success: boolean;
   newBadges: Badge[];
@@ -73,6 +74,21 @@ export const submitQuizAttempt = async (input: {
     0,
   );
   const totalQuestions = questions.length;
+  const scorePercent = Math.round((score / totalQuestions) * 100);
+
+  if (input.preview) {
+    if (user.role !== "ADMIN" && user.role !== "LIBRARIAN") {
+      throw new Error("Only librarians can preview quizzes.");
+    }
+
+    return {
+      success: true,
+      newBadges: [],
+      xpAwarded: 0,
+      scorePercent,
+    };
+  }
+
   const profileId = user.profileId;
 
   const insertResult = await query(
@@ -97,8 +113,6 @@ export const submitQuizAttempt = async (input: {
 
   revalidatePath("/dashboard/student");
   revalidatePath("/dashboard/student/badges");
-
-  const scorePercent = Math.round((score / totalQuestions) * 100);
 
   return {
     success: true,
