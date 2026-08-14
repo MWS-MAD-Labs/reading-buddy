@@ -870,7 +870,11 @@ describe("markBookAsCompleted", () => {
     );
   });
 
-  const mockCompletionTransaction = (completed: boolean) => {
+  const mockCompletionTransaction = (
+    completed: boolean,
+    currentPage = 100,
+    reviewInserted = true,
+  ) => {
     const transactionQueries: Array<{ sql: string; params: unknown[] }> = [];
     vi.mocked(transactionWithContext).mockImplementation(
       async (_userId, callback) => {
@@ -882,7 +886,10 @@ describe("markBookAsCompleted", () => {
               return queryResult([{ page_count: 100, title: "Test Book" }]);
             }
             if (sql.includes("SELECT completed")) {
-              return queryResult([{ completed }]);
+              return queryResult([{ completed, current_page: currentPage }]);
+            }
+            if (sql.includes("INSERT INTO book_reviews")) {
+              return queryResult(reviewInserted ? [{ id: "review-1" }] : []);
             }
             return queryResult([]);
           }),
@@ -911,6 +918,94 @@ describe("markBookAsCompleted", () => {
     ).toBe(true);
     expect(createJournalEntry).toHaveBeenCalledTimes(1);
     expect(onBookCompleted).toHaveBeenCalledWith("user-1", "profile-1", 7);
+  });
+
+  it("submits the review in the completion transaction", async () => {
+    const transactionQueries = mockCompletionTransaction(false);
+    const { markBookAsCompleted } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await expect(
+      markBookAsCompleted({
+        bookId: 7,
+        review: { rating: 5, comment: "A thoughtful review." },
+      }),
+    ).resolves.toMatchObject({ success: true });
+
+    expect(
+      transactionQueries.find(({ sql }) =>
+        sql.includes("INSERT INTO book_reviews"),
+      )?.params,
+    ).toEqual([7, "profile-1", 5, "A thoughtful review."]);
+    expect(
+      transactionQueries.some(({ sql }) =>
+        sql.includes("INSERT INTO student_books"),
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    {
+      review: { rating: 0, comment: "A thoughtful review." },
+      message: "Rating must be between 1 and 5.",
+    },
+    {
+      review: { rating: 6, comment: "A thoughtful review." },
+      message: "Rating must be between 1 and 5.",
+    },
+    {
+      review: { rating: 5, comment: "short" },
+      message: "Review must be at least 10 characters.",
+    },
+    {
+      review: { rating: 5 } as { rating: number; comment: string },
+      message: "Review must be at least 10 characters.",
+    },
+  ])("rejects invalid review input: $message", async ({ review, message }) => {
+    const { markBookAsCompleted } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await expect(
+      markBookAsCompleted({ bookId: 7, review }),
+    ).rejects.toThrow(message);
+    expect(transactionWithContext).not.toHaveBeenCalled();
+  });
+
+  it("requires the saved progress to reach the final page before reviewing", async () => {
+    mockCompletionTransaction(false, 99);
+    const { markBookAsCompleted } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await expect(
+      markBookAsCompleted({
+        bookId: 7,
+        review: { rating: 5, comment: "A thoughtful review." },
+      }),
+    ).rejects.toThrow("Reach the final page before finishing this book.");
+    expect(createJournalEntry).not.toHaveBeenCalled();
+    expect(onBookCompleted).not.toHaveBeenCalled();
+  });
+
+  it("still completes when a review already exists", async () => {
+    const transactionQueries = mockCompletionTransaction(false, 100, false);
+    const { markBookAsCompleted } = await import(
+      "@/app/(dashboard)/dashboard/student/actions"
+    );
+
+    await expect(
+      markBookAsCompleted({
+        bookId: 7,
+        review: { rating: 5, comment: "A thoughtful review." },
+      }),
+    ).resolves.toMatchObject({ success: true });
+    expect(
+      transactionQueries.some(({ sql }) =>
+        sql.includes("INSERT INTO student_books"),
+      ),
+    ).toBe(true);
   });
 
   it("is idempotent when the book was already completed", async () => {

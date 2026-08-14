@@ -142,7 +142,7 @@ describe("UpdateReadingProgressDialog", () => {
     await screen.findByText(/Progress updated to page 30\./);
   });
 
-  it("offers explicit completion after the final page and marks the book finished only after confirmation", async () => {
+  it("requires a review after the final page and finishes only after review submission", async () => {
     const user = userEvent.setup();
     vi.mocked(updatePhysicalReadingProgress).mockResolvedValue(
       successfulResult(100),
@@ -157,20 +157,35 @@ describe("UpdateReadingProgressDialog", () => {
 
     expect(
       await screen.findByText(
-        "You reached the final page. Mark this book as finished?",
+        "You reached the final page. Write a review to finish this book.",
       ),
     ).toBeInTheDocument();
     expect(markBookAsCompleted).not.toHaveBeenCalled();
 
     await user.click(
-      screen.getByRole("button", { name: "Mark as finished" }),
+      screen.getByRole("button", { name: "Submit review and finish" }),
+    );
+    expect(
+      screen.getByText("Choose a rating from 1 to 5 stars."),
+    ).toBeInTheDocument();
+    expect(markBookAsCompleted).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Rate 5 stars" }));
+    await user.type(screen.getByRole("textbox", { name: "Your review" }), "A wonderful book to read!");
+    await user.click(
+      screen.getByRole("button", { name: "Submit review and finish" }),
     );
 
     await waitFor(() =>
-      expect(markBookAsCompleted).toHaveBeenCalledWith({ bookId: 1 }),
+      expect(markBookAsCompleted).toHaveBeenCalledWith({
+        bookId: 1,
+        review: { rating: 5, comment: "A wonderful book to read!" },
+      }),
     );
     expect(
-      await screen.findByText("The Test Book is marked as finished."),
+      await screen.findByText(
+        "The Test Book is marked as finished and your review was submitted.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -223,6 +238,37 @@ describe("UpdateReadingProgressDialog", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("finishes without another review when one already exists", async () => {
+    const user = userEvent.setup();
+    vi.mocked(updatePhysicalReadingProgress).mockResolvedValue(
+      successfulResult(100),
+    );
+    renderDialog({ hasReviewed: true });
+    await user.click(screen.getByRole("button", { name: "Update page" }));
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Page" }), {
+      target: { value: "100" },
+    });
+    await user.click(screen.getByRole("button", { name: "Save progress" }));
+
+    expect(
+      await screen.findByText(
+        "You reached the final page. Mark this book as finished?",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Your review" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Mark as finished" }));
+    await waitFor(() =>
+      expect(markBookAsCompleted).toHaveBeenCalledWith({ bookId: 1 }),
+    );
+    expect(
+      await screen.findByText("The Test Book is marked as finished."),
+    ).toBeInTheDocument();
+  });
+
   it("does not offer completion again for an already completed book", async () => {
     const user = userEvent.setup();
     vi.mocked(updatePhysicalReadingProgress).mockResolvedValue(
@@ -238,7 +284,7 @@ describe("UpdateReadingProgressDialog", () => {
 
     await screen.findByText(/Progress updated to page 100\./);
     expect(
-      screen.queryByText("You reached the final page. Mark this book as finished?"),
+      screen.queryByText("You reached the final page. Write a review to finish this book."),
     ).not.toBeInTheDocument();
   });
 

@@ -88,8 +88,8 @@ A manual physical-page form must therefore not call the current action unchanged
 - Prevent stale EPUB CFI data from overriding a manual update.
 - Make identical submissions idempotent.
 - Support confirmed backward corrections.
-- Preserve current digital-reader behavior from the student's perspective.
-- Define explicit behavior for gamification, completion, journals, and checkpoints.
+- Keep manual and digital completion behavior consistent from the student's perspective.
+- Define explicit behavior for gamification, completion reviews, journals, and checkpoints.
 
 ### 4.2 Non-goals for the first release
 
@@ -146,11 +146,18 @@ A backward correction must not:
 
 Server validation must still accept a backward update even though client confirmation is a UX requirement. The server must not trust a client-provided previous page.
 
-### 5.6 Completion
+### 5.6 Completion and review
 
-Reaching `books.page_count` does not automatically mark a book complete.
+Reaching `books.page_count` does not automatically mark a book complete. Manual and digital readers offer completion only after the persisted reading position reaches the catalog's final page.
 
-After a final-page update, the UI asks whether the student wants to mark the book as finished. Confirmation uses the existing `markBookAsCompleted()` action. This preserves an intentional completion step and existing completion rewards.
+If the student has not reviewed the book, the completion UI requires:
+
+- a rating from `1` to `5`; and
+- a review comment of at least 10 characters.
+
+`markBookAsCompleted()` validates the persisted final-page position and inserts the pending review in the same transaction that marks `student_books.completed = true`. Completion rewards, the finished-book journal entry, and badge evaluation run only when the book becomes newly completed.
+
+If a review already exists, the student may confirm completion without submitting another review. A review uniqueness conflict is therefore non-fatal to completion, while other review database failures roll back the transaction. The library's standalone `submitBookReview()` action remains available for legacy or post-completion reviews.
 
 ### 5.7 Required checkpoint quizzes
 
@@ -187,7 +194,12 @@ flowchart TD
     H -->|No| K[Persist canonical position]
     K --> L[Return previous and current state]
     L --> M[Refresh dashboard and reader routes]
-    M --> N[Optional completion prompt]
+    M --> N{Final persisted page?}
+    N -->|No| O[Continue reading]
+    N -->|Yes, no review| P[Collect rating and review]
+    N -->|Yes, review exists| Q[Confirm completion]
+    P --> R[Atomically submit review and finish]
+    Q --> S[Finish without duplicate review]
 ```
 
 ### 6.1 Separation of responsibilities
@@ -572,9 +584,17 @@ No-op:
 
 > Your progress is already saved at page 57.
 
-Final page:
+Final page without an existing review:
+
+> You reached the final page. Write a review to finish this book.
+
+The student selects a 1–5 star rating, writes at least 10 characters, and chooses **Submit review and finish**.
+
+Final page with an existing review:
 
 > You reached the final page. Mark this book as finished?
+
+The student may choose **Mark as finished** without creating a duplicate review.
 
 ### 11.6 Blocking checkpoint state
 
@@ -607,7 +627,13 @@ b.page_count,
 b.file_format,
 sb.progress_percent,
 sb.progress_source,
-sb.last_manual_sync_at
+sb.last_manual_sync_at,
+EXISTS (
+  SELECT 1
+  FROM book_reviews br
+  WHERE br.book_id = sb.book_id
+    AND br.student_id = sb.student_id
+) AS has_reviewed
 ```
 
 Map those values into the book-card data passed to the dialog.
@@ -684,7 +710,8 @@ Implemented controls include:
 
 - The library book-details modal shows **Update page** beside **Read Book** for authenticated readers.
 - The modal reuses `UpdateReadingProgressDialog` rather than maintaining a separate progress form.
-- Book details include the current profile's saved page, total pages, file format, and completion state.
+- Book details include the current profile's saved page, total pages, file format, completion state, and whether the profile already has a review.
+- The library and student dashboard pass the same review state into `UpdateReadingProgressDialog`, so both entry points use identical completion behavior.
 - Non-student profiles can save and resume progress but receive no XP, streak, badge, journal, or student-total side effects from digital or manual progress saves.
 
 ### 14.4 Required checkpoint enforcement
@@ -742,20 +769,23 @@ Implementation notes:
 
 **Completed:** 2026-08-11
 
-- [x] Prompt for completion after a final-page save.
-- [x] Reuse `markBookAsCompleted()` after confirmation.
+- [x] Prompt for a review and completion after a final-page save.
+- [x] Reuse `markBookAsCompleted()` for atomic review submission and completion.
+- [x] Align the digital reader with the same final-page completion rules.
 - [x] Surface pending checkpoints without forced navigation.
 - [x] Add end-to-end coverage.
 
 Implementation notes:
 
-- Final-page manual saves remain progress-only until the student explicitly selects **Mark as finished**.
-- Completion is transactionally idempotent, preventing duplicate completion journal entries, statistics, or rewards if confirmation is retried.
+- Final-page saves remain progress-only until the student explicitly completes the book.
+- Students without an existing review must select a rating and write a review before choosing **Submit review and finish**. Students with an existing review receive a simple **Mark as finished** confirmation.
+- Manual and digital completion use the same `markBookAsCompleted()` action. The digital finish control appears only at the reader-reported final page, after a delay that allows normal progress persistence; the server remains authoritative and verifies the saved page against `books.page_count`.
+- Review insertion and completion are transactional. Completion is idempotent, preventing duplicate completion journal entries, statistics, or rewards if submission is retried, and an existing review does not block completion.
 - Manual updates query for the latest genuinely pending required checkpoint and show an optional **Start quiz** action without redirecting automatically. Quiz return navigation uses the checkpoint page rather than a later saved page.
 - The dashboard includes existing completion state so already-finished books are not prompted again.
 - Component coverage verifies both pending and absent checkpoint states, including reading past a checkpoint before starting its quiz.
 - The opt-in Playwright scenario seeds isolated data and removes dependent quiz, journal, gamification, progress, profile, book, and user records in a reverse-dependency transaction.
-- Twenty-nine focused server-action and component tests, TypeScript type-check, changed-file ESLint, `git diff --check`, and Playwright test discovery passed. The authenticated Playwright scenario remains opt-in with `RUN_PROGRESS_SYNC_E2E=1`.
+- Forty-eight focused server-action and component tests cover validation, final-page enforcement, existing-review behavior, manual and digital completion, and client refresh. TypeScript type-check and `git diff --check` passed. The authenticated Playwright scenario remains opt-in with `RUN_PROGRESS_SYNC_E2E=1`.
 
 ### Phase 4: Optional analytics and rewards — Complete
 

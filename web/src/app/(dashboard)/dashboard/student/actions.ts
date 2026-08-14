@@ -49,6 +49,13 @@ class RequiredCheckpointError extends Error {
   }
 }
 
+class BookCompletionInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BookCompletionInputError";
+  }
+}
+
 export type SaveReadingPositionResult = {
   previousPage: number | null;
   currentPage: number;
@@ -802,6 +809,10 @@ export const getPendingCheckpointForPage = async (input: {
 
 export const markBookAsCompleted = async (input: {
   bookId: number;
+  review?: {
+    rating: number;
+    comment: string;
+  };
 }): Promise<{
   success: boolean;
   newBadges: Badge[];
@@ -813,6 +824,24 @@ export const markBookAsCompleted = async (input: {
 
   if (!user || !user.userId || !user.profileId) {
     throw new Error("You must be signed in to mark a book as completed.");
+  }
+
+  const reviewComment =
+    typeof input.review?.comment === "string"
+      ? input.review.comment.trim()
+      : undefined;
+  if (
+    input.review &&
+    (!Number.isInteger(input.review.rating) ||
+      input.review.rating < 1 ||
+      input.review.rating > 5)
+  ) {
+    throw new BookCompletionInputError("Rating must be between 1 and 5.");
+  }
+  if (input.review && (!reviewComment || reviewComment.length < 10)) {
+    throw new BookCompletionInputError(
+      "Review must be at least 10 characters.",
+    );
   }
 
   let book: { page_count: number | null; title: string | null };
@@ -834,17 +863,50 @@ export const markBookAsCompleted = async (input: {
         const selectedBook = bookResult.rows[0];
 
         if (!selectedBook) {
-          throw new Error("Book not found.");
+          throw new BookCompletionInputError("Book not found.");
         }
 
-        const progressResult = await client.query<{ completed: boolean }>(
-          `SELECT completed
+        const progressResult = await client.query<{
+          completed: boolean;
+          current_page: number;
+        }>(
+          `SELECT completed, current_page
            FROM student_books
            WHERE student_id = $1 AND book_id = $2
            FOR UPDATE`,
           [user.profileId, input.bookId],
         );
-        const wasCompleted = progressResult.rows[0]?.completed === true;
+        const progress = progressResult.rows[0];
+        const wasCompleted = progress?.completed === true;
+
+        if (
+          input.review &&
+          selectedBook.page_count !== null &&
+          (!progress || progress.current_page < selectedBook.page_count)
+        ) {
+          throw new BookCompletionInputError(
+            "Reach the final page before finishing this book.",
+          );
+        }
+
+        if (input.review) {
+          await client.query<{ id: string }>(
+            `INSERT INTO book_reviews (book_id, student_id, rating, comment)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (book_id, student_id) DO NOTHING
+             RETURNING id`,
+            [
+              input.bookId,
+              user.profileId,
+              input.review.rating,
+              reviewComment,
+            ],
+          );
+
+          // A review may already exist if the user reviewed through the library
+          // or retried after a response was interrupted. That should not prevent
+          // the book from being marked complete.
+        }
 
         if (!wasCompleted) {
           await client.query(
@@ -872,10 +934,11 @@ export const markBookAsCompleted = async (input: {
     book = completion.book;
     newlyCompleted = completion.newlyCompleted;
   } catch (error) {
-    console.error("Failed to mark book as completed:", error);
-    if (error instanceof Error && error.message === "Book not found.") {
+    if (error instanceof BookCompletionInputError) {
       throw error;
     }
+
+    console.error("Failed to mark book as completed:", error);
     throw new Error("Failed to mark book as completed.");
   }
 
@@ -921,6 +984,8 @@ export const markBookAsCompleted = async (input: {
 
   revalidatePath("/dashboard/student");
   revalidatePath("/dashboard/student/badges");
+  revalidatePath("/dashboard/library");
+  revalidatePath("/dashboard/librarian/reviews");
   revalidatePath(`/dashboard/student/read/${input.bookId}`);
 
   return {

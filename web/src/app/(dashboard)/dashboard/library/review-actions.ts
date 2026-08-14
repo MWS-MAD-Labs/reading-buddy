@@ -196,7 +196,8 @@ export async function getUserReview(bookId: number): Promise<BookReview | null> 
 }
 
 /**
- * Submit a book review
+ * Submit a standalone review for an already completed book. Reviews collected
+ * during completion are inserted atomically by markBookAsCompleted instead.
  */
 export async function submitBookReview(
     bookId: number,

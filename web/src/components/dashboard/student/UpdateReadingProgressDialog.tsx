@@ -7,6 +7,7 @@ import {
   updatePhysicalReadingProgress,
   type SaveReadingPositionResult,
 } from "@/app/(dashboard)/dashboard/student/actions";
+import { StarRating } from "@/components/ui/star-rating";
 import {
   Button,
   Dialog,
@@ -28,6 +29,7 @@ type UpdateReadingProgressDialogProps = {
   totalPages: number | null;
   fileFormat: string | null;
   isCompleted?: boolean;
+  hasReviewed?: boolean;
   onProgressUpdated?: (result: SaveReadingPositionResult) => void;
 };
 
@@ -38,11 +40,13 @@ export function UpdateReadingProgressDialog({
   totalPages,
   fileFormat,
   isCompleted = false,
+  hasReviewed = false,
   onProgressUpdated,
 }: UpdateReadingProgressDialogProps) {
   const router = useRouter();
   const inputId = useId();
   const messageId = useId();
+  const reviewId = useId();
   const messageRef = useRef<HTMLParagraphElement>(null);
   const [open, setOpen] = useState(false);
   const [savedPage, setSavedPage] = useState(currentPage);
@@ -51,6 +55,8 @@ export function UpdateReadingProgressDialog({
   const [isPending, setIsPending] = useState(false);
   const [completed, setCompleted] = useState(isCompleted);
   const [showCompletionPrompt, setShowCompletionPrompt] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [review, setReview] = useState("");
   const [pendingCheckpoint, setPendingCheckpoint] = useState<{
     quizId: number;
     checkpointPage: number;
@@ -62,6 +68,8 @@ export function UpdateReadingProgressDialog({
     setPage(String(savedPage));
     setPendingPage(null);
     setShowCompletionPrompt(false);
+    setRating(0);
+    setReview("");
     setPendingCheckpoint(null);
     setError(null);
     setSuccess(null);
@@ -140,11 +148,26 @@ export function UpdateReadingProgressDialog({
   };
 
   const handleMarkCompleted = async () => {
+    if (!hasReviewed && (rating < 1 || rating > 5)) {
+      setError("Choose a rating from 1 to 5 stars.");
+      requestAnimationFrame(() => messageRef.current?.focus());
+      return;
+    }
+    if (!hasReviewed && review.trim().length < 10) {
+      setError("Write a review of at least 10 characters.");
+      requestAnimationFrame(() => messageRef.current?.focus());
+      return;
+    }
+
     setIsPending(true);
     setError(null);
 
     try {
-      const result = await markBookAsCompleted({ bookId });
+      const result = await markBookAsCompleted(
+        hasReviewed
+          ? { bookId }
+          : { bookId, review: { rating, comment: review } },
+      );
       if (!result.success) {
         setError("We could not mark this book as finished. Please try again.");
         return;
@@ -152,11 +175,19 @@ export function UpdateReadingProgressDialog({
 
       setCompleted(true);
       setShowCompletionPrompt(false);
-      setSuccess(`${bookTitle} is marked as finished.`);
+      setSuccess(
+        hasReviewed
+          ? `${bookTitle} is marked as finished.`
+          : `${bookTitle} is marked as finished and your review was submitted.`,
+      );
       router.refresh();
       requestAnimationFrame(() => messageRef.current?.focus());
-    } catch {
-      setError("We could not mark this book as finished. Please try again.");
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "We could not mark this book as finished. Please try again.",
+      );
       requestAnimationFrame(() => messageRef.current?.focus());
     } finally {
       setIsPending(false);
@@ -280,10 +311,49 @@ export function UpdateReadingProgressDialog({
               )}
 
               {showCompletionPrompt && (
-                <div className="space-y-3 rounded-2xl border border-[#73a66b]/40 bg-[#f4fbf2] px-4 py-3">
-                  <p className="text-sm font-bold text-[#355b30]">
-                    You reached the final page. Mark this book as finished?
-                  </p>
+                <div className="space-y-4 rounded-2xl border border-[#73a66b]/40 bg-[#f4fbf2] px-4 py-4">
+                  <div>
+                    <p className="text-sm font-bold text-[#355b30]">
+                      {hasReviewed
+                        ? "You reached the final page. Mark this book as finished?"
+                        : "You reached the final page. Write a review to finish this book."}
+                    </p>
+                    {!hasReviewed && (
+                      <p className="mt-1 text-xs leading-5 text-[#4f704a]">
+                        Your review will be submitted for moderation when the book is marked finished.
+                      </p>
+                    )}
+                  </div>
+
+                  {!hasReviewed && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Your rating</Label>
+                        <StarRating value={rating} onChange={setRating} size="lg" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={reviewId}>Your review</Label>
+                        <textarea
+                          id={reviewId}
+                          value={review}
+                          rows={4}
+                          minLength={10}
+                          disabled={isPending}
+                          placeholder="What did you think about this book?"
+                          className="focus-ring w-full rounded-xl border border-[#eadfda] bg-white p-3 text-sm outline-none transition focus:border-[#73a66b] disabled:cursor-not-allowed disabled:opacity-60"
+                          onChange={(event) => {
+                            setReview(event.target.value);
+                            setError(null);
+                          }}
+                        />
+                        <FieldHelper>
+                          {review.trim().length}/10 characters minimum
+                        </FieldHelper>
+                      </div>
+                    </>
+                  )}
+
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -300,7 +370,7 @@ export function UpdateReadingProgressDialog({
                       loading={isPending}
                       onClick={handleMarkCompleted}
                     >
-                      Mark as finished
+                      {hasReviewed ? "Mark as finished" : "Submit review and finish"}
                     </Button>
                   </div>
                 </div>

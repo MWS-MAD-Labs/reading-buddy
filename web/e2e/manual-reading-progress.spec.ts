@@ -361,7 +361,7 @@ test.describe("Manual reading progress synchronization", () => {
     await page.getByRole("spinbutton", { name: "Page" }).fill("100");
     await page.getByRole("button", { name: "Save progress" }).click();
     await expect(
-      page.getByText("You reached the final page. Mark this book as finished?"),
+      page.getByText("You reached the final page. Write a review to finish this book."),
     ).toBeVisible();
 
     const beforeConfirmation = await pool.query<{ completed: boolean }>(
@@ -372,15 +372,23 @@ test.describe("Manual reading progress synchronization", () => {
     );
     expect(beforeConfirmation.rows[0].completed).toBe(false);
 
-    await page.getByRole("button", { name: "Mark as finished" }).click();
+    await page.getByRole("button", { name: "Rate 5 stars" }).click();
+    await page.getByRole("textbox", { name: "Your review" }).fill(
+      "A thoughtful and enjoyable test review.",
+    );
+    await page.getByRole("button", { name: "Submit review and finish" }).click();
     await expect(
-      page.getByText(`${bookTitle} is marked as finished.`),
+      page.getByText(
+        `${bookTitle} is marked as finished and your review was submitted.`,
+      ),
     ).toBeVisible();
 
     const afterConfirmation = await pool.query<{
       completed: boolean;
       completed_at: Date | null;
       finished_entries: string;
+      review_count: string;
+      review_status: string | null;
     }>(
       `SELECT
          sb.completed,
@@ -391,7 +399,19 @@ test.describe("Manual reading progress synchronization", () => {
            WHERE je.student_id = sb.student_id
              AND je.book_id = sb.book_id
              AND je.entry_type = 'finished_book'
-         ) AS finished_entries
+         ) AS finished_entries,
+         (
+           SELECT COUNT(*)
+           FROM book_reviews br
+           WHERE br.student_id = sb.student_id
+             AND br.book_id = sb.book_id
+         ) AS review_count,
+         (
+           SELECT br.status
+           FROM book_reviews br
+           WHERE br.student_id = sb.student_id
+             AND br.book_id = sb.book_id
+         ) AS review_status
        FROM student_books sb
        WHERE sb.student_id = $1 AND sb.book_id = $2`,
       [profileId, bookId],
@@ -399,5 +419,7 @@ test.describe("Manual reading progress synchronization", () => {
     expect(afterConfirmation.rows[0].completed).toBe(true);
     expect(afterConfirmation.rows[0].completed_at).not.toBeNull();
     expect(afterConfirmation.rows[0].finished_entries).toBe("1");
+    expect(afterConfirmation.rows[0].review_count).toBe("1");
+    expect(afterConfirmation.rows[0].review_status).toBe("PENDING");
   });
 });

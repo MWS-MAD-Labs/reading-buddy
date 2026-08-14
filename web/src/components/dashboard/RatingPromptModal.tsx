@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, Loader2, Star, PartyPopper } from "lucide-react";
 import { StarRating } from "@/components/ui/star-rating";
-import { submitBookReview } from "@/app/(dashboard)/dashboard/library/review-actions";
+import { markBookAsCompleted } from "@/app/(dashboard)/dashboard/student/actions";
 
 type RatingPromptModalProps = {
     bookId: number;
@@ -31,18 +31,23 @@ export function RatingPromptModal({
         setError(null);
 
         try {
-            const result = await submitBookReview(bookId, rating, comment);
+            const result = await markBookAsCompleted({
+                bookId,
+                review: { rating, comment },
+            });
             if (result.success) {
                 setSuccess(true);
                 setTimeout(() => {
                     onSubmitted?.();
                     onClose();
                 }, 2000);
-            } else {
-                setError(result.error || "Failed to submit review");
             }
-        } catch (err) {
-            setError("An error occurred. Please try again.");
+        } catch (caughtError) {
+            setError(
+                caughtError instanceof Error
+                    ? caughtError.message
+                    : "An error occurred. Please try again.",
+            );
         } finally {
             setSubmitting(false);
         }
@@ -67,7 +72,7 @@ export function RatingPromptModal({
                         <PartyPopper className="mx-auto mb-4 h-16 w-16 text-amber-500" />
                         <h2 className="mb-2 text-2xl font-black text-purple-900">Thank you! 🎉</h2>
                         <p className="text-purple-600">
-                            Your review has been submitted and is awaiting moderation.
+                            Your book is finished and your review is awaiting moderation.
                         </p>
                     </div>
                 ) : (
@@ -76,11 +81,11 @@ export function RatingPromptModal({
                         <div className="mb-6 text-center">
                             <Star className="mx-auto mb-2 h-12 w-12 text-amber-400" />
                             <h2 className="text-xl font-black text-purple-900">
-                                Congrats on finishing!
+                                Finish with a review
                             </h2>
                             {bookTitle && (
                                 <p className="mt-1 text-sm text-purple-600">
-                                    How did you like <span className="font-bold">{bookTitle}</span>?
+                                    How did you like <span className="font-bold">{bookTitle}</span>? Submit your review to mark it finished.
                                 </p>
                             )}
                         </div>
@@ -120,7 +125,7 @@ export function RatingPromptModal({
                                 onClick={onClose}
                                 className="flex-1 rounded-full border-2 border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100"
                             >
-                                Maybe Later
+                                Keep Reading
                             </button>
                             <button
                                 onClick={handleSubmit}
@@ -130,7 +135,7 @@ export function RatingPromptModal({
                                 {submitting ? (
                                     <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                                 ) : (
-                                    "Submit Review"
+                                    "Submit Review and Finish"
                                 )}
                             </button>
                         </div>

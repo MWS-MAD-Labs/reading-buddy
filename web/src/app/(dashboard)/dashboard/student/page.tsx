@@ -68,6 +68,11 @@ export default async function StudentDashboardPage() {
       sb.progress_percent,
       sb.progress_source,
       sb.completed,
+      EXISTS(
+        SELECT 1
+        FROM book_reviews br
+        WHERE br.book_id = sb.book_id AND br.student_id = sb.student_id
+      ) AS has_reviewed,
       b.id as book_id_ref,
       b.title,
       b.author,
@@ -90,6 +95,7 @@ export default async function StudentDashboardPage() {
       row.progress_percent === null ? null : Number(row.progress_percent),
     progress_source: row.progress_source,
     completed: row.completed === true,
+    has_reviewed: row.has_reviewed === true,
     books: {
       id: row.book_id_ref,
       title: row.title,
@@ -287,6 +293,7 @@ export default async function StudentDashboardPage() {
                             totalPages={book.page_count}
                             fileFormat={book.file_format}
                             isCompleted={assignment.completed}
+                            hasReviewed={assignment.has_reviewed}
                           />
                         </div>
                       </div>

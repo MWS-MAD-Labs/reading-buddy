@@ -172,6 +172,7 @@ export function BookDetailsModal({
                                             totalPages={book.pageCount}
                                             fileFormat={book.fileFormat}
                                             isCompleted={book.userHasCompleted}
+                                            hasReviewed={book.userHasReviewed}
                                         />
                                     )}
                                 </div>
