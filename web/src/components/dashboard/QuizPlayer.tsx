@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { submitQuizAttempt } from "@/app/(dashboard)/dashboard/student/quiz/actions";
+import { updatePhysicalReadingProgress } from "@/app/(dashboard)/dashboard/student/actions";
+import { publishQuiz } from "@/app/(dashboard)/dashboard/librarian/actions";
 
 type QuizQuestion = {
   question: string;
@@ -18,12 +20,21 @@ type QuizData = {
   questions: QuizQuestion[];
 };
 
+type QuizOrigin =
+  | "reading"
+  | "progress-update"
+  | "librarian-preview"
+  | "classroom";
+
 type QuizPlayerProps = {
   quizId: number;
   quizData: QuizData;
   bookId?: number;
   returnPage?: number;
+  targetPage?: number;
   classId?: number;
+  origin?: QuizOrigin;
+  quizStatus?: string;
 };
 
 export const QuizPlayer = ({
@@ -31,17 +42,24 @@ export const QuizPlayer = ({
   quizData,
   bookId,
   returnPage,
+  targetPage,
   classId,
+  origin,
+  quizStatus,
 }: QuizPlayerProps) => {
   const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(
-    quizData.questions.map((_: any) => null),
+    quizData.questions.map(() => null),
   );
   const [status, setStatus] = useState<"idle" | "submitting" | "completed">(
     "idle",
   );
   const [error, setError] = useState<string | null>(null);
   const [score, setScore] = useState<number | null>(null);
+  const [completionActionPending, setCompletionActionPending] = useState(false);
   const router = useRouter();
+  const librarianReturnPath = bookId
+    ? `/dashboard/librarian?quizBookId=${bookId}`
+    : "/dashboard/librarian";
 
   const handleSelect = (questionIndex: number, optionIndex: number) => {
     setSelectedAnswers((prev) =>
@@ -58,33 +76,69 @@ export const QuizPlayer = ({
     setStatus("submitting");
     setError(null);
 
-    const correctAnswers = quizData.questions.reduce(
-      (total, question, index) => {
-        return (
-          total + (question.answerIndex === selectedAnswers[index] ? 1 : 0)
-        );
-      },
-      0,
-    );
-
-    const computedScore = Math.round(
-      (correctAnswers / quizData.questions.length) * 100,
-    );
-
     try {
-      await submitQuizAttempt({
+      const result = await submitQuizAttempt({
         quizId,
-        answers: selectedAnswers.map((answer: any) => Number(answer)),
-        score: correctAnswers,
-        totalQuestions: quizData.questions.length,
+        answers: selectedAnswers.map((answer) => Number(answer)),
+        preview: origin === "librarian-preview",
       });
-      setScore(computedScore);
+      setScore(result.scorePercent);
       setStatus("completed");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Unable to submit quiz.";
       setError(message);
       setStatus("idle");
+    }
+  };
+
+  const handleProgressUpdate = async () => {
+    if (!bookId || !targetPage) return;
+
+    setCompletionActionPending(true);
+    setError(null);
+
+    try {
+      const result = await updatePhysicalReadingProgress({
+        bookId,
+        currentPage: targetPage,
+      });
+
+      if (!result.success) {
+        if (result.code === "CHECKPOINT_REQUIRED") {
+          router.push(
+            `/dashboard/student/quiz/${result.checkpoint.quizId}?origin=progress-update&bookId=${bookId}&page=${result.checkpoint.checkpointPage}&targetPage=${targetPage}`,
+          );
+          return;
+        }
+        setError(result.message);
+        return;
+      }
+
+      router.push("/dashboard/student");
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to finish the page update.",
+      );
+    } finally {
+      setCompletionActionPending(false);
+    }
+  };
+
+  const handlePublishAndReturn = async () => {
+    setCompletionActionPending(true);
+    setError(null);
+
+    try {
+      await publishQuiz(quizId);
+      router.push(librarianReturnPath);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to publish quiz.");
+      setCompletionActionPending(false);
     }
   };
 
@@ -194,7 +248,54 @@ export const QuizPlayer = ({
         </div>
       ) : null}
 
-      {status === "completed" && score !== null && bookId ? (
+      {status === "completed" &&
+      score !== null &&
+      origin === "progress-update" &&
+      bookId &&
+      targetPage ? (
+        <button
+          type="button"
+          onClick={handleProgressUpdate}
+          disabled={completionActionPending}
+          className="btn-3d btn-squish mt-4 w-full rounded-3xl border-4 border-green-300 bg-gradient-to-r from-green-400 to-emerald-500 px-8 py-4 text-xl font-black text-white shadow-2xl hover:from-green-500 hover:to-emerald-600 disabled:pointer-events-none disabled:opacity-50"
+        >
+          {completionActionPending
+            ? "Saving page update…"
+            : `Confirm and update to page ${targetPage}`}
+        </button>
+      ) : null}
+
+      {status === "completed" &&
+      score !== null &&
+      origin === "librarian-preview" ? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => router.push(librarianReturnPath)}
+            disabled={completionActionPending}
+            className="btn-3d btn-squish w-full rounded-3xl border-4 border-blue-300 bg-gradient-to-r from-blue-400 to-indigo-500 px-8 py-4 text-xl font-black text-white shadow-2xl hover:from-blue-500 hover:to-indigo-600 disabled:pointer-events-none disabled:opacity-50"
+          >
+            ⬅️ Back to quiz panel
+          </button>
+          {quizStatus === "draft" ? (
+            <button
+              type="button"
+              onClick={handlePublishAndReturn}
+              disabled={completionActionPending}
+              className="btn-3d btn-squish w-full rounded-3xl border-4 border-green-300 bg-gradient-to-r from-green-400 to-emerald-500 px-8 py-4 text-xl font-black text-white shadow-2xl hover:from-green-500 hover:to-emerald-600 disabled:pointer-events-none disabled:opacity-50"
+            >
+              {completionActionPending
+                ? "Publishing…"
+                : "Confirm, publish, and return"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {status === "completed" &&
+      score !== null &&
+      bookId &&
+      (origin === "reading" || (!origin && !classId)) ? (
         <button
           type="button"
           onClick={() =>
@@ -206,7 +307,10 @@ export const QuizPlayer = ({
         </button>
       ) : null}
 
-      {status === "completed" && score !== null && classId ? (
+      {status === "completed" &&
+      score !== null &&
+      classId &&
+      (origin === "classroom" || !origin) ? (
         <button
           type="button"
           onClick={() =>

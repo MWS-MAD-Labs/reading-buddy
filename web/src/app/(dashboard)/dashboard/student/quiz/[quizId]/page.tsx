@@ -7,7 +7,12 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ quizId: string }>;
-  searchParams?: Promise<{ page?: string; bookId?: string }>;
+  searchParams?: Promise<{
+    page?: string;
+    bookId?: string;
+    targetPage?: string;
+    origin?: string;
+  }>;
 };
 
 type QuizPayload = {
@@ -39,7 +44,7 @@ export default async function StudentQuizPage({
 
   // Fetch quiz from PostgreSQL
   const quizResult = await query(
-    `SELECT id, book_id, questions FROM quizzes WHERE id = $1`,
+    `SELECT id, book_id, questions, status FROM quizzes WHERE id = $1`,
     [quizId],
   );
 
@@ -76,9 +81,20 @@ export default async function StudentQuizPage({
 
   const quizData = quiz.questions as QuizPayload;
 
-  const requestedPage = awaitedSearchParams?.page
-    ? Number.parseInt(awaitedSearchParams.page, 10) || undefined
-    : undefined;
+  const parsePositiveInteger = (value?: string) => {
+    if (!value) return undefined;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+  };
+  const requestedPage = parsePositiveInteger(awaitedSearchParams?.page);
+  const targetPage = parsePositiveInteger(awaitedSearchParams?.targetPage);
+  const origin =
+    awaitedSearchParams?.origin === "reading" ||
+    awaitedSearchParams?.origin === "progress-update" ||
+    awaitedSearchParams?.origin === "librarian-preview" ||
+    awaitedSearchParams?.origin === "classroom"
+      ? awaitedSearchParams.origin
+      : undefined;
 
   return (
     <div className="space-y-6">
@@ -98,7 +114,10 @@ export default async function StudentQuizPage({
         quizData={quizData}
         bookId={quiz.book_id}
         returnPage={requestedPage}
+        targetPage={targetPage}
         classId={quizAssignment?.class_id}
+        origin={origin}
+        quizStatus={quiz.status}
       />
     </div>
   );

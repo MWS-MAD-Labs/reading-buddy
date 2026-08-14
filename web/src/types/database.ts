@@ -142,6 +142,8 @@ export interface ClassWithTeacher extends Class {
 // Student Books (Reading Progress)
 // ============================================================================
 
+export type ReadingProgressSource = "digital_reader" | "manual_physical";
+
 export interface StudentBook {
   id: number;
   student_id: string;
@@ -150,6 +152,8 @@ export interface StudentBook {
   current_page: number;
   epub_cfi?: string | null;
   progress_percent?: number | null;
+  progress_source: ReadingProgressSource;
+  last_manual_sync_at: string | null;
   total_pages: number | null;
   status: "not_started" | "in_progress" | "completed";
   started_at: string | null;
@@ -161,6 +165,26 @@ export interface StudentBook {
 export interface StudentBookWithDetails extends StudentBook {
   book: Book;
   class: Pick<Class, "id" | "name" | "code"> | null;
+}
+
+export type ReadingProgressRewardStatus =
+  | "awarded"
+  | "daily_cap_reached"
+  | "already_rewarded"
+  | "not_applicable";
+
+export interface ReadingProgressEvent {
+  id: string;
+  student_id: string;
+  book_id: number;
+  previous_page: number | null;
+  current_page: number;
+  source: ReadingProgressSource;
+  pages_advanced: number;
+  rewarded_pages: number;
+  xp_awarded: number;
+  reward_status: ReadingProgressRewardStatus;
+  created_at: string;
 }
 
 // ============================================================================
@@ -316,6 +340,7 @@ export interface BadgeProgress {
 
 export type XPSource =
   | "page_read"
+  | "manual_page_read"
   | "book_completed"
   | "quiz_completed"
   | "quiz_perfect"

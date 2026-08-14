@@ -44,6 +44,11 @@ ALTER TABLE class_students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE class_books ENABLE ROW LEVEL SECURITY;
 ALTER TABLE book_render_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE student_books ENABLE ROW LEVEL SECURITY;
+ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE book_journals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE book_reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_votes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reading_progress_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quiz_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
@@ -262,6 +267,102 @@ CREATE POLICY "student_books_delete_own"
   );
 
 -- ============================================================================
+-- JOURNAL POLICIES
+-- ============================================================================
+
+CREATE POLICY "journal_entries_select_own"
+  ON journal_entries FOR SELECT
+  USING (student_id = get_current_profile_id());
+
+CREATE POLICY "journal_entries_select_staff_public"
+  ON journal_entries FOR SELECT
+  USING (
+    is_private = FALSE
+    AND get_current_user_role() IN ('TEACHER', 'LIBRARIAN', 'ADMIN')
+  );
+
+CREATE POLICY "journal_entries_insert_own"
+  ON journal_entries FOR INSERT
+  WITH CHECK (student_id = get_current_profile_id());
+
+CREATE POLICY "journal_entries_update_own"
+  ON journal_entries FOR UPDATE
+  USING (student_id = get_current_profile_id());
+
+CREATE POLICY "journal_entries_delete_own"
+  ON journal_entries FOR DELETE
+  USING (student_id = get_current_profile_id());
+
+CREATE POLICY "book_journals_select_own"
+  ON book_journals FOR SELECT
+  USING (student_id = get_current_profile_id());
+
+CREATE POLICY "book_journals_insert_own"
+  ON book_journals FOR INSERT
+  WITH CHECK (student_id = get_current_profile_id());
+
+CREATE POLICY "book_journals_update_own"
+  ON book_journals FOR UPDATE
+  USING (student_id = get_current_profile_id());
+
+CREATE POLICY "book_journals_delete_own"
+  ON book_journals FOR DELETE
+  USING (student_id = get_current_profile_id());
+
+-- ============================================================================
+-- BOOK REVIEW POLICIES
+-- ============================================================================
+
+CREATE POLICY "book_reviews_select_visible"
+  ON book_reviews FOR SELECT
+  USING (
+    status = 'APPROVED'
+    OR student_id = get_current_profile_id()
+    OR get_current_user_role() IN ('LIBRARIAN', 'ADMIN')
+  );
+
+CREATE POLICY "book_reviews_insert_own"
+  ON book_reviews FOR INSERT
+  WITH CHECK (
+    student_id = get_current_profile_id()
+    AND status = 'PENDING'
+    AND rejection_feedback IS NULL
+    AND moderated_by IS NULL
+    AND moderated_at IS NULL
+  );
+
+CREATE POLICY "book_reviews_update_own_unmoderated"
+  ON book_reviews FOR UPDATE
+  USING (
+    student_id = get_current_profile_id()
+    AND status IN ('PENDING', 'REJECTED')
+  )
+  WITH CHECK (
+    student_id = get_current_profile_id()
+    AND status = 'PENDING'
+    AND rejection_feedback IS NULL
+    AND moderated_by IS NULL
+    AND moderated_at IS NULL
+  );
+
+CREATE POLICY "book_reviews_update_moderator"
+  ON book_reviews FOR UPDATE
+  USING (get_current_user_role() IN ('LIBRARIAN', 'ADMIN'))
+  WITH CHECK (get_current_user_role() IN ('LIBRARIAN', 'ADMIN'));
+
+CREATE POLICY "review_votes_select_authenticated"
+  ON review_votes FOR SELECT
+  USING (get_current_profile_id() IS NOT NULL);
+
+CREATE POLICY "review_votes_insert_own"
+  ON review_votes FOR INSERT
+  WITH CHECK (user_id = get_current_profile_id());
+
+CREATE POLICY "review_votes_delete_own"
+  ON review_votes FOR DELETE
+  USING (user_id = get_current_profile_id());
+
+-- ============================================================================
 -- QUIZZES POLICIES
 -- ============================================================================
 
@@ -409,6 +510,22 @@ CREATE POLICY "student_badges_select_all_admin"
 CREATE POLICY "student_badges_insert_system"
   ON student_badges FOR INSERT
   WITH CHECK (true); -- System can award badges
+
+-- ============================================================================
+-- READING PROGRESS EVENT POLICIES
+-- ============================================================================
+
+CREATE POLICY "reading_progress_events_select_own"
+  ON reading_progress_events FOR SELECT
+  USING (student_id = get_current_profile_id());
+
+CREATE POLICY "reading_progress_events_select_staff"
+  ON reading_progress_events FOR SELECT
+  USING (get_current_user_role() IN ('TEACHER', 'LIBRARIAN', 'ADMIN'));
+
+CREATE POLICY "reading_progress_events_insert_own"
+  ON reading_progress_events FOR INSERT
+  WITH CHECK (student_id = get_current_profile_id());
 
 -- ============================================================================
 -- XP TRANSACTIONS POLICIES

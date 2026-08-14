@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { UnifiedBookReader } from "./UnifiedBookReader";
 import { RatingPromptModal } from "./RatingPromptModal";
 import { getUserReview } from "@/app/(dashboard)/dashboard/library/review-actions";
@@ -26,11 +27,9 @@ type ReaderWithRatingPromptProps = {
 };
 
 /**
- * Best practices for book completion thresholds:
- * - 90% threshold accounts for back matter (footnotes, acknowledgments, index)
- * - Confirmation dialog ensures intentional completion
+ * Completion is offered at the final page so digital and manually entered
+ * progress use the same review-before-finish requirement.
  */
-const COMPLETION_THRESHOLD_PERCENT = 90;
 const FINISH_BUTTON_DELAY_MS = 5000;
 
 export function ReaderWithRatingPrompt({
@@ -45,17 +44,16 @@ export function ReaderWithRatingPrompt({
   fileFormat = "pdf",
   totalPages,
 }: ReaderWithRatingPromptProps) {
+  const router = useRouter();
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [hasReviewed, setHasReviewed] = useState<boolean | null>(null);
-  const [hasShownPrompt, setHasShownPrompt] = useState(false);
   const [showFinishButton, setShowFinishButton] = useState(false);
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [effectiveTotalPages, setEffectiveTotalPages] = useState(
     totalPages ?? null,
   );
 
-  const finishButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     getUserReview(bookId).then((review) => {
@@ -64,61 +62,58 @@ export function ReaderWithRatingPrompt({
   }, [bookId]);
 
   useEffect(() => {
-    return () => {
-      if (finishButtonTimeoutRef.current) {
-        clearTimeout(finishButtonTimeoutRef.current);
-      }
-    };
-  }, []);
+    // UnifiedBookReader saves progress before this delayed control appears.
+    // Completion still verifies the persisted page against books.page_count so
+    // a failed save or mismatched reader metadata cannot mark a book complete.
+    if (effectiveTotalPages === null || currentPage < effectiveTotalPages) {
+      return;
+    }
 
-  const updateFinishButtonVisibility = useCallback(
-    (page: number, totalPages: number | null) => {
-      if (finishButtonTimeoutRef.current) {
-        clearTimeout(finishButtonTimeoutRef.current);
-        finishButtonTimeoutRef.current = null;
-      }
+    const timeout = setTimeout(() => {
+      setShowFinishButton(true);
+    }, FINISH_BUTTON_DELAY_MS);
 
-      const progressPercent = totalPages ? (page / totalPages) * 100 : 0;
-      const hasReachedThreshold =
-        progressPercent >= COMPLETION_THRESHOLD_PERCENT;
-
-      if (hasReachedThreshold) {
-        finishButtonTimeoutRef.current = setTimeout(() => {
-          setShowFinishButton(true);
-        }, FINISH_BUTTON_DELAY_MS);
-      } else {
-        setShowFinishButton(false);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    updateFinishButtonVisibility(currentPage, effectiveTotalPages);
-  }, [currentPage, effectiveTotalPages, updateFinishButtonVisibility]);
+    return () => clearTimeout(timeout);
+  }, [currentPage, effectiveTotalPages]);
 
   const handleConfirmFinish = useCallback(async () => {
-    setShowConfirmDialog(false);
-
     try {
       await markBookAsCompleted({ bookId });
+      setShowConfirmDialog(false);
+      router.refresh();
     } catch (error) {
       console.error("Failed to mark book as completed:", error);
     }
-
-    if (hasReviewed !== true && !hasShownPrompt) {
-      setShowRatingPrompt(true);
-      setHasShownPrompt(true);
-    }
-  }, [bookId, hasReviewed, hasShownPrompt]);
+  }, [bookId, router]);
 
   const handleFinishClick = useCallback(() => {
-    setShowConfirmDialog(true);
-  }, []);
+    if (hasReviewed === true) {
+      setShowConfirmDialog(true);
+      return;
+    }
 
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-  }, []);
+    setShowRatingPrompt(true);
+  }, [hasReviewed]);
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setCurrentPage(page);
+      if (effectiveTotalPages !== null && page < effectiveTotalPages) {
+        setShowFinishButton(false);
+      }
+    },
+    [effectiveTotalPages],
+  );
+
+  const handleTotalPagesChange = useCallback(
+    (nextTotalPages: number | null) => {
+      setEffectiveTotalPages(nextTotalPages);
+      if (nextTotalPages === null || currentPage < nextTotalPages) {
+        setShowFinishButton(false);
+      }
+    },
+    [currentPage],
+  );
 
   return (
     <>
@@ -132,7 +127,7 @@ export function ReaderWithRatingPrompt({
         pageImages={pageImages}
         fileFormat={fileFormat}
         onPageChange={handlePageChange}
-        onTotalPagesChange={setEffectiveTotalPages}
+        onTotalPagesChange={handleTotalPagesChange}
         onComplete={handleFinishClick}
         showFinishButton={showFinishButton}
       />
@@ -191,7 +186,10 @@ export function ReaderWithRatingPrompt({
           bookId={bookId}
           bookTitle={bookTitle}
           onClose={() => setShowRatingPrompt(false)}
-          onSubmitted={() => setHasReviewed(true)}
+          onSubmitted={() => {
+            setHasReviewed(true);
+            router.refresh();
+          }}
         />
       )}
     </>

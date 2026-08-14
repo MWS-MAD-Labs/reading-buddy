@@ -1,0 +1,918 @@
+# Offline Reading Progress Synchronization
+
+**Status:** Complete — Phase 4 implemented
+
+**Audience:** Product, frontend, backend, database, and QA engineers
+
+**Primary owner:** Reading progress domain
+
+**Last updated:** 2026-08-12
+
+## 1. Purpose
+
+This document defines how Reading Buddy will support students who read a physical copy of a catalogued book and later update the last page they reached in the application.
+
+In this specification, **offline reading** means reading outside the Reading Buddy digital reader, normally using a physical book. It does **not** mean browser-offline/PWA support, background synchronization, or storing updates while the device has no network connection.
+
+The implementation must extend the existing reading-progress flow. It must not create an unrelated progress record that can disagree with the progress shown by the dashboard or digital reader.
+
+## 2. Problem statement
+
+Reading Buddy currently updates progress automatically while a student uses the digital reader. A student reading the same title in a physical copy has no direct way to record their latest page.
+
+The feature must let the authenticated student:
+
+1. Open a book listed under **My Readings**.
+2. Enter the last physical page they reached.
+3. Save that page as their current reading progress.
+4. See the updated progress throughout Reading Buddy.
+5. Correct an accidentally entered page, including moving progress backward after confirmation.
+
+The feature must not accidentally grant duplicate XP, inflate total pages read, update streaks without an agreed product policy, or resume an EPUB from a stale location.
+
+## 3. Existing system
+
+### 3.1 Canonical progress record
+
+Reading progress is currently stored in `student_books`:
+
+- `student_id`
+- `book_id`
+- `current_page`
+- `epub_cfi`
+- `progress_percent`
+- `completed`
+- `started_at`
+- `completed_at`
+- `updated_at`
+
+The unique constraint on `(student_id, book_id)` makes this row the canonical latest state for one student and one book.
+
+### 3.2 Existing application entry points
+
+| Responsibility | Current location |
+|---|---|
+| Progress server action | `web/src/app/(dashboard)/dashboard/student/actions.ts` |
+| Automatic reader save | `web/src/components/dashboard/UnifiedBookReader.tsx` |
+| Reader initialization | `web/src/app/(dashboard)/dashboard/student/read/[bookId]/page.tsx` |
+| Student reading cards | `web/src/app/(dashboard)/dashboard/student/page.tsx` |
+| Student progress tests | `web/src/__tests__/app/student-actions.test.ts` |
+| Main database schema | `database-setup.sql` |
+| Self-hosted application schema | `sql/self-hosted/03-app-schema.sql` |
+| Deploy migrations | `sql/migrations/` |
+| TypeScript database types | `web/src/types/database.ts` |
+
+### 3.3 Current risk in `recordReadingProgress`
+
+The existing `recordReadingProgress()` action combines persistence and reading-activity side effects. A forward update may:
+
+- create journal entries;
+- update the reading streak;
+- award page XP;
+- increment `profiles.total_pages_read`; and
+- evaluate badges.
+
+It uses a process-local `lastPageReadCache` to calculate newly read pages. A process-local cache is not authoritative because it can be empty after a deployment, differ between application instances, and become inconsistent with PostgreSQL.
+
+A manual physical-page form must therefore not call the current action unchanged. The previous page must be obtained from PostgreSQL, and side effects must be selected according to the progress source.
+
+## 4. Goals and non-goals
+
+### 4.1 Goals
+
+- Reuse `student_books` as the canonical latest reading position.
+- Let students update a physical-book page from **My Readings**.
+- Let any authenticated library reader update their saved page from the book details modal.
+- Validate the page on the server against trusted book metadata.
+- Distinguish digital-reader updates from manual physical-book updates.
+- Prevent stale EPUB CFI data from overriding a manual update.
+- Make identical submissions idempotent.
+- Support confirmed backward corrections.
+- Keep manual and digital completion behavior consistent from the student's perspective.
+- Define explicit behavior for gamification, completion reviews, journals, and checkpoints.
+
+### 4.2 Non-goals for the first release
+
+- Browser-offline/PWA mutation queues.
+- Synchronizing with Kindle, Kobo, Apple Books, or another external reader.
+- Mapping printed edition pages precisely to reflowable EPUB locations.
+- Teacher approval of every manual update.
+- Historical reading analytics beyond the optional event model described below.
+- Automatic book completion solely because the last page was entered.
+
+## 5. Product rules
+
+### 5.1 Canonical position
+
+`student_books.current_page` remains the canonical page displayed by dashboards and used as the page-based resume position.
+
+### 5.2 Supported books
+
+The manual update control may be shown for every book with a valid catalog record. Validation behavior depends on `books.page_count`:
+
+- When `page_count` is known, the page must be between `1` and `page_count`, inclusive.
+- When `page_count` is unknown, the page must be a positive integer and the UI must state that the total page count is unavailable.
+
+For EPUB files, the UI must warn that a printed page and a reflowable EPUB location may not match exactly.
+
+### 5.3 Forward updates
+
+A page greater than the saved page is accepted after validation.
+
+Manual updates from student profiles can award page XP under the Phase 4 policy: only pages above the book's historical high-water mark qualify, and rewards are capped at 20 manual pages per student per UTC day. Manual updates still do not increment `profiles.total_pages_read`, update reading streaks, award page-count badges, or create reading-session journal entries.
+
+Authenticated non-student profiles may save and resume reading progress, but their manual or digital progress does not award XP, update streaks, evaluate badges, create reading journal entries, or increment student reading totals.
+
+### 5.4 Same-page updates
+
+Submitting the already saved page is a successful no-op:
+
+- no database activity event is created;
+- no XP or streak operation runs;
+- the action returns the current state; and
+- the UI displays that progress is already up to date.
+
+### 5.5 Backward updates
+
+A page lower than the saved page is allowed so students can correct mistakes. The client must show a confirmation before submission.
+
+A backward correction must not:
+
+- subtract XP;
+- decrement `profiles.total_pages_read`;
+- remove journal entries;
+- reverse achievements; or
+- change historical reading activity.
+
+Server validation must still accept a backward update even though client confirmation is a UX requirement. The server must not trust a client-provided previous page.
+
+### 5.6 Completion and review
+
+Reaching `books.page_count` does not automatically mark a book complete. Manual and digital readers offer completion only after the persisted reading position reaches the catalog's final page.
+
+If the student has not reviewed the book, the completion UI requires:
+
+- a rating from `1` to `5`; and
+- a review comment of at least 10 characters.
+
+`markBookAsCompleted()` validates the persisted final-page position and inserts the pending review in the same transaction that marks `student_books.completed = true`. Completion rewards, the finished-book journal entry, and badge evaluation run only when the book becomes newly completed.
+
+If a review already exists, the student may confirm completion without submitting another review. A review uniqueness conflict is therefore non-fatal to completion, while other review database failures roll back the transaction. The library's standalone `submitBookReview()` action remains available for legacy or post-completion reviews.
+
+### 5.7 Required checkpoint quizzes
+
+A forward manual update must not save beyond an unanswered required checkpoint. The server checks for required checkpoints inside the same transaction that reads the current page and would write the new page.
+
+Rules:
+
+- Select the earliest unanswered required checkpoint at or before the requested page.
+- Return `CHECKPOINT_REQUIRED` before changing `student_books` or creating progress/reward events.
+- Show the blocking checkpoint and a **Start quiz** action in the progress dialog.
+- Treat a submitted quiz attempt with a non-null server-calculated score as completed. The quiz action loads the stored questions, requires exactly one valid answer per question, calculates the score from stored `answerIndex` values, and ignores any client-supplied score metadata.
+- After completing the quiz, the reader retries the requested page update.
+- If several checkpoints were crossed, enforce them sequentially. A jump to page 35 with checkpoints at pages 10, 20, and 30 requires page 10 first, then page 20, then page 30.
+- Backward corrections remain allowed and do not require retaking checkpoints.
+
+Example:
+
+> Your progress was not updated. Complete the required quiz at page 10, then try saving this page again.
+
+## 6. Proposed architecture
+
+```mermaid
+flowchart TD
+    A[Authenticated reader selects Update page] --> B[Manual progress dialog]
+    B --> C[Client validates input]
+    C --> D[updatePhysicalReadingProgress]
+    D --> E[Authenticate reader]
+    E --> F[Load book and current progress]
+    F --> G[Validate page]
+    G --> H{Unanswered required checkpoint?}
+    H -->|Yes| I[Return CHECKPOINT_REQUIRED without saving]
+    I --> J[Reader completes earliest quiz]
+    J --> C
+    H -->|No| K[Persist canonical position]
+    K --> L[Return previous and current state]
+    L --> M[Refresh dashboard and reader routes]
+    M --> N{Final persisted page?}
+    N -->|No| O[Continue reading]
+    N -->|Yes, no review| P[Collect rating and review]
+    N -->|Yes, review exists| Q[Confirm completion]
+    P --> R[Atomically submit review and finish]
+    Q --> S[Finish without duplicate review]
+```
+
+### 6.1 Separation of responsibilities
+
+Refactor progress handling into a persistence operation and source-aware activity processing.
+
+```ts
+type ReadingProgressSource = "digital_reader" | "manual_physical";
+
+type SaveReadingPositionInput = {
+  bookId: number;
+  currentPage: number;
+  epubCfi?: string | null;
+  progressPercent?: number | null;
+  source: ReadingProgressSource;
+};
+
+type SaveReadingPositionResult = {
+  previousPage: number | null;
+  currentPage: number;
+  totalPages: number | null;
+  progressPercent: number | null;
+  source: ReadingProgressSource;
+  changed: boolean;
+  movedBackward: boolean;
+  reachedFinalPage: boolean;
+  isNewBook: boolean;
+};
+```
+
+The implementation may keep these functions in `student/actions.ts` initially, but persistence and gamification logic must be independently testable.
+
+Recommended conceptual structure:
+
+```ts
+async function saveReadingPosition(
+  user: AuthenticatedUser,
+  input: SaveReadingPositionInput,
+): Promise<SaveReadingPositionResult>;
+
+async function processDigitalReadingActivity(
+  user: AuthenticatedUser,
+  result: SaveReadingPositionResult,
+): Promise<ActivityResult>;
+
+export async function recordReadingProgress(input: DigitalProgressInput);
+
+export async function updatePhysicalReadingProgress(
+  input: ManualProgressInput,
+);
+```
+
+### 6.2 Digital reader action
+
+The existing reader continues to call `recordReadingProgress()`. The action must internally set:
+
+```ts
+source: "digital_reader"
+```
+
+The previous page must be read from PostgreSQL instead of `lastPageReadCache`. Only a positive database-backed page delta may be considered for reading activity:
+
+```ts
+const pagesAdvanced = Math.max(
+  0,
+  currentPage - (previousPage ?? 0),
+);
+```
+
+The cache may be removed. It must not be the basis for XP, total pages, or streak decisions.
+
+### 6.3 Manual physical-book action
+
+Add a dedicated action:
+
+```ts
+type UpdatePhysicalReadingProgressInput = {
+  bookId: number;
+  currentPage: number;
+};
+
+export async function updatePhysicalReadingProgress(
+  input: UpdatePhysicalReadingProgressInput,
+): Promise<SaveReadingPositionResult>;
+```
+
+This action:
+
+1. Authenticates the current user and requires a profile ID.
+2. Loads the book's `id` and `page_count` from PostgreSQL.
+3. Loads and locks the current profile's `student_books` row.
+4. Validates the submitted page.
+5. For a forward update, checks the earliest unanswered required checkpoint at or before the requested page.
+6. Returns `CHECKPOINT_REQUIRED` without writing progress when a blocking checkpoint exists.
+7. Calculates `progress_percent` on the server after checkpoint validation succeeds.
+8. Upserts the canonical `student_books` row.
+9. Clears stale `epub_cfi` when the manual page becomes canonical.
+10. Sets the progress source and manual synchronization timestamp.
+11. Applies capped, event-backed manual XP only when the authenticated profile role is `STUDENT`.
+12. Saves non-student progress with zero rewarded pages and zero XP.
+13. Does not update streaks, total-pages counters, badges, or reading-session journals for manual updates.
+14. Revalidates all routes that display this progress.
+15. Returns structured state for success, no-op, checkpoint, and completion UI.
+
+## 7. Database design
+
+### 7.1 Required schema extension
+
+Add source metadata to `student_books`:
+
+```sql
+ALTER TABLE student_books
+ADD COLUMN IF NOT EXISTS progress_source VARCHAR(30)
+  NOT NULL DEFAULT 'digital_reader',
+ADD COLUMN IF NOT EXISTS last_manual_sync_at TIMESTAMPTZ;
+```
+
+Add a constraint idempotently. PostgreSQL does not support `ADD CONSTRAINT IF NOT EXISTS`, so the migration should use a guarded `DO` block:
+
+```sql
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'student_books_progress_source_check'
+  ) THEN
+    ALTER TABLE student_books
+      ADD CONSTRAINT student_books_progress_source_check
+      CHECK (progress_source IN ('digital_reader', 'manual_physical'));
+  END IF;
+END $$;
+```
+
+Existing records are treated as `digital_reader` because that is the only currently implemented save source.
+
+### 7.2 Write behavior
+
+For a digital-reader update:
+
+```sql
+progress_source = 'digital_reader',
+last_manual_sync_at = student_books.last_manual_sync_at,
+updated_at = NOW()
+```
+
+For a manual physical-book update:
+
+```sql
+current_page = :validated_page,
+progress_percent = :calculated_percent,
+epub_cfi = NULL,
+progress_source = 'manual_physical',
+last_manual_sync_at = NOW(),
+updated_at = NOW()
+```
+
+Clearing `epub_cfi` is required because `StudentReadPage` currently prefers an existing CFI unless a page query parameter is supplied. Keeping an older CFI could resume the EPUB before the manually entered page.
+
+### 7.3 Progress percentage
+
+When `books.page_count` is known:
+
+```ts
+const progressPercent = Math.min(
+  100,
+  Number(((currentPage / pageCount) * 100).toFixed(2)),
+);
+```
+
+When `page_count` is unknown, store `NULL`. Do not calculate against an estimated total such as 300 pages.
+
+### 7.4 Migration locations
+
+The schema change must be represented in all active installation paths:
+
+1. Add a sortable deploy migration under `sql/migrations/`, for example:
+   `20260811_add_manual_reading_progress_source.sql`.
+2. Add that filename to `sql/deploy-migrations.txt` if the manifest exists.
+3. Update `database-setup.sql` for new installations.
+4. Update `sql/self-hosted/03-app-schema.sql`.
+5. Update any actively used staging bootstrap schema.
+6. Update `web/src/types/database.ts`.
+
+The migration must be idempotent and safe for existing rows.
+
+### 7.5 Event history
+
+Phase 4 adds an append-only event table because manual reading now awards capped XP and teachers consume the audit history.
+
+Implemented schema:
+
+```sql
+CREATE TABLE IF NOT EXISTS reading_progress_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  previous_page INTEGER,
+  current_page INTEGER NOT NULL,
+  source VARCHAR(30) NOT NULL,
+  pages_advanced INTEGER NOT NULL DEFAULT 0,
+  rewarded_pages INTEGER NOT NULL DEFAULT 0,
+  xp_awarded INTEGER NOT NULL DEFAULT 0,
+  reward_status VARCHAR(30) NOT NULL DEFAULT 'not_applicable',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT reading_progress_events_source_check
+    CHECK (source IN ('digital_reader', 'manual_physical'))
+);
+```
+
+Changed digital and manual saves create events. Same-page manual submissions remain no-ops and do not create events.
+
+## 8. Validation and authorization
+
+All authoritative validation occurs in the server action.
+
+### 8.1 Input validation
+
+- `bookId` must be a positive integer.
+- `currentPage` must be a finite integer.
+- `currentPage` must be at least `1`.
+- The book must exist.
+- If `books.page_count` is known, `currentPage` must not exceed it.
+- `progressPercent` and `previousPage` must not be accepted from the manual client.
+
+### 8.2 Authorization
+
+- The action uses the authenticated user's `profileId` as the profile key stored in `student_books.student_id`.
+- The client must never submit a `studentId` or another profile identifier.
+- Queries and writes must run through `queryWithContext()` using the authenticated `userId`.
+- Every authenticated profile can update only its own `student_books` record.
+- Student profiles are eligible for the configured reading rewards; staff profiles save position only.
+- If catalog access restrictions are enforced elsewhere, the action must apply the same rule before creating a new `student_books` row.
+
+### 8.3 Error contract
+
+Use stable, user-safe errors. The UI should not parse database error text.
+
+Recommended result union:
+
+```ts
+type ManualProgressResult =
+  | {
+      success: true;
+      data: SaveReadingPositionResult;
+    }
+  | {
+      success: false;
+      code:
+        | "UNAUTHENTICATED"
+        | "BOOK_NOT_FOUND"
+        | "INVALID_PAGE"
+        | "PAGE_EXCEEDS_BOOK"
+        | "CHECKPOINT_REQUIRED"
+        | "SAVE_FAILED";
+      message: string;
+      checkpoint?: {
+        quizId: number;
+        checkpointPage: number;
+      };
+    };
+```
+
+If existing project conventions prefer thrown errors for authentication and unexpected failures, the action may follow them, but validation errors should remain distinguishable and testable.
+
+## 9. Concurrency and idempotency
+
+The read of the previous page and update of `student_books` should be atomic. Preferred implementations are:
+
+1. A transaction with `SELECT ... FOR UPDATE`, followed by insert/update; or
+2. A single SQL statement/CTE that obtains the previous state and returns both previous and updated values.
+
+This prevents two near-simultaneous reader/manual writes from calculating activity against the same old page.
+
+The database remains last-write-wins for canonical position. `updated_at`, `progress_source`, and `last_manual_sync_at` expose the last accepted update.
+
+Identical manual submissions must be treated as no-ops. Avoid changing `updated_at` or `last_manual_sync_at` for an identical page unless product analytics explicitly require recording the interaction.
+
+## 10. EPUB and edition behavior
+
+A printed page number cannot be mapped reliably to a reflowable EPUB CFI because location changes with edition, font size, viewport, and layout.
+
+MVP behavior:
+
+- Save the entered physical page to `current_page`.
+- Clear `epub_cfi`.
+- Preserve `progress_percent` calculated from catalog `page_count`, when available.
+- Resume using page-based behavior on the next reader opening.
+- Show an EPUB warning in the manual update dialog.
+
+Suggested warning:
+
+> Printed page numbers may not exactly match this EPUB edition. Reading Buddy will use your page as an approximate resume position.
+
+A future edition-aware implementation may store separate `physical_current_page` and digital location fields, but that is outside this MVP.
+
+## 11. User experience specification
+
+### 11.1 Entry point
+
+Expose **Update page** from both reading entry points:
+
+- each book card in the **My Readings** section of `web/src/app/(dashboard)/dashboard/student/page.tsx`; and
+- beside **Read Book** in the library book-details modal implemented by `web/src/components/dashboard/BookDetailsModal.tsx`.
+
+The library modal uses the same `UpdateReadingProgressDialog` as the student dashboard. It initializes from the current profile's saved page, or page `1` when no progress row exists. Keep **Continue reading** or **Read Book** as the primary digital-reader action.
+
+The card should display:
+
+- current page;
+- total pages when known;
+- percentage when known; and
+- a subtle “Updated from physical book” label when `progress_source` is `manual_physical`.
+
+Example:
+
+```text
+Current page: 57 of 310
+Updated from physical book
+
+[Continue reading] [Update page]
+```
+
+### 11.2 Dialog component
+
+Create a client component such as:
+
+`web/src/components/dashboard/student/UpdateReadingProgressDialog.tsx`
+
+Required content:
+
+- Book title
+- Current saved page
+- Total pages when available
+- Numeric page input
+- Cancel button
+- Save progress button
+- EPUB warning when applicable
+- Loading, success, and error states
+
+Suggested copy:
+
+```text
+Update your reading progress
+
+What page did you reach in your physical book?
+Current saved page: 42 of 310
+
+Page [ 57 ]
+
+[Cancel] [Save progress]
+```
+
+### 11.3 Client validation
+
+Client validation improves feedback but does not replace server validation:
+
+- input is required;
+- input uses whole numbers;
+- minimum is `1`;
+- maximum is `page_count` when known; and
+- save is disabled while a request is pending.
+
+### 11.4 Backward confirmation
+
+If the new page is lower than the displayed current page, show:
+
+> Your saved progress is page 57. Change it back to page 42?
+
+Actions:
+
+- **Keep page 57**
+- **Change to page 42**
+
+### 11.5 Success states
+
+Forward or backward change:
+
+> Progress updated to page 57.
+
+No-op:
+
+> Your progress is already saved at page 57.
+
+Final page without an existing review:
+
+> You reached the final page. Write a review to finish this book.
+
+The student selects a 1–5 star rating, writes at least 10 characters, and chooses **Submit review and finish**.
+
+Final page with an existing review:
+
+> You reached the final page. Mark this book as finished?
+
+The student may choose **Mark as finished** without creating a duplicate review.
+
+### 11.6 Blocking checkpoint state
+
+When the server returns `CHECKPOINT_REQUIRED`:
+
+- keep the displayed saved page unchanged;
+- do not show success, completion, or reward messages;
+- explain that the requested page was not saved;
+- show the earliest blocking checkpoint page;
+- provide a **Start quiz** action; and
+- require the reader to retry the page update after submitting the quiz.
+
+### 11.7 Accessibility
+
+- Use an accessible dialog primitive already present in the UI system when available.
+- Give the numeric input a visible label.
+- Associate validation text with the input using `aria-describedby`.
+- Move focus to the first error or success message when appropriate.
+- Support Escape to close when no request is pending.
+- Do not communicate manual/digital source through color alone.
+
+## 12. Query and type changes
+
+### 12.1 Student dashboard query
+
+Extend the **My Readings** query in `web/src/app/(dashboard)/dashboard/student/page.tsx` to select:
+
+```sql
+b.page_count,
+b.file_format,
+sb.progress_percent,
+sb.progress_source,
+sb.last_manual_sync_at,
+EXISTS (
+  SELECT 1
+  FROM book_reviews br
+  WHERE br.book_id = sb.book_id
+    AND br.student_id = sb.student_id
+) AS has_reviewed
+```
+
+Map those values into the book-card data passed to the dialog.
+
+### 12.2 Other dashboard calculation
+
+`web/src/app/(dashboard)/dashboard/student/dashboard-actions.ts` currently estimates a total of 300 pages. Change it to select and use `books.page_count`. If the total is unknown, return `null` instead of an invented total and percentage.
+
+### 12.3 TypeScript types
+
+Update `StudentBook` in `web/src/types/database.ts`:
+
+```ts
+export type ReadingProgressSource =
+  | "digital_reader"
+  | "manual_physical";
+
+export interface StudentBook {
+  // existing fields
+  progress_source: ReadingProgressSource;
+  last_manual_sync_at: string | null;
+}
+```
+
+Keep types aligned with actual schema nullability. Do not add fields such as `total_pages` or `status` to SQL writes unless they exist in the deployed table.
+
+## 13. Cache revalidation
+
+After a changed manual update, revalidate routes that display or consume the position:
+
+```ts
+revalidatePath("/dashboard/student");
+revalidatePath("/dashboard");
+revalidatePath(`/dashboard/student/read/${bookId}`);
+revalidatePath(`/dashboard/journal/${bookId}`);
+```
+
+Use the actual journal route present in the application. Revalidation is unnecessary for a same-page no-op unless cached data could already be stale for another reason.
+
+## 14. Gamification and journal policy
+
+### 14.1 Current policy
+
+| Side effect | Student digital reader | Student manual update | Non-student digital/manual progress |
+|---|---:|---:|---:|
+| Save canonical page | Yes | Yes | Yes |
+| Save progress percentage | Yes | Yes | Yes |
+| Save EPUB CFI | When supplied | Clear stale value | Same source-aware behavior |
+| Update reading streak | Existing behavior | No | No |
+| Award page XP | Existing behavior | Event-backed, high-water protected, maximum 20 rewarded pages per UTC day | No |
+| Increment total pages read | Existing behavior | No | No |
+| Evaluate page badges | Existing behavior | No | No |
+| Mark complete automatically | No | No | No |
+| Create reading-session journal entry | Existing behavior | No by default | No |
+
+A manual progress journal entry may be added later, but it must be explicitly labelled `manual_physical` and must not be interpreted as verified reading activity. Staff progress is position-only and must not contribute to student analytics, leaderboards, streaks, badges, or reward totals.
+
+### 14.2 Reward safeguards
+
+Manual physical reading rewards use append-only, database-backed events rather than recalculating from `student_books.current_page` alone.
+
+Implemented controls include:
+
+- maximum 20 rewarded manual pages per student per UTC day;
+- reward eligibility only above the book's historical high-water mark;
+- student-wide and student/book transaction locks;
+- teacher-visible source and reward labels; and
+- correction events that do not reverse historical rewards; and
+- role-aware reward eligibility so authenticated staff can save progress without student gamification side effects.
+
+### 14.3 Library progress entry point
+
+**Completed:** 2026-08-13
+
+- The library book-details modal shows **Update page** beside **Read Book** for authenticated readers.
+- The modal reuses `UpdateReadingProgressDialog` rather than maintaining a separate progress form.
+- Book details include the current profile's saved page, total pages, file format, completion state, and whether the profile already has a review.
+- The library and student dashboard pass the same review state into `UpdateReadingProgressDialog`, so both entry points use identical completion behavior.
+- Non-student profiles can save and resume progress but receive no XP, streak, badge, journal, or student-total side effects from digital or manual progress saves.
+
+### 14.4 Required checkpoint enforcement
+
+**Completed:** 2026-08-13
+
+- Forward manual updates are checked for unanswered required quizzes before progress is written.
+- The earliest blocking checkpoint is returned, so multiple checkpoints are completed in page order.
+- `student_books`, reading progress events, and XP records remain unchanged while a checkpoint blocks the update.
+- The shared update dialog displays the blocking quiz and keeps the previous saved page visible.
+- After submitting the quiz, the reader retries the page update; the next unanswered checkpoint is enforced if applicable.
+- Quiz completion cannot be forged with a client-supplied score because `submitQuizAttempt()` accepts only the quiz ID and answers as input and computes the stored attempt score on the server.
+
+## 15. Implementation sequence
+
+### Phase 1: Progress foundation — Complete
+
+**Completed:** 2026-08-11
+
+- [x] Introduce `ReadingProgressSource`.
+- [x] Add schema fields and deploy migration.
+- [x] Refactor persistence to read the previous page from PostgreSQL.
+- [x] Remove `lastPageReadCache` as an authority for side effects.
+- [x] Preserve current digital reader calls and behavior.
+- [x] Add focused server-action tests.
+
+Implementation notes:
+
+- Digital progress saves are serialized per student/book pair with a PostgreSQL transaction-level advisory lock.
+- Page activity side effects use the previous page loaded from PostgreSQL rather than process memory.
+- Digital saves set `progress_source = 'digital_reader'` and preserve `last_manual_sync_at`.
+- The schema update is represented in the deploy migration, primary bootstrap schema, self-hosted schema, staging bootstrap schema, and TypeScript database types.
+- Focused server-action tests and the TypeScript type-check passed. ESLint reported no errors; the database helper retains four pre-existing `no-explicit-any` warnings.
+
+### Phase 2: Manual update action and UI — Complete
+
+**Completed:** 2026-08-11
+
+- [x] Add `updatePhysicalReadingProgress()`.
+- [x] Add server-side page validation and calculation.
+- [x] Add `UpdateReadingProgressDialog`.
+- [x] Add **Update page** to My Readings cards.
+- [x] Display source and total-page information.
+- [x] Add component tests.
+
+Implementation notes:
+
+- Manual updates derive the student from the authenticated session, validate against catalog page counts, calculate percentages server-side, and clear stale EPUB CFI state.
+- Identical page submissions are transactionally detected and do not update `updated_at` or `last_manual_sync_at`.
+- Manual updates do not run XP, streak, badge, journal, or total-pages side effects.
+- My Readings cards show page totals, percentages, and a visible physical-book source label, with EPUB and unknown-page-count guidance in the dialog.
+- Focused server-action and component tests, TypeScript type-check, and changed-file ESLint validation passed. ESLint retains pre-existing warnings in the student dashboard page.
+
+### Phase 3: Completion and checkpoints — Complete
+
+**Completed:** 2026-08-11
+
+- [x] Prompt for a review and completion after a final-page save.
+- [x] Reuse `markBookAsCompleted()` for atomic review submission and completion.
+- [x] Align the digital reader with the same final-page completion rules.
+- [x] Surface pending checkpoints without forced navigation.
+- [x] Add end-to-end coverage.
+
+Implementation notes:
+
+- Final-page saves remain progress-only until the student explicitly completes the book.
+- Students without an existing review must select a rating and write a review before choosing **Submit review and finish**. Students with an existing review receive a simple **Mark as finished** confirmation.
+- Manual and digital completion use the same `markBookAsCompleted()` action. The digital finish control appears only at the reader-reported final page, after a delay that allows normal progress persistence; the server remains authoritative and verifies the saved page against `books.page_count`.
+- Review insertion and completion are transactional. Completion is idempotent, preventing duplicate completion journal entries, statistics, or rewards if submission is retried, and an existing review does not block completion.
+- Manual updates query for the latest genuinely pending required checkpoint and show an optional **Start quiz** action without redirecting automatically. Quiz return navigation uses the checkpoint page rather than a later saved page.
+- The dashboard includes existing completion state so already-finished books are not prompted again.
+- Component coverage verifies both pending and absent checkpoint states, including reading past a checkpoint before starting its quiz.
+- The opt-in Playwright scenario seeds isolated data and removes dependent quiz, journal, gamification, progress, profile, book, and user records in a reverse-dependency transaction.
+- Forty-eight focused server-action and component tests cover validation, final-page enforcement, existing-review behavior, manual and digital completion, and client refresh. TypeScript type-check and `git diff --check` passed. The authenticated Playwright scenario remains opt-in with `RUN_PROGRESS_SYNC_E2E=1`.
+
+### Phase 4: Optional analytics and rewards — Complete
+
+**Completed:** 2026-08-11
+
+- [x] Add an append-only event table consumed by history and rewards.
+- [x] Define and implement the manual-reading reward policy.
+- [x] Add teacher-facing source and classroom history views.
+- [x] Add abuse prevention and idempotent reward processing.
+
+Implementation notes:
+
+- Every changed save writes a `reading_progress_events` row with source, page movement, reward status, rewarded pages, and XP awarded.
+- Manual progress earns the existing per-page XP only for pages above the book's historical high-water mark. Digital and manual history both contribute, and both `previous_page` and `current_page` event endpoints preserve the high-water mark across backward corrections.
+- Manual rewards are capped at 20 pages per student per UTC day across all books. Student-wide and student/book advisory locks serialize cap and high-water calculations.
+- Reward XP, the XP audit row, the canonical progress update, and the progress event are committed atomically. A partial unique index on `(student_id, source_id)` for `manual_page_read` transactions provides a database-level duplicate guard; profile XP changes only after the idempotency claim succeeds, and level calculation uses the canonical `calculate_level()` database function.
+- Manual saves still do not affect streaks, `profiles.total_pages_read`, page-count badges, or reading-session journals.
+- Classroom overviews show current progress and the 25 most recent source-labelled events only for books assigned to that classroom, preventing unrelated student reading activity from appearing in the class view.
+- Student and teacher views disclose when the 20-page daily cap partially reduces or fully prevents a manual reward.
+- Final validation passed with 34 server-action and component tests, TypeScript type-check, changed-file ESLint, production build, and the authenticated Playwright scenario against a freshly initialized isolated PostgreSQL database.
+- Post-completion hardening on 2026-08-12 made digital total-page increments atomic, fixed PostgreSQL progress-source parameter typing, aligned fresh-install journal/review schema dependencies, and stabilized Playwright on the webpack dev server.
+- Review moderation RLS was hardened for both existing and fresh databases: student-owned inserts and updates can only produce clean `PENDING` reviews with no rejection or moderation metadata, while only librarians and administrators can approve or reject. Live PostgreSQL tests verified malicious INSERT/UPDATE attempts are rejected in self-hosted and staging authorization models.
+
+## 16. Testing requirements
+
+### 16.1 Server-action tests
+
+Extend `web/src/__tests__/app/student-actions.test.ts` or split progress tests into a dedicated file when it improves clarity.
+
+Required cases:
+
+1. Authenticated student inserts their first manual progress row.
+2. Manual update changes an existing row.
+3. Server calculates percentage from `books.page_count`.
+4. Unknown page count produces `NULL` percentage.
+5. Page below 1 is rejected.
+6. Non-integer page is rejected.
+7. Page above `page_count` is rejected.
+8. Missing book is rejected.
+9. The client cannot choose another `student_id`.
+10. Manual update clears stale `epub_cfi`.
+11. Manual update sets `progress_source = 'manual_physical'`.
+12. Manual update sets `last_manual_sync_at` when changed.
+13. Identical page is a no-op.
+14. Backward update succeeds.
+15. Backward update does not subtract historical statistics.
+16. Manual reward processing is database-backed, high-water-mark protected, and capped at 20 pages per UTC day.
+17. Manual update does not call `updateReadingStreak()`.
+18. Manual update does not increment `profiles.total_pages_read`.
+19. Digital updates continue to use `digital_reader`.
+20. Digital page delta is based on the database's previous page, not process memory.
+21. Concurrent updates do not duplicate digital activity side effects.
+
+### 16.2 Component tests
+
+Required dialog cases:
+
+- shows current and total pages;
+- validates empty, decimal, zero, negative, and over-limit input;
+- disables duplicate submission while pending;
+- displays server validation errors;
+- confirms backward movement;
+- displays a same-page message;
+- displays an EPUB approximation warning;
+- offers completion after the final page;
+- surfaces a pending checkpoint without forced navigation;
+- keeps checkpoint messaging hidden when no checkpoint is pending; and
+- closes or updates local card state after success.
+
+### 16.3 End-to-end scenario
+
+1. Sign in as a student with a book saved at page 20.
+2. Open **My Readings**.
+3. Select **Update page**.
+4. Enter page 35 and save.
+5. Verify the card shows page 35 and manual source.
+6. Reload and verify page 35 persists.
+7. Open the digital reader and verify it resumes using the updated page rather than an old CFI.
+8. Verify XP, streak, and total pages read did not change because of the manual update.
+9. Change progress to page 30 and confirm the backward correction.
+10. Verify historical rewards remain unchanged.
+
+## 17. Acceptance criteria
+
+The MVP is accepted when all of the following are true. The environment-backed browser scenario passed against an isolated PostgreSQL database on 2026-08-12.
+
+- [x] A signed-in student can update a book's current page from **My Readings**.
+- [x] The action derives `student_id` from the authenticated session.
+- [x] The server rejects invalid and out-of-range pages.
+- [x] `student_books.current_page` remains the canonical latest position.
+- [x] Progress percentage uses `books.page_count`, not an estimate.
+- [x] Manual updates are identified as `manual_physical`.
+- [x] Manual updates clear stale EPUB CFI data.
+- [x] Same-page submissions are idempotent.
+- [x] Backward corrections require client confirmation and are accepted by the server.
+- [x] Manual updates award only capped, event-backed page XP and do not alter streaks or increment total pages.
+- [x] Entering the final page does not automatically complete the book.
+- [x] The student can explicitly mark the book complete after a prompt.
+- [x] Existing digital-reader progress still saves successfully.
+- [x] Digital activity calculations no longer depend on process-local cache state.
+- [x] Dashboard, reader, and journal views show the updated page in environment-backed end-to-end verification.
+- [x] Automated tests cover validation, source behavior, no-op behavior, backward correction, stale CFI handling, and gamification isolation.
+
+## 18. Definition of done
+
+Development is complete when:
+
+1. The deploy-safe migrations and installation schemas are updated, including strict review moderation RLS for existing and fresh databases.
+2. TypeScript database types match the schema.
+3. Progress persistence is source-aware and database-backed.
+4. The manual server action and accessible dialog are implemented.
+5. Relevant dashboards use actual book page counts.
+6. Unit/component tests pass.
+7. The primary end-to-end scenario passes.
+8. Lint and TypeScript checks pass for changed code.
+9. Product copy and EPUB limitations are visible in the UI.
+10. This document is updated if implementation decisions differ from the specification.
+
+## 19. Open decisions
+
+These decisions are intentionally deferred and must not block the MVP:
+
+1. Should a future teacher-verification workflow allow a higher or classroom-specific manual reward cap?
+2. Should teacher history support date, source, student, or book filters?
+3. Should manual updates create journal entries by default?
+4. Should some classrooms require checkpoint completion immediately after a manual update?
+5. Is edition-level metadata needed to distinguish physical and digital page counts?
+6. Is true no-network/PWA synchronization a separate roadmap feature?
+
+Until those decisions are approved, implement the conservative MVP policies defined in this document.

@@ -25,44 +25,60 @@ const entryTypeConfig: Record<
   string,
   {
     label: string;
+    icon: string;
     badgeVariant: "bubble" | "sky" | "lime" | "amber" | "neutral" | "outline";
-    surfaceClassName: string;
+    accentClassName: string;
+    softSurfaceClassName: string;
   }
 > = {
   note: {
     label: "Note",
+    icon: "📝",
     badgeVariant: "amber",
-    surfaceClassName: "from-[#fffaf4] via-white to-[#FBF2DF]",
-  },
-  reading_session: {
-    label: "Reading Session",
-    badgeVariant: "sky",
-    surfaceClassName: "from-[#EFF8FE] via-white to-[#fffaf4]",
-  },
-  achievement: {
-    label: "Achievement",
-    badgeVariant: "bubble",
-    surfaceClassName: "from-[#F5E7E8] via-white to-[#FBF2DF]",
+    accentClassName: "bg-[#D6A13A]",
+    softSurfaceClassName: "bg-[#FBF2DF]",
   },
   quote: {
     label: "Quote",
-    badgeVariant: "lime",
-    surfaceClassName: "from-[#EDF3EB] via-white to-[#fffaf4]",
+    icon: "💬",
+    badgeVariant: "sky",
+    accentClassName: "bg-[#B8DDF8]",
+    softSurfaceClassName: "bg-[#EFF8FE]",
   },
   question: {
     label: "Question",
-    badgeVariant: "bubble",
-    surfaceClassName: "from-[#F5E7E8] via-white to-[#EFF8FE]",
+    icon: "❓",
+    badgeVariant: "sky",
+    accentClassName: "bg-[#B8DDF8]",
+    softSurfaceClassName: "bg-[#EFF8FE]",
+  },
+  reading_session: {
+    label: "Reading Progress",
+    icon: "📖",
+    badgeVariant: "sky",
+    accentClassName: "bg-[#B8DDF8]",
+    softSurfaceClassName: "bg-[#EFF8FE]",
+  },
+  achievement: {
+    label: "Growing",
+    icon: "🏅",
+    badgeVariant: "amber",
+    accentClassName: "bg-[#D6A13A]",
+    softSurfaceClassName: "bg-[#FBF2DF]",
   },
   started_book: {
     label: "Started Reading",
+    icon: "📚",
     badgeVariant: "sky",
-    surfaceClassName: "from-[#EFF8FE] via-white to-[#FBF2DF]",
+    accentClassName: "bg-[#B8DDF8]",
+    softSurfaceClassName: "bg-[#EFF8FE]",
   },
   finished_book: {
-    label: "Finished Book",
+    label: "Completed",
+    icon: "🏁",
     badgeVariant: "lime",
-    surfaceClassName: "from-[#EDF3EB] via-white to-[#EFF8FE]",
+    accentClassName: "bg-[#6F8B6A]",
+    softSurfaceClassName: "bg-[#EDF3EB]",
   },
 };
 
@@ -73,7 +89,6 @@ export function JournalEntryCard({
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-
   const [isEditingReview, setIsEditingReview] = useState(false);
   const [editRating, setEditRating] = useState(entry.review_rating || 0);
   const [editComment, setEditComment] = useState(entry.review_comment || "");
@@ -81,9 +96,11 @@ export function JournalEntryCard({
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const config = entryTypeConfig[entry.entry_type] ?? {
-    label: "Entry",
+    label: "Journal Entry",
+    icon: "📓",
     badgeVariant: "neutral" as const,
-    surfaceClassName: "from-white via-[#fffaf4] to-[#EFF8FE]",
+    accentClassName: "bg-[#D6A13A]",
+    softSurfaceClassName: "bg-[#fffaf4]",
   };
 
   const time = new Date(entry.created_at).toLocaleTimeString("en-US", {
@@ -110,7 +127,7 @@ export function JournalEntryCard({
       editComment.trim().length < 10
     ) {
       setSubmitError(
-        "Please provide a rating and comment (min 10 characters).",
+        "Please add a rating and a short reflection before resubmitting.",
       );
       return;
     }
@@ -134,11 +151,11 @@ export function JournalEntryCard({
         }));
         setIsEditingReview(false);
       } else {
-        setSubmitError(result.error || "Failed to resubmit review");
+        setSubmitError(result.error || "Could not resubmit the review yet.");
       }
     } catch (error) {
       console.error("Failed to resubmit review:", error);
-      setSubmitError("An error occurred. Please try again.");
+      setSubmitError("Could not resubmit the review yet. Please try again.");
     } finally {
       setIsSubmittingReview(false);
     }
@@ -149,13 +166,13 @@ export function JournalEntryCard({
       case "PENDING":
         return (
           <Badge variant="amber" size="sm">
-            Pending Review
+            Evidence ready
           </Badge>
         );
       case "APPROVED":
         return (
           <Badge variant="lime" size="sm">
-            Approved
+            Completed
           </Badge>
         );
       case "REJECTED":
@@ -165,7 +182,7 @@ export function JournalEntryCard({
             size="sm"
             className="bg-[#F8EAEB] text-[#B94A4E]"
           >
-            Needs Revision
+            Needs reflection
           </Badge>
         );
       default:
@@ -173,182 +190,228 @@ export function JournalEntryCard({
     }
   };
 
+  const getUnattachedEntryMessage = () => {
+    if (entry.entry_type === "achievement") {
+      return "A moment of growth earned across the reading journey.";
+    }
+
+    if (
+      entry.entry_type === "note" &&
+      entry.metadata?.scope === "general_reflection"
+    ) {
+      return "General journal reflection.";
+    }
+
+    if (
+      ["started_book", "finished_book", "reading_session"].includes(
+        entry.entry_type,
+      )
+    ) {
+      return "The original book for this reading activity is no longer available.";
+    }
+
+    return "General journal entry.";
+  };
+
+  const contentLabel =
+    entry.entry_type === "quote" ? "Saved quote" : "Journal reflection";
+
   return (
     <Card
-      variant="playful"
+      variant="frosted"
       padding="snug"
-      className={cn(
-        "relative bg-linear-to-br transition hover:-translate-y-0.5 hover:shadow-[0_20px_50px_rgba(36,23,24,0.1)]",
-        config.surfaceClassName,
-      )}
+      className="motion-hover-lift relative overflow-hidden bg-white text-[#241718]"
     >
       <div
         className={cn(
-          "absolute -left-[2.55rem] top-5 h-3 w-3 rounded-full ring-4 ring-white",
-          entry.review_status === "REJECTED" ? "bg-[#B94A4E]" : "bg-[#D6A13A]",
+          "absolute inset-y-0 left-0 w-1.5",
+          config.accentClassName,
         )}
       />
+      <div
+        className={cn(
+          "absolute -left-[2.35rem] top-6 h-3 w-3 rounded-full ring-4 ring-[#fffaf4]",
+          entry.review_status === "REJECTED"
+            ? "bg-[#B94A4E]"
+            : config.accentClassName,
+        )}
+        aria-hidden="true"
+      />
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="min-w-0 space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <Badge variant={config.badgeVariant} size="sm">
-              {config.label}
-            </Badge>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {entry.review_status && getStatusBadge(entry.review_status)}
-              <Badge variant="neutral" size="sm">
-                {time}
+      <div className="space-y-5 pl-3">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className={cn(
+                "flex size-11 shrink-0 items-center justify-center rounded-2xl text-lg",
+                config.softSurfaceClassName,
+              )}
+              aria-hidden="true"
+            >
+              {config.icon}
+            </div>
+            <div>
+              <Badge variant={config.badgeVariant} size="sm">
+                {config.label}
               </Badge>
+              <p className="mt-1 text-xs font-medium text-[#6f6061]">
+                Saved at {time}
+              </p>
             </div>
           </div>
-
-          {entry.content && (
-            <p className="whitespace-pre-wrap text-base leading-7 text-[#241718]">
-              {entry.entry_type === "quote" ? (
-                <span className="italic">&ldquo;{entry.content}&rdquo;</span>
-              ) : (
-                entry.content
-              )}
-            </p>
-          )}
-
           <div className="flex flex-wrap gap-2">
-            {entry.entry_type === "reading_session" &&
-              entry.page_range_start &&
-              entry.page_range_end && (
-                <Badge
-                  variant="neutral"
-                  className="normal-case tracking-normal"
-                >
-                  Pages {entry.page_range_start} → {entry.page_range_end}
-                </Badge>
-              )}
-            {entry.entry_type === "reading_session" &&
-              entry.reading_duration_minutes && (
-                <Badge
-                  variant="neutral"
-                  className="normal-case tracking-normal"
-                >
-                  Duration {entry.reading_duration_minutes} min
-                </Badge>
-              )}
+            {entry.review_status && getStatusBadge(entry.review_status)}
             {entry.page_number && entry.entry_type !== "reading_session" && (
-              <Badge variant="outline" className="normal-case tracking-normal">
+              <Badge
+                variant="outline"
+                size="sm"
+                className="normal-case tracking-normal"
+              >
                 Page {entry.page_number}
               </Badge>
             )}
           </div>
+        </header>
 
-          {entry.entry_type === "finished_book" && entry.review_status && (
-            <div className="rounded-2xl border border-[#eadfda] bg-white/75 p-3">
-              {entry.review_status === "REJECTED" &&
-                entry.review_rejection_feedback &&
-                !isEditingReview && (
-                  <div className="mb-3 rounded-2xl border border-[#B94A4E]/25 bg-[#F8EAEB] p-3">
-                    <div className="mb-1 text-xs font-bold text-[#B94A4E]">
-                      Librarian Feedback
-                    </div>
-                    <p className="mb-2 text-xs leading-5 text-[#8b3639]">
-                      {entry.review_rejection_feedback}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setIsEditingReview(true);
-                        setEditRating(entry.review_rating || 0);
-                        setEditComment(entry.review_comment || "");
-                        setSubmitError(null);
-                      }}
-                      className="min-h-0 px-0 py-0 text-[#B94A4E] underline hover:bg-transparent"
-                    >
-                      Revise Review
-                    </Button>
-                  </div>
-                )}
+        {entry.content && (
+          <section aria-label={contentLabel}>
+            {entry.entry_type === "quote" ? (
+              <blockquote className="quote-font rounded-3xl border border-[#B8DDF8]/55 bg-[#EFF8FE] px-5 py-4 text-lg leading-8 text-[#1F2A44]">
+                “{entry.content}”
+              </blockquote>
+            ) : (
+              <p className="whitespace-pre-wrap text-base leading-7 text-[#241718]">
+                {entry.content}
+              </p>
+            )}
+          </section>
+        )}
 
-              {isEditingReview ? (
-                <div className="space-y-3">
-                  <div>
-                    <Label className="mb-1">Rating</Label>
-                    <StarRating
-                      value={editRating}
-                      onChange={setEditRating}
-                      size="md"
-                    />
-                  </div>
-                  <div>
-                    <Label className="mb-1">Comment (min 10 chars)</Label>
-                    <textarea
-                      value={editComment}
-                      onChange={(e) => setEditComment(e.target.value)}
-                      className="focus-ring w-full rounded-2xl border border-[#eadfda] bg-white px-3 py-2 text-sm text-[#241718] focus-visible:border-[#D6A13A]"
-                      rows={3}
-                    />
-                  </div>
-                  {submitError && <FieldError>{submitError}</FieldError>}
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleResubmitReview}
-                      disabled={
-                        editRating === 0 || editComment.trim().length < 10
-                      }
-                      loading={isSubmittingReview}
-                    >
-                      Submit Revision
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsEditingReview(false)}
-                      disabled={isSubmittingReview}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="mb-2 flex items-center gap-2">
-                    <StarRating
-                      value={entry.review_rating || 0}
-                      size="sm"
-                      readonly
-                    />
-                  </div>
-                  {entry.review_comment && (
-                    <p className="text-sm italic leading-6 text-[#5d4b4c]">
-                      &ldquo;{entry.review_comment}&rdquo;
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+        <div className="flex flex-wrap gap-2">
+          {entry.entry_type === "reading_session" &&
+            entry.page_range_start &&
+            entry.page_range_end && (
+              <Badge variant="sky" className="normal-case tracking-normal">
+                Pages {entry.page_range_start} → {entry.page_range_end}
+              </Badge>
+            )}
+          {entry.entry_type === "reading_session" &&
+            entry.reading_duration_minutes && (
+              <Badge variant="amber" className="normal-case tracking-normal">
+                {entry.reading_duration_minutes} min of progress
+              </Badge>
+            )}
         </div>
 
-        <aside className="self-start rounded-[24px] border border-[#eadfda] bg-white/75 p-4 shadow-[0_12px_30px_rgba(36,23,24,0.04)] lg:max-w-xl">
+        {entry.entry_type === "finished_book" && entry.review_status && (
+          <section
+            className="rounded-3xl border border-[#eadfda] bg-[#fffaf4] p-4"
+            aria-label="Book review status"
+          >
+            {entry.review_status === "REJECTED" &&
+              entry.review_rejection_feedback &&
+              !isEditingReview && (
+                <div className="mb-4 rounded-2xl border border-[#B94A4E]/25 bg-[#F8EAEB] p-4">
+                  <div className="mb-1 heading-font text-xs font-bold uppercase tracking-wide text-[#B94A4E]">
+                    Guided reflection
+                  </div>
+                  <p className="mb-3 text-sm leading-6 text-[#7E1518]">
+                    {entry.review_rejection_feedback}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setIsEditingReview(true);
+                      setEditRating(entry.review_rating || 0);
+                      setEditComment(entry.review_comment || "");
+                      setSubmitError(null);
+                    }}
+                    className="min-h-0 px-0 py-0 text-[#B94A4E] underline hover:bg-transparent"
+                  >
+                    Revise reflection
+                  </Button>
+                </div>
+              )}
+
+            {isEditingReview ? (
+              <div className="space-y-3">
+                <div>
+                  <Label className="mb-1">Rating</Label>
+                  <StarRating
+                    value={editRating}
+                    onChange={setEditRating}
+                    size="md"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1">Reflection min 10 characters</Label>
+                  <textarea
+                    value={editComment}
+                    onChange={(event) => setEditComment(event.target.value)}
+                    className="focus-ring w-full rounded-2xl border border-[#eadfda] bg-white px-3 py-2 text-sm text-[#241718] focus-visible:border-[#D6A13A]"
+                    rows={3}
+                  />
+                </div>
+                {submitError && <FieldError>{submitError}</FieldError>}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleResubmitReview}
+                    disabled={
+                      editRating === 0 || editComment.trim().length < 10
+                    }
+                    loading={isSubmittingReview}
+                  >
+                    Submit reflection
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditingReview(false)}
+                    disabled={isSubmittingReview}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <StarRating
+                  value={entry.review_rating || 0}
+                  size="sm"
+                  readonly
+                />
+                {entry.review_comment && (
+                  <p className="mt-2 text-sm italic leading-6 text-[#5d4b4c]">
+                    “{entry.review_comment}”
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        <aside className="rounded-3xl border border-[#eadfda] bg-[#fffaf4] p-4">
           {entry.book_id && entry.book_title ? (
             <div className="flex gap-4">
               {entry.book_cover_url && (
                 <img
                   src={entry.book_cover_url}
                   alt={`Cover of ${entry.book_title}`}
-                  className="h-28 w-20 shrink-0 rounded-xl object-cover shadow-md"
+                  className="h-24 w-16 shrink-0 rounded-2xl object-cover shadow-[0_12px_30px_rgba(36,23,24,0.08)]"
                 />
               )}
               <div className="min-w-0 flex-1 space-y-1">
-                <Badge variant="sky" size="sm" className="mb-2">
-                  Book
+                <Badge variant="sky" size="sm">
+                  Book context
                 </Badge>
                 <Link
                   href={`/dashboard/journal/${entry.book_id}`}
-                  className="heading-font block text-base font-bold leading-tight text-[#7E1518] hover:underline"
+                  className="heading-font mt-2 block text-base font-bold leading-tight text-[#7E1518] hover:underline"
                 >
                   {entry.book_title}
                 </Link>
@@ -362,10 +425,10 @@ export function JournalEntryCard({
           ) : (
             <div className="space-y-2">
               <Badge variant="neutral" size="sm">
-                Journal
+                Reflection context
               </Badge>
               <p className="text-sm leading-6 text-[#6f6061]">
-                This entry is not attached to a specific book.
+                {getUnattachedEntryMessage()}
               </p>
             </div>
           )}
@@ -379,7 +442,7 @@ export function JournalEntryCard({
                   "flex-1 no-underline",
                 )}
               >
-                Open
+                Open book
               </Link>
             )}
 
@@ -391,14 +454,14 @@ export function JournalEntryCard({
                 onClick={() => setShowShareModal(true)}
                 className="flex-1"
               >
-                Share
+                Share reflection
               </Button>
             )}
 
             {showConfirmDelete ? (
               <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl bg-[#F8EAEB] p-2">
                 <span className="text-xs font-medium text-[#B94A4E]">
-                  Delete?
+                  Delete this entry?
                 </span>
                 <Button
                   type="button"

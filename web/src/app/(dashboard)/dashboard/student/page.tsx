@@ -14,6 +14,7 @@ import {
   RecentBadges,
 } from "@/components/dashboard/gamification";
 import { WeeklyChallengeCard } from "@/components/dashboard/student/WeeklyChallengeCard";
+import { UpdateReadingProgressDialog } from "@/components/dashboard/student/UpdateReadingProgressDialog";
 import {
   Badge as UiBadge,
   buttonVariants,
@@ -64,10 +65,20 @@ export default async function StudentDashboardPage() {
       sb.current_page,
       sb.updated_at,
       sb.started_at,
+      sb.progress_percent,
+      sb.progress_source,
+      sb.completed,
+      EXISTS(
+        SELECT 1
+        FROM book_reviews br
+        WHERE br.book_id = sb.book_id AND br.student_id = sb.student_id
+      ) AS has_reviewed,
       b.id as book_id_ref,
       b.title,
       b.author,
-      b.cover_url
+      b.cover_url,
+      b.page_count,
+      b.file_format
     FROM student_books sb
     JOIN books b ON sb.book_id = b.id
     WHERE sb.student_id = $1
@@ -80,11 +91,18 @@ export default async function StudentDashboardPage() {
     current_page: row.current_page,
     updated_at: row.updated_at,
     started_at: row.started_at,
+    progress_percent:
+      row.progress_percent === null ? null : Number(row.progress_percent),
+    progress_source: row.progress_source,
+    completed: row.completed === true,
+    has_reviewed: row.has_reviewed === true,
     books: {
       id: row.book_id_ref,
       title: row.title,
       author: row.author,
       cover_url: row.cover_url,
+      page_count: row.page_count === null ? null : Number(row.page_count),
+      file_format: row.file_format,
     },
   }));
 
@@ -240,18 +258,44 @@ export default async function StudentDashboardPage() {
                         <p className="text-sm leading-6 text-[#5d4b4c]">
                           {book?.author}
                         </p>
-                        <p className="text-xs text-[#6f6061]">
-                          Current page: {assignment.current_page ?? 1}
-                        </p>
-                        <Link
-                          href={`/dashboard/student/read/${assignment.book_id}?page=${assignment.current_page ?? 1}`}
-                          className={buttonVariants({
-                            size: "sm",
-                            className: "mt-3 w-fit",
-                          })}
-                        >
-                          Continue reading
-                        </Link>
+                        <div className="space-y-1 text-xs text-[#6f6061]">
+                          <p>
+                            Current page: {assignment.current_page ?? 1}
+                            {book.page_count !== null
+                              ? ` of ${book.page_count}`
+                              : ""}
+                          </p>
+                          {assignment.progress_percent !== null && (
+                            <p>
+                              {Math.min(100, assignment.progress_percent).toFixed(
+                                assignment.progress_percent % 1 === 0 ? 0 : 1,
+                              )}
+                              % complete
+                            </p>
+                          )}
+                          {assignment.progress_source === "manual_physical" && (
+                            <p className="font-semibold text-[#7a5311]">
+                              Updated from physical book
+                            </p>
+                          )}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Link
+                            href={`/dashboard/student/read/${assignment.book_id}?page=${assignment.current_page ?? 1}`}
+                            className={buttonVariants({ size: "sm" })}
+                          >
+                            Continue reading
+                          </Link>
+                          <UpdateReadingProgressDialog
+                            bookId={assignment.book_id}
+                            bookTitle={book?.title ?? "this book"}
+                            currentPage={assignment.current_page ?? 1}
+                            totalPages={book.page_count}
+                            fileFormat={book.file_format}
+                            isCompleted={assignment.completed}
+                            hasReviewed={assignment.has_reviewed}
+                          />
+                        </div>
                       </div>
                     </div>
                   </Card>

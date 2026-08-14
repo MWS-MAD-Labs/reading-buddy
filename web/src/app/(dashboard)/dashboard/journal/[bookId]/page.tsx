@@ -8,6 +8,7 @@ import {
 } from "@/app/(dashboard)/dashboard/journal/journal-actions";
 import { JournalTimeline } from "@/components/dashboard/journal/JournalTimeline";
 import { BookJournalHeader } from "@/components/dashboard/journal/BookJournalHeader";
+import { JournalEntryComposer } from "@/components/dashboard/journal/JournalEntryComposer";
 import {
   Badge,
   buttonVariants,
@@ -89,20 +90,71 @@ export default async function BookJournalPage({ params }: PageProps) {
         >
           Continue Reading
         </Link>
+        <JournalEntryComposer
+          triggerLabel="Add Note"
+          title="Add Note"
+          description="Save a note for this book. Add a page number if it belongs to a specific page."
+          mode="book-entry"
+          fixedBook={{
+            id: book.id,
+            title: book.title,
+            author: book.author ?? null,
+            cover_url: book.cover_url ?? null,
+            current_page: progress?.current_page ?? null,
+            completed: progress?.completed ?? null,
+          }}
+          defaultEntryType="note"
+          defaultPageNumber={progress?.current_page}
+          triggerVariant="outline"
+        />
+        <JournalEntryComposer
+          triggerLabel="Save Quote"
+          title="Save Quote"
+          description="Capture a quote from this book and optionally attach a page number."
+          mode="book-entry"
+          fixedBook={{
+            id: book.id,
+            title: book.title,
+            author: book.author ?? null,
+            cover_url: book.cover_url ?? null,
+            current_page: progress?.current_page ?? null,
+            completed: progress?.completed ?? null,
+          }}
+          defaultEntryType="quote"
+          defaultPageNumber={progress?.current_page}
+          triggerVariant="outline"
+        />
+        <JournalEntryComposer
+          triggerLabel="Ask Question"
+          title="Ask Question"
+          description="Save a question this book raised for you."
+          mode="book-entry"
+          fixedBook={{
+            id: book.id,
+            title: book.title,
+            author: book.author ?? null,
+            cover_url: book.cover_url ?? null,
+            current_page: progress?.current_page ?? null,
+            completed: progress?.completed ?? null,
+          }}
+          defaultEntryType="question"
+          defaultPageNumber={progress?.current_page}
+          triggerVariant="outline"
+        />
       </div>
 
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <Badge variant="neutral" size="sm">
-              Book notes
+              Book journal
             </Badge>
             <h2 className="heading-font mt-2 text-xl font-bold text-[#7E1518]">
-              My Notes
+              My Book Entries
             </h2>
           </div>
           <Badge variant="outline" size="sm">
-            {entriesResult.entries.length} notes
+            {entriesResult.entries.length} entries
           </Badge>
         </div>
 
@@ -118,10 +170,10 @@ export default async function BookJournalPage({ params }: PageProps) {
               Notes
             </Badge>
             <CardTitle className="text-lg text-[#7E1518]">
-              No notes yet
+              No book entries yet
             </CardTitle>
             <CardDescription>
-              Start reading and add some thoughts for this book.
+              Start reading or add a note, quote, or question for this book.
             </CardDescription>
           </Card>
         )}

@@ -106,6 +106,7 @@ CREATE POLICY "Delete own vote" ON review_votes FOR DELETE
   USING (user_id = get_current_profile_id());
 
 -- Trigger to update updated_at on book_reviews
+DROP TRIGGER IF EXISTS update_book_reviews_updated_at ON book_reviews;
 CREATE TRIGGER update_book_reviews_updated_at
   BEFORE UPDATE ON book_reviews
   FOR EACH ROW

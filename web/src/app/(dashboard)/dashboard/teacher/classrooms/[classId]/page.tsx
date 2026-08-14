@@ -50,11 +50,31 @@ type RosterRow = {
 type ReadingRow = {
   student_id: string;
   current_page: number | null;
+  progress_source: "digital_reader" | "manual_physical";
+  updated_at: string | null;
   started_at: string | null;
   completed_at: string | null;
   full_name: string | null;
   title: string | null;
   page_count: number | null;
+};
+
+type ReadingHistoryRow = {
+  id: string;
+  student_id: string;
+  previous_page: number | null;
+  current_page: number;
+  source: "digital_reader" | "manual_physical";
+  rewarded_pages: number;
+  xp_awarded: number;
+  reward_status:
+    | "awarded"
+    | "daily_cap_reached"
+    | "already_rewarded"
+    | "not_applicable";
+  created_at: string;
+  full_name: string | null;
+  title: string | null;
 };
 
 type QuizAttemptRow = {
@@ -96,6 +116,16 @@ const formatDate = (value: string | null) => {
   if (!value) return "—";
   return new Date(value).toLocaleDateString();
 };
+
+const formatDateTime = (value: string) =>
+  new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
+const formatProgressSource = (
+  source: "digital_reader" | "manual_physical",
+) => (source === "manual_physical" ? "Physical update" : "Digital reader");
 
 const tabClass = (active: boolean) =>
   buttonVariants({ variant: active ? "primary" : "neutral", size: "sm" });
@@ -163,6 +193,8 @@ export default async function ManageClassroomPage({
   let readings: {
     student_id: string;
     current_page: number | null;
+    progress_source: "digital_reader" | "manual_physical";
+    updated_at: string | null;
     started_at: string | null;
     completed_at: string | null;
     profiles: { full_name: string | null } | null;
@@ -174,28 +206,65 @@ export default async function ManageClassroomPage({
       `SELECT
         sb.student_id,
         sb.current_page,
+        sb.progress_source,
+        sb.updated_at,
         sb.started_at,
         sb.completed_at,
         p.full_name,
         b.title,
         b.page_count
        FROM student_books sb
+       JOIN class_books cb
+         ON cb.book_id = sb.book_id
+        AND cb.class_id = $2
        LEFT JOIN profiles p ON sb.student_id = p.id
        LEFT JOIN books b ON sb.book_id = b.id
        WHERE sb.student_id = ANY($1)
-       ORDER BY sb.started_at DESC NULLS LAST
+       ORDER BY sb.updated_at DESC NULLS LAST
        LIMIT 10`,
-      [rosterStudentIds],
+      [rosterStudentIds, classId],
     );
 
     readings = (readingsResult.rows as ReadingRow[]).map((row) => ({
       student_id: row.student_id,
       current_page: row.current_page,
+      progress_source: row.progress_source,
+      updated_at: row.updated_at,
       started_at: row.started_at,
       completed_at: row.completed_at,
       profiles: { full_name: row.full_name },
       books: { title: row.title, page_count: row.page_count },
     }));
+  }
+
+  let readingHistory: ReadingHistoryRow[] = [];
+
+  if (rosterStudentIds.length > 0) {
+    const historyResult = await query(
+      `SELECT
+         rpe.id,
+         rpe.student_id,
+         rpe.previous_page,
+         rpe.current_page,
+         rpe.source,
+         rpe.rewarded_pages,
+         rpe.xp_awarded,
+         rpe.reward_status,
+         rpe.created_at,
+         p.full_name,
+         b.title
+       FROM reading_progress_events rpe
+       JOIN class_books cb
+         ON cb.book_id = rpe.book_id
+        AND cb.class_id = $2
+       LEFT JOIN profiles p ON rpe.student_id = p.id
+       LEFT JOIN books b ON rpe.book_id = b.id
+       WHERE rpe.student_id = ANY($1)
+       ORDER BY rpe.created_at DESC
+       LIMIT 25`,
+      [rosterStudentIds, classId],
+    );
+    readingHistory = historyResult.rows as ReadingHistoryRow[];
   }
 
   let quizAttempts: {
@@ -364,6 +433,7 @@ export default async function ManageClassroomPage({
                       <th className={cellClass}>Student</th>
                       <th className={cellClass}>Book</th>
                       <th className={cellClass}>Current page</th>
+                      <th className={cellClass}>Source</th>
                       <th className={cellClass}>Updated</th>
                     </tr>
                   </thead>
@@ -384,14 +454,17 @@ export default async function ManageClassroomPage({
                             {entry.books?.page_count ?? "—"}
                           </td>
                           <td className={cellClass}>
-                            {formatDate(entry.completed_at ?? entry.started_at)}
+                            {formatProgressSource(entry.progress_source)}
+                          </td>
+                          <td className={cellClass}>
+                            {formatDate(entry.updated_at)}
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
                         <td
-                          colSpan={4}
+                          colSpan={5}
                           className={`${cellClass} text-center text-[#6f6061]`}
                         >
                           No updates yet.
@@ -452,6 +525,73 @@ export default async function ManageClassroomPage({
               </div>
             </Card>
           </section>
+
+          <Card variant="frosted" padding="cozy">
+            <CardHeader>
+              <Badge variant="lime">Reading history</Badge>
+              <CardTitle>Recent progress changes</CardTitle>
+              <CardDescription>
+                Source-labelled history helps distinguish physical updates from
+                digital-reader activity. Manual rewards are limited to new
+                high-water pages and 20 pages per student per UTC day.
+              </CardDescription>
+            </CardHeader>
+            <div className={tableWrapperClass}>
+              <table className={tableClass}>
+                <thead className={headClass}>
+                  <tr>
+                    <th className={cellClass}>When</th>
+                    <th className={cellClass}>Student</th>
+                    <th className={cellClass}>Book</th>
+                    <th className={cellClass}>Change</th>
+                    <th className={cellClass}>Source</th>
+                    <th className={cellClass}>Reward</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#eadfda]">
+                  {readingHistory.length > 0 ? (
+                    readingHistory.map((event) => (
+                      <tr key={event.id}>
+                        <td className={cellClass}>
+                          {formatDateTime(event.created_at)}
+                        </td>
+                        <td className={cellClass}>
+                          {event.full_name ?? "Unknown student"}
+                        </td>
+                        <td className={cellClass}>{event.title ?? "—"}</td>
+                        <td className={cellClass}>
+                          {event.previous_page ?? "New"} → {event.current_page}
+                        </td>
+                        <td className={cellClass}>
+                          {formatProgressSource(event.source)}
+                        </td>
+                        <td className={cellClass}>
+                          {event.source === "digital_reader"
+                            ? "Digital rewards tracked separately"
+                            : event.xp_awarded > 0
+                              ? `${event.xp_awarded} XP (${event.rewarded_pages} pages)${event.reward_status === "daily_cap_reached" ? "; daily cap applied" : ""}`
+                              : event.reward_status === "daily_cap_reached"
+                                ? "Daily cap reached"
+                                : event.reward_status === "already_rewarded"
+                                  ? "Previously rewarded range"
+                                  : "No page reward"}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className={`${cellClass} text-center text-[#6f6061]`}
+                      >
+                        No progress history yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
 
           <ClassroomRoster
             classId={classId}

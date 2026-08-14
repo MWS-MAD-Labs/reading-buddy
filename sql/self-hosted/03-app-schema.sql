@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS books (
   page_images_prefix TEXT,
   page_images_count INT,
   page_images_rendered_at TIMESTAMPTZ,
+  is_picture_book BOOLEAN NOT NULL DEFAULT FALSE,
   -- Multi-format support
   file_format VARCHAR(20) DEFAULT 'pdf',
   original_file_url TEXT,
@@ -144,11 +145,97 @@ CREATE TABLE IF NOT EXISTS student_books (
   current_page INT NOT NULL DEFAULT 1,
   epub_cfi TEXT,
   progress_percent NUMERIC(5,2),
+  progress_source VARCHAR(30) NOT NULL DEFAULT 'digital_reader',
+  last_manual_sync_at TIMESTAMPTZ,
   completed BOOLEAN NOT NULL DEFAULT FALSE,
   started_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  CONSTRAINT student_books_unique UNIQUE(student_id, book_id)
+  CONSTRAINT student_books_unique UNIQUE(student_id, book_id),
+  CONSTRAINT student_books_progress_source_check
+    CHECK (progress_source IN ('digital_reader', 'manual_physical'))
+);
+
+-- Reading journal entries
+CREATE TABLE IF NOT EXISTS journal_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  entry_type VARCHAR(50) NOT NULL,
+  content TEXT,
+  book_id INTEGER REFERENCES books(id) ON DELETE SET NULL,
+  page_number INTEGER,
+  page_range_start INTEGER,
+  page_range_end INTEGER,
+  reading_duration_minutes INTEGER,
+  metadata JSONB DEFAULT '{}',
+  is_private BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT journal_entries_type_check CHECK (
+    entry_type IN ('note', 'reading_session', 'achievement', 'quote', 'question', 'started_book', 'finished_book')
+  )
+);
+
+CREATE TABLE IF NOT EXISTS book_journals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  personal_rating INTEGER CHECK (personal_rating BETWEEN 1 AND 5),
+  review_text TEXT,
+  favorite_quote TEXT,
+  favorite_quote_page INTEGER,
+  reading_goal_pages INTEGER,
+  notes_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT book_journals_student_book_unique UNIQUE(student_id, book_id)
+);
+
+-- Book reviews and helpful votes
+CREATE TABLE IF NOT EXISTS book_reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT NOT NULL CHECK (char_length(comment) >= 10),
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  rejection_feedback TEXT,
+  moderated_by UUID REFERENCES profiles(id),
+  moderated_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT book_reviews_student_book_unique UNIQUE(book_id, student_id),
+  CONSTRAINT book_reviews_status_check CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED'))
+);
+
+CREATE TABLE IF NOT EXISTS review_votes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  review_id UUID NOT NULL REFERENCES book_reviews(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT review_votes_review_user_unique UNIQUE(review_id, user_id)
+);
+
+-- Append-only reading progress history
+CREATE TABLE IF NOT EXISTS reading_progress_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  previous_page INTEGER,
+  current_page INTEGER NOT NULL,
+  source VARCHAR(30) NOT NULL,
+  pages_advanced INTEGER NOT NULL DEFAULT 0,
+  rewarded_pages INTEGER NOT NULL DEFAULT 0,
+  xp_awarded INTEGER NOT NULL DEFAULT 0,
+  reward_status VARCHAR(30) NOT NULL DEFAULT 'not_applicable',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT reading_progress_events_source_check
+    CHECK (source IN ('digital_reader', 'manual_physical')),
+  CONSTRAINT reading_progress_events_pages_check
+    CHECK (pages_advanced >= 0 AND rewarded_pages >= 0 AND rewarded_pages <= pages_advanced),
+  CONSTRAINT reading_progress_events_xp_check CHECK (xp_awarded >= 0),
+  CONSTRAINT reading_progress_events_reward_status_check
+    CHECK (reward_status IN ('awarded', 'daily_cap_reached', 'already_rewarded', 'not_applicable'))
 );
 
 -- Quizzes table
@@ -162,6 +249,9 @@ CREATE TABLE IF NOT EXISTS quizzes (
   quiz_type VARCHAR(50) DEFAULT 'classroom',
   checkpoint_page INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW(),
+  status VARCHAR(50) NOT NULL DEFAULT 'draft',
+  is_published BOOLEAN NOT NULL DEFAULT FALSE,
+  tags TEXT[],
   CONSTRAINT quizzes_quiz_type_check CHECK (quiz_type IN ('checkpoint', 'classroom'))
 );
 
@@ -339,6 +429,23 @@ CREATE INDEX IF NOT EXISTS idx_books_file_format ON books(file_format);
 CREATE INDEX IF NOT EXISTS idx_student_books_student ON student_books(student_id);
 CREATE INDEX IF NOT EXISTS idx_student_books_book ON student_books(book_id);
 
+-- Reading progress event indexes
+CREATE INDEX IF NOT EXISTS idx_journal_entries_student ON journal_entries(student_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_journal_entries_book ON journal_entries(book_id, student_id);
+CREATE INDEX IF NOT EXISTS idx_journal_entries_type ON journal_entries(entry_type);
+CREATE INDEX IF NOT EXISTS idx_book_journals_student ON book_journals(student_id);
+CREATE INDEX IF NOT EXISTS idx_book_journals_book ON book_journals(book_id);
+
+CREATE INDEX IF NOT EXISTS idx_book_reviews_book ON book_reviews(book_id);
+CREATE INDEX IF NOT EXISTS idx_book_reviews_status ON book_reviews(status);
+CREATE INDEX IF NOT EXISTS idx_book_reviews_pending ON book_reviews(status) WHERE status = 'PENDING';
+CREATE INDEX IF NOT EXISTS idx_book_reviews_student ON book_reviews(student_id);
+CREATE INDEX IF NOT EXISTS idx_review_votes_review ON review_votes(review_id);
+
+CREATE INDEX IF NOT EXISTS idx_reading_progress_events_student_created ON reading_progress_events(student_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reading_progress_events_book_created ON reading_progress_events(book_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reading_progress_events_manual_daily_rewards ON reading_progress_events(student_id, created_at) WHERE source = 'manual_physical' AND rewarded_pages > 0;
+
 -- Quizzes indexes
 CREATE INDEX IF NOT EXISTS idx_quizzes_book ON quizzes(book_id);
 CREATE INDEX IF NOT EXISTS idx_quizzes_type ON quizzes(quiz_type);
@@ -369,6 +476,9 @@ CREATE INDEX IF NOT EXISTS idx_student_badges_book ON student_badges(book_id) WH
 
 -- XP transactions indexes
 CREATE INDEX IF NOT EXISTS idx_xp_transactions_student ON xp_transactions(student_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_xp_transactions_manual_source_id
+  ON xp_transactions(student_id, source_id)
+  WHERE source = 'manual_page_read';
 
 -- Challenge indexes
 CREATE INDEX IF NOT EXISTS idx_challenges_active ON reading_challenges(is_active, end_date) WHERE is_active = true;
@@ -386,6 +496,7 @@ COMMENT ON TABLE profiles IS 'User profiles linked to NextAuth users table';
 COMMENT ON COLUMN profiles.user_id IS 'Reference to NextAuth users.id';
 COMMENT ON TABLE books IS 'Book catalog with multi-format support';
 COMMENT ON TABLE student_books IS 'Student reading progress tracking';
+COMMENT ON TABLE reading_progress_events IS 'Append-only source and reward audit history for reading progress changes';
 COMMENT ON TABLE quizzes IS 'Quiz definitions for books';
 COMMENT ON TABLE quiz_attempts IS 'Student quiz submissions and scores';
 COMMENT ON TABLE badges IS 'Achievement badge definitions';

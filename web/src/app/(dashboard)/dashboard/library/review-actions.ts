@@ -30,6 +30,8 @@ export type BookDetails = {
     publisher: string | null;
     publicationYear: number | null;
     pageCount: number | null;
+    fileFormat: string | null;
+    currentPage: number;
     averageRating: number | null;
     reviewCount: number;
     userHasCompleted: boolean;
@@ -47,7 +49,14 @@ export async function getBookDetails(bookId: number): Promise<BookDetails | null
         user.userId,
         `SELECT
       b.id, b.title, b.author, b.cover_url, b.description,
-      b.genre, b.language, b.publisher, b.publication_year, b.page_count,
+      b.genre, b.language, b.publisher, b.publication_year, b.page_count, b.file_format,
+      COALESCE((
+        SELECT sb.current_page
+        FROM student_books sb
+        WHERE sb.book_id = b.id AND sb.student_id = $2
+        ORDER BY sb.updated_at DESC
+        LIMIT 1
+      ), 1) as current_page,
       COALESCE(AVG(br.rating) FILTER (WHERE br.status = 'APPROVED'), 0) as average_rating,
       COUNT(br.id) FILTER (WHERE br.status = 'APPROVED') as review_count,
       EXISTS(
@@ -78,7 +87,9 @@ export async function getBookDetails(bookId: number): Promise<BookDetails | null
         language: row.language,
         publisher: row.publisher,
         publicationYear: row.publication_year,
-        pageCount: row.page_count,
+        pageCount: row.page_count === null ? null : Number(row.page_count),
+        fileFormat: row.file_format,
+        currentPage: Number(row.current_page) || 1,
         averageRating: row.average_rating ? parseFloat(row.average_rating) : null,
         reviewCount: parseInt(row.review_count),
         userHasCompleted: row.user_has_completed,
@@ -185,7 +196,8 @@ export async function getUserReview(bookId: number): Promise<BookReview | null> 
 }
 
 /**
- * Submit a book review
+ * Submit a standalone review for an already completed book. Reviews collected
+ * during completion are inserted atomically by markBookAsCompleted instead.
  */
 export async function submitBookReview(
     bookId: number,

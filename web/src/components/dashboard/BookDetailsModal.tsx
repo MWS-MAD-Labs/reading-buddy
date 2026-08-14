@@ -6,6 +6,7 @@ import Link from "next/link";
 import { BookOpen, X, Loader2, MessageSquare, Star } from "lucide-react";
 import { StarRating } from "@/components/ui/star-rating";
 import { ReviewCard } from "@/components/dashboard/ReviewCard";
+import { UpdateReadingProgressDialog } from "@/components/dashboard/student/UpdateReadingProgressDialog";
 import {
     getBookDetails,
     getBookReviews,
@@ -20,11 +21,17 @@ type BookDetailsModalProps = {
     bookId: number | null;
     onClose: () => void;
     onReadBook?: (bookId: number) => void;
+    canUpdateProgress?: boolean;
 };
 
 type SortOption = "latest" | "most_voted";
 
-export function BookDetailsModal({ bookId, onClose, onReadBook }: BookDetailsModalProps) {
+export function BookDetailsModal({
+    bookId,
+    onClose,
+    onReadBook,
+    canUpdateProgress = false,
+}: BookDetailsModalProps) {
     const [book, setBook] = useState<BookDetails | null>(null);
     const [reviews, setReviews] = useState<BookReview[]>([]);
     const [userReview, setUserReview] = useState<BookReview | null>(null);
@@ -145,17 +152,30 @@ export function BookDetailsModal({ bookId, onClose, onReadBook }: BookDetailsMod
                                     <span className="text-xs text-gray-400">No reviews yet</span>
                                 )}
 
-                                {/* Read button */}
-                                {onReadBook && (
-                                    <Link
-                                        href={`/dashboard/student/read/${book.id}`}
-                                        onClick={() => onReadBook(book.id)}
-                                        className="heading-font mt-3 inline-flex items-center gap-2 rounded-full bg-[#7E1518] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#681114]"
-                                    >
-                                        <BookOpen className="h-4 w-4" />
-                                        Read Book
-                                    </Link>
-                                )}
+                                {/* Reading actions */}
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                    {onReadBook && (
+                                        <Link
+                                            href={`/dashboard/student/read/${book.id}`}
+                                            onClick={() => onReadBook(book.id)}
+                                            className="heading-font inline-flex items-center gap-2 rounded-full bg-[#7E1518] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#681114]"
+                                        >
+                                            <BookOpen className="h-4 w-4" />
+                                            Read Book
+                                        </Link>
+                                    )}
+                                    {canUpdateProgress && (
+                                        <UpdateReadingProgressDialog
+                                            bookId={book.id}
+                                            bookTitle={book.title}
+                                            currentPage={book.currentPage}
+                                            totalPages={book.pageCount}
+                                            fileFormat={book.fileFormat}
+                                            isCompleted={book.userHasCompleted}
+                                            hasReviewed={book.userHasReviewed}
+                                        />
+                                    )}
+                                </div>
                             </div>
                         </div>
 

@@ -43,9 +43,12 @@ export function JournalTimeline({ entries }: JournalTimelineProps) {
   const tabs = [
     { value: "all", label: "All" },
     { value: "note", label: "Notes" },
-    { value: "reading_session", label: "Sessions" },
     { value: "quote", label: "Quotes" },
-    { value: "achievement", label: "Achievements" },
+    { value: "question", label: "Questions" },
+    { value: "reading_session", label: "Sessions" },
+    ...(entries.some((entry) => entry.entry_type === "achievement")
+      ? [{ value: "achievement", label: "Achievements" }]
+      : []),
   ];
 
   return (

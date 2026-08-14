@@ -93,7 +93,7 @@ export default async function LibraryPage() {
         </p>
       </header>
 
-      <LibraryCollection books={libraryBooks} />
+      <LibraryCollection books={libraryBooks} canUpdateProgress />
     </div>
   );
 }
