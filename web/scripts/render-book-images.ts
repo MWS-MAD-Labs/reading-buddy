@@ -17,6 +17,7 @@ import {
 import { join } from "path";
 import { tmpdir } from "os";
 import { execSync } from "child_process";
+import { renderPdfPage } from "./render-pdf-page";
 
 loadEnvConfig(process.cwd());
 
@@ -182,7 +183,6 @@ const processJob = async (job: JobRecord) => {
     const pagePrefix = buildBookAssetsPrefix(book.id);
 
     // Use pdftocairo for reliable PDF rendering
-    const outputPrefix = join(tempDir, "page");
 
     console.log("Converting PDF to images using pdftocairo...");
 
@@ -201,7 +201,6 @@ const processJob = async (job: JobRecord) => {
 
     // Convert each page individually
     for (let page = 1; page <= totalPages; page++) {
-      const pageOutput = join(tempDir, "page");
 
       // Update progress before converting
       await pool.query(
@@ -212,38 +211,7 @@ const processJob = async (job: JobRecord) => {
       );
 
       try {
-        execSync(
-          `pdftocairo -jpeg -r 150 -f ${page} -l ${page} -jpegopt quality=95 "${tempPdfPath}" "${pageOutput}"`,
-          { stdio: "pipe" },
-        );
-
-        // Rename the generated file
-        let generatedFile: string | null = null;
-
-        // Try different padding formats
-        for (const padding of [2, 3, 4]) {
-          const candidate = join(
-            tempDir,
-            `page-${String(page).padStart(padding, "0")}.jpg`,
-          );
-          if (existsSync(candidate)) {
-            generatedFile = candidate;
-            break;
-          }
-        }
-
-        if (!generatedFile) {
-          throw new Error(
-            `Generated file not found for page ${page} (tried 2, 3, and 4-digit padding formats)`,
-          );
-        }
-
-        const targetFile = join(
-          tempDir,
-          `page-${String(page).padStart(4, "0")}.jpg`,
-        );
-
-        execSync(`mv "${generatedFile}" "${targetFile}"`);
+        renderPdfPage(tempPdfPath, tempDir, page);
         console.log(`✓ Converted page ${page}/${totalPages}`);
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
