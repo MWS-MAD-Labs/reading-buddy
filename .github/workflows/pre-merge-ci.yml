@@ -110,6 +110,17 @@ jobs:
           DB_USER: reading_buddy
           DB_PASSWORD: test_password
 
+      - name: Seed isolated test data
+        working-directory: web
+        run: npx tsx scripts/setup-test-data.ts
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          DB_NAME: reading_buddy_test
+          DB_USER: reading_buddy
+          DB_PASSWORD: test_password
+
       - name: Run end-to-end tests
         working-directory: web
         run: npm run test:e2e
