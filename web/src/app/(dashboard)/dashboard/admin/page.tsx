@@ -8,15 +8,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui";
-import { requireRole } from "@/lib/auth/roleCheck";
+import { requirePermission } from "@/lib/auth/roleCheck";
 import { query } from "@/lib/db";
 import { cn } from "@/lib/cn";
+import { isHubAuthEnabled } from "@/lib/central/hub-session";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
   // Only ADMIN users can access this page
-  await requireRole(["ADMIN"]);
+  await requirePermission("users.manage");
+  const managedExternally = isHubAuthEnabled();
 
   // Get profiles with their emails from local database
   const result = await query(`
@@ -52,8 +54,9 @@ export default async function AdminDashboardPage() {
             User Management
           </CardTitle>
           <CardDescription className="max-w-2xl">
-            Manage users, roles, access levels, badges, and login messages for
-            the entire Reading Buddy system.
+            {managedExternally
+              ? "People, roles, and grade access come from MWS Central. Reading Buddy keeps their reading activity and progress."
+              : "Manage users, roles, access levels, badges, and login messages for the entire Reading Buddy system."}
           </CardDescription>
         </CardHeader>
         <div className="mb-5 flex flex-wrap gap-2">
@@ -87,7 +90,7 @@ export default async function AdminDashboardPage() {
         </div>
       </Card>
 
-      <AdminUserTable users={users} />
+      <AdminUserTable users={users} managedExternally={managedExternally} />
     </div>
   );
 }

@@ -34,9 +34,8 @@ export default async function LibraryPage() {
       ORDER BY b.created_at DESC`,
       [userAccessLevel],
     );
-  } else {
-    // For staff or students without access level set, show all published books
-    // (i.e., books that have at least one access level - not draft books)
+  } else if (!isStudent) {
+    // Staff see every published book.
     result = await queryWithContext(
       user.userId!,
       `SELECT DISTINCT
@@ -51,6 +50,9 @@ export default async function LibraryPage() {
       ORDER BY b.created_at DESC`,
       [],
     );
+  } else {
+    // A missing or unmapped Central grade must never widen student access.
+    result = { rows: [] };
   }
 
   const libraryBooks: LibraryBook[] = result.rows.map((book: any) => ({

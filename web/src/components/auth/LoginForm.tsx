@@ -16,6 +16,8 @@ import { cn } from "@/lib/cn";
 
 type LoginFormProps = {
   broadcast?: LoginBroadcast | null;
+  hubAuthEnabled?: boolean;
+  authError?: string | null;
 };
 
 const toneStyles: Record<
@@ -65,8 +67,20 @@ const GoogleLogo = () => (
   </svg>
 );
 
-export const LoginForm = ({ broadcast }: LoginFormProps) => {
-  const [error, setError] = useState<string | null>(null);
+const AUTH_ERRORS: Record<string, string> = {
+  no_access: "Your account does not currently have access to Reading Buddy.",
+  upstream_unavailable:
+    "MWS Central is temporarily unavailable. Please try again shortly.",
+};
+
+export const LoginForm = ({
+  broadcast,
+  hubAuthEnabled = false,
+  authError,
+}: LoginFormProps) => {
+  const [error, setError] = useState<string | null>(
+    authError ? (AUTH_ERRORS[authError] ?? "Sign-in could not be completed.") : null,
+  );
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
@@ -74,6 +88,10 @@ export const LoginForm = ({ broadcast }: LoginFormProps) => {
     setIsGoogleLoading(true);
 
     try {
+      if (hubAuthEnabled) {
+        window.location.assign("/auth/sso");
+        return;
+      }
       // Use NextAuth for Google OAuth
       const result = (await signIn("google", {
         callbackUrl: "/dashboard",
@@ -132,7 +150,11 @@ export const LoginForm = ({ broadcast }: LoginFormProps) => {
               </Alert>
             ) : (
               <Alert variant="info" title="Heads up">
-                Only <strong>@millennia21.id</strong> accounts can log in.
+                {hubAuthEnabled ? (
+                  <>Sign in through <strong>MWS Hub</strong> to continue.</>
+                ) : (
+                  <>Only <strong>@millennia21.id</strong> accounts can log in.</>
+                )}
               </Alert>
             )}
 
@@ -146,7 +168,7 @@ export const LoginForm = ({ broadcast }: LoginFormProps) => {
                 fullWidth
                 icon={<GoogleLogo />}
               >
-                Sign In with Google
+                {hubAuthEnabled ? "Continue with MWS Hub" : "Sign In with Google"}
               </Button>
             </div>
           </div>

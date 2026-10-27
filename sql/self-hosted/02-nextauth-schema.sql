@@ -11,6 +11,13 @@ CREATE TABLE IF NOT EXISTS users (
   email_verified TIMESTAMPTZ,
   image TEXT,
   password_hash TEXT,
+  central_person_id TEXT,
+  central_source TEXT CHECK (central_source IS NULL OR central_source IN ('employee', 'student')),
+  central_status TEXT NOT NULL DEFAULT 'unknown',
+  central_entitlement_id TEXT,
+  central_entitlement_version BIGINT,
+  central_permissions TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  central_synced_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -56,6 +63,17 @@ CREATE TABLE IF NOT EXISTS verification_tokens (
 -- ==========================================
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE UNIQUE INDEX IF NOT EXISTS users_central_person_id_key ON users(central_person_id) WHERE central_person_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS users_central_status_idx ON users(central_status);
+
+CREATE TABLE IF NOT EXISTS central_sync_state (
+  application TEXT PRIMARY KEY,
+  sync_key TEXT NOT NULL,
+  synced_at TIMESTAMPTZ NOT NULL,
+  checked_at TIMESTAMPTZ,
+  last_error TEXT,
+  last_summary JSONB
+);
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_provider ON accounts(provider, provider_account_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);

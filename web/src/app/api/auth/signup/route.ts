@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { isHubAuthEnabled } from "@/lib/central/hub-session";
 
 const signupSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -10,6 +11,13 @@ const signupSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  if (isHubAuthEnabled()) {
+    return NextResponse.json(
+      { error: "Accounts are managed by MWS Central" },
+      { status: 410 },
+    );
+  }
+
   try {
     const body = await req.json();
 

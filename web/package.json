@@ -31,7 +31,10 @@
     "test:auto-checkpoints": "tsx scripts/test-auto-checkpoints.ts",
     "test:ai-providers": "tsx scripts/test-ai-providers.ts",
     "db:setup": "tsx scripts/setup-db.ts",
-    "migrate:text-reader": "tsx scripts/migrate-to-text-reader.ts"
+    "migrate:text-reader": "tsx scripts/migrate-to-text-reader.ts",
+    "permissions:sync": "tsx scripts/sync-permissions.ts sync",
+    "permissions:check": "tsx scripts/sync-permissions.ts check",
+    "users:sync": "tsx scripts/sync-users.ts"
   },
   "dependencies": {
     "@auth/pg-adapter": "^1.11.1",
@@ -58,6 +61,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.562.0",
     "minio": "^8.0.6",
+    "mws-central-auth": "github:MWS-MAD-Labs/mws-central-auth#v0.8.0",
     "next": "16.0.1",
     "next-auth": "^5.0.0-beta.30",
     "pdf2pic": "^3.2.0",
@@ -72,6 +76,7 @@
     "recharts": "^3.5.1",
     "tailwind-merge": "^3.3.1",
     "use-debounce": "^10.0.6",
+    "zod": "^4.6.7",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

@@ -3,6 +3,8 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
+import { isHubAuthEnabled } from "@/lib/central/hub-session";
+import { resolveHubSession } from "@/lib/central/hub-auth";
 
 // Create a dedicated pool for NextAuth adapter
 const authPool = new Pool({
@@ -249,4 +251,10 @@ export const authOptions: NextAuthConfig = {
   debug: process.env.NODE_ENV === "development",
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
+const nextAuth = NextAuth(authOptions);
+
+export const { handlers, signIn, signOut } = nextAuth;
+
+export async function auth() {
+  return isHubAuthEnabled() ? resolveHubSession() : nextAuth.auth();
+}

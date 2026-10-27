@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { SignOutButton } from "@/components/dashboard/SignOutButton";
+import { isHubAuthEnabled } from "@/lib/central/hub-session";
 
 export default async function DashboardLayout({
   children,
@@ -12,6 +13,7 @@ export default async function DashboardLayout({
 }) {
   // Get current user from NextAuth (redirects to login if not authenticated)
   const user = await getCurrentUser();
+  const hubAuthEnabled = isHubAuthEnabled();
 
   const roleLabel =
     user.role === "ADMIN"
@@ -57,12 +59,12 @@ export default async function DashboardLayout({
                   | null
               }
             />
-            <SignOutButton />
+            <SignOutButton hubAuthEnabled={hubAuthEnabled} />
           </div>
 
           {/* Mobile Navigation */}
           <div className="flex items-center gap-2 lg:hidden">
-            <SignOutButton />
+            <SignOutButton hubAuthEnabled={hubAuthEnabled} />
             <MobileNav
               userRole={
                 user.role as
