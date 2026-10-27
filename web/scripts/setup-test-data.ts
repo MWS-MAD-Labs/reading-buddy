@@ -38,9 +38,13 @@ async function main() {
     console.log(`✅ Test user ensured: ${testEmail} (ID: ${userId})`);
 
     await pool.query(
-      `INSERT INTO profiles (id, user_id, role, full_name, level, xp)
-       VALUES ($1, $1, 'STUDENT', $2, 1, 0)
-       ON CONFLICT (user_id) DO NOTHING`,
+      `INSERT INTO profiles
+         (id, user_id, role, full_name, access_level, level, xp)
+       VALUES ($1, $1, 'STUDENT', $2, 'JUNIOR_HIGH', 1, 0)
+       ON CONFLICT (user_id) DO UPDATE
+       SET role = 'STUDENT',
+           full_name = EXCLUDED.full_name,
+           access_level = EXCLUDED.access_level`,
       [userId, testName],
     );
     console.log("✅ Profile ensured for user");
