@@ -98,9 +98,9 @@ export default function Home() {
             className="group flex items-center gap-3"
             aria-label="Reading Buddy home"
           >
-            <span className="relative h-12 w-12 overflow-hidden rounded-[20px] border border-[#eadfda] bg-white shadow-[0_14px_30px_rgba(36,23,24,0.08)] transition duration-200 group-hover:-translate-y-0.5">
+            <span className="relative h-12 w-12 overflow-hidden rounded-[10px] border border-[#781217] bg-[#781217] shadow-[0_14px_30px_rgba(36,23,24,0.08)] transition duration-200 group-hover:-translate-y-0.5">
               <Image
-                src="/logo.svg"
+                src="/Reading_Buddy_Icon.svg"
                 alt=""
                 fill
                 className="object-cover p-1.5"

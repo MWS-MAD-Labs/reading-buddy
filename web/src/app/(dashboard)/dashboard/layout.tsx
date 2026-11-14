@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { MobileNav } from "@/components/dashboard/MobileNav";
 import { SignOutButton } from "@/components/dashboard/SignOutButton";
+import { isHubAuthEnabled } from "@/lib/central/hub-session";
 
 export default async function DashboardLayout({
   children,
@@ -12,6 +13,7 @@ export default async function DashboardLayout({
 }) {
   // Get current user from NextAuth (redirects to login if not authenticated)
   const user = await getCurrentUser();
+  const hubAuthEnabled = isHubAuthEnabled();
 
   const roleLabel =
     user.role === "ADMIN"
@@ -32,7 +34,7 @@ export default async function DashboardLayout({
           <div className="flex items-center gap-2 lg:gap-3">
             <div className="heading-font inline-flex items-center gap-2 rounded-full border border-[#7E1518]/15 bg-[#F5E7E8] px-3 py-2 text-sm font-bold text-[#7E1518]">
               <Image
-                src="/logo.svg"
+                src="/Reading_Buddy_Icon.svg"
                 alt="Reading Buddy logo"
                 width={22}
                 height={22}
@@ -57,12 +59,12 @@ export default async function DashboardLayout({
                   | null
               }
             />
-            <SignOutButton />
+            <SignOutButton hubAuthEnabled={hubAuthEnabled} />
           </div>
 
           {/* Mobile Navigation */}
           <div className="flex items-center gap-2 lg:hidden">
-            <SignOutButton />
+            <SignOutButton hubAuthEnabled={hubAuthEnabled} />
             <MobileNav
               userRole={
                 user.role as

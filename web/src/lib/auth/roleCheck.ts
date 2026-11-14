@@ -1,5 +1,10 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "./server";
+import {
+  ROLE_PERMISSIONS,
+  hasPermission,
+  type AppPermission,
+} from "@/lib/central/access-control";
 
 export type UserRole = "ADMIN" | "LIBRARIAN" | "TEACHER" | "STUDENT";
 
@@ -12,6 +17,7 @@ export type SessionUser = {
   email?: string;
   role?: UserRole;
   profileId?: string;
+  permissions?: string[];
 };
 
 export type RequireRoleResult = {
@@ -39,7 +45,29 @@ export async function requireRole(
       email: user.email ?? undefined,
       role: userRole,
       profileId: user.profileId,
+      permissions: user.permissions,
     },
     role: userRole,
+  };
+}
+
+export async function requirePermission(
+  permission: AppPermission,
+): Promise<SessionUser> {
+  const user = await getCurrentUser();
+  const role = user.role as UserRole | undefined;
+  const effectivePermissions =
+    user.permissions ?? (role ? [...ROLE_PERMISSIONS[role]] : []);
+
+  if (!hasPermission(effectivePermissions, permission)) {
+    redirect("/dashboard?error=unauthorized");
+  }
+
+  return {
+    id: user.id!,
+    email: user.email ?? undefined,
+    role,
+    profileId: user.profileId,
+    permissions: effectivePermissions,
   };
 }

@@ -139,8 +139,28 @@ async function setupDatabase() {
                     email_verified TIMESTAMP WITH TIME ZONE,
                     image TEXT,
                     password_hash TEXT,
+                    central_person_id TEXT,
+                    central_source TEXT CHECK (central_source IS NULL OR central_source IN ('employee', 'student')),
+                    central_status TEXT NOT NULL DEFAULT 'unknown',
+                    central_entitlement_id TEXT,
+                    central_entitlement_version BIGINT,
+                    central_permissions TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+                    central_synced_at TIMESTAMP WITH TIME ZONE,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+
+                CREATE UNIQUE INDEX IF NOT EXISTS users_central_person_id_key
+                ON public.users(central_person_id)
+                WHERE central_person_id IS NOT NULL;
+
+                CREATE TABLE IF NOT EXISTS public.central_sync_state (
+                    application TEXT PRIMARY KEY,
+                    sync_key TEXT NOT NULL,
+                    synced_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    checked_at TIMESTAMP WITH TIME ZONE,
+                    last_error TEXT,
+                    last_summary JSONB
                 );
 
                 -- Trigger to sync public.users to auth.users for FK consistency

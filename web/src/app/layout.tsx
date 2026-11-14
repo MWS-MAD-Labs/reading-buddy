@@ -3,6 +3,10 @@ import { Lora, Nunito_Sans, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { NextAuthProvider } from "@/components/providers/NextAuthProvider";
 import { getServerEnv } from "@/lib/env";
+import {
+  hubSession,
+  isHubAuthEnabled,
+} from "@/lib/central/hub-session";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-heading",
@@ -40,6 +44,7 @@ export default function RootLayout({
 }>) {
   // Get runtime environment variables on the server
   const env = getServerEnv();
+  const hub = isHubAuthEnabled() ? hubSession() : null;
 
   return (
     <html lang="en">
@@ -53,7 +58,12 @@ export default function RootLayout({
       <body
         className={`${plusJakartaSans.variable} ${nunitoSans.variable} ${lora.variable} antialiased`}
       >
-        <NextAuthProvider>{children}</NextAuthProvider>
+        <NextAuthProvider
+          hubRefreshUrl={hub?.refreshUrl() ?? null}
+          hubHomeUrl={hub?.homeUrl() ?? null}
+        >
+          {children}
+        </NextAuthProvider>
       </body>
     </html>
   );

@@ -2,6 +2,15 @@
 
 import { query, transaction } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { requirePermission } from "@/lib/auth/roleCheck";
+import { isHubAuthEnabled } from "@/lib/central/hub-session";
+
+async function requireLocalUserManagement(): Promise<void> {
+  await requirePermission("users.manage");
+  if (isHubAuthEnabled()) {
+    throw new Error("Users and roles are managed in MWS Central.");
+  }
+}
 
 type AddUserParams = {
   email: string;
@@ -19,6 +28,7 @@ interface TransactionClient {
 }
 
 export async function addUser(params: AddUserParams): Promise<void> {
+  await requireLocalUserManagement();
   await transaction(async (client: TransactionClient) => {
     // Check if user already exists (but might be missing profile)
     const existingUser = await client.query(
@@ -81,6 +91,7 @@ type UpdateUserDataParams = {
 export async function updateUserData(
   params: UpdateUserDataParams,
 ): Promise<void> {
+  await requireLocalUserManagement();
   const result = await query(
     `UPDATE profiles
      SET full_name = $1, role = $2, access_level = $3, updated_at = NOW()
@@ -97,6 +108,7 @@ export async function updateUserRole(
   userId: string,
   newRole: "STUDENT" | "TEACHER" | "LIBRARIAN" | "ADMIN",
 ): Promise<void> {
+  await requireLocalUserManagement();
   const result = await query(
     `UPDATE profiles SET role = $1, updated_at = NOW() WHERE id = $2`,
     [newRole, userId],
@@ -111,6 +123,7 @@ export async function updateUserAccessLevel(
   userId: string,
   accessLevel: string | null,
 ): Promise<void> {
+  await requireLocalUserManagement();
   const result = await query(
     `UPDATE profiles SET access_level = $1, updated_at = NOW() WHERE id = $2`,
     [accessLevel, userId],
@@ -122,6 +135,7 @@ export async function updateUserAccessLevel(
 }
 
 export async function deleteUser(userId: string): Promise<void> {
+  await requireLocalUserManagement();
   await transaction(async (client: TransactionClient) => {
     // Get user_id from profile
     const profileResult = await client.query(
@@ -161,6 +175,7 @@ type BulkUserRow = {
 export async function bulkUploadUsers(
   users: BulkUserRow[],
 ): Promise<BulkUploadResult> {
+  await requireLocalUserManagement();
   const result: BulkUploadResult = {
     success: true,
     created: 0,
@@ -231,6 +246,7 @@ export async function getUsersWithEmails(): Promise<{
   }>;
   error?: string;
 }> {
+  await requirePermission("users.manage");
   try {
     const result = await query(`
       SELECT
@@ -269,6 +285,7 @@ export async function cleanupOrphanedProfiles(): Promise<{
   orphanedIds: string[];
   error?: string;
 }> {
+  await requirePermission("users.manage");
   try {
     // Find profiles without corresponding users
     const result = await query(`
@@ -300,6 +317,7 @@ export async function getSystemStats(): Promise<{
   data?: SystemStats;
   error?: string;
 }> {
+  await requirePermission("users.manage");
   try {
     // 1. Get user counts by role
     const userCountsResult = await query(`

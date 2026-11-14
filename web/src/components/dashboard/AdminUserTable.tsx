@@ -41,7 +41,13 @@ const roleBadgeVariant: Record<
   STUDENT: "amber",
 };
 
-export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
+export const AdminUserTable = ({
+  users,
+  managedExternally = false,
+}: {
+  users: UserRecord[];
+  managedExternally?: boolean;
+}) => {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -111,6 +117,12 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
 
   return (
     <div className="space-y-4">
+      {managedExternally && (
+        <Alert variant="info">
+          User identity, roles, and grade access are read-only here and managed
+          in MWS Central.
+        </Alert>
+      )}
       <Card variant="frosted" padding="snug">
         <CardContent className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative max-w-md flex-1">
@@ -126,7 +138,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
             />
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          {!managedExternally && <div className="flex flex-wrap gap-3">
             <Button
               type="button"
               variant="secondary"
@@ -145,7 +157,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
             >
               Bulk Upload
             </Button>
-          </div>
+          </div>}
         </CardContent>
       </Card>
 
@@ -196,7 +208,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
                   )}
                 </div>
 
-                <div className="flex gap-2">
+                {!managedExternally && <div className="flex gap-2">
                   <Button
                     type="button"
                     variant="neutral"
@@ -219,7 +231,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
                   >
                     Delete
                   </Button>
-                </div>
+                </div>}
               </Card>
             ))}
             <Card variant="frosted" padding="snug">
@@ -253,15 +265,17 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
                 <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-[#6f6061]">
                   Access Level
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-black uppercase tracking-wider text-[#6f6061]">
-                  Actions
-                </th>
+                {!managedExternally && (
+                  <th className="px-6 py-4 text-center text-xs font-black uppercase tracking-wider text-[#6f6061]">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#eadfda] bg-white">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={managedExternally ? 4 : 5} className="px-6 py-12 text-center">
                     <p className="text-sm font-semibold text-[#5d4b4c]">
                       {searchQuery
                         ? "No users found matching your search."
@@ -297,35 +311,37 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
                           : "—"}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <Button
-                          type="button"
-                          variant="neutral"
-                          size="sm"
-                          onClick={() => handleEditUser(user)}
-                          title="Edit user"
-                          icon={<PencilIcon className="h-4 w-4" />}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="danger"
-                          size="sm"
-                          onClick={() =>
-                            handleDeleteUser(
-                              user.id,
-                              user.full_name || "this user",
-                            )
-                          }
-                          title="Delete user"
-                          icon={<TrashIcon className="h-4 w-4" />}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
+                    {!managedExternally && (
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            type="button"
+                            variant="neutral"
+                            size="sm"
+                            onClick={() => handleEditUser(user)}
+                            title="Edit user"
+                            icon={<PencilIcon className="h-4 w-4" />}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            onClick={() =>
+                              handleDeleteUser(
+                                user.id,
+                                user.full_name || "this user",
+                              )
+                            }
+                            title="Delete user"
+                            icon={<TrashIcon className="h-4 w-4" />}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -342,7 +358,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
       </Card>
 
       {/* Modals */}
-      {showAddModal && (
+      {!managedExternally && showAddModal && (
         <AddUserModal
           onClose={() => setShowAddModal(false)}
           onSuccess={(msg) => {
@@ -353,7 +369,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
         />
       )}
 
-      {editingUser && (
+      {!managedExternally && editingUser && (
         <EditUserModal
           user={editingUser}
           onClose={() => setEditingUser(null)}
@@ -365,7 +381,7 @@ export const AdminUserTable = ({ users }: { users: UserRecord[] }) => {
         />
       )}
 
-      {showBulkModal && (
+      {!managedExternally && showBulkModal && (
         <BulkUploadModal
           onClose={() => setShowBulkModal(false)}
           onSuccess={(msg) => {

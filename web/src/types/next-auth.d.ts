@@ -12,6 +12,11 @@ declare module "next-auth" {
       xp?: number;
       level?: number;
       fullName?: string;
+      centralPersonId?: string;
+      centralSource?: "employee" | "student";
+      centralRole?: string;
+      permissions?: string[];
+      entitlementVersion?: number;
     } & DefaultSession["user"];
   }
 

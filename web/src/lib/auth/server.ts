@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { isHubAuthEnabled } from "@/lib/central/hub-session";
 
 /**
  * Get the current user session on the server
@@ -17,7 +18,7 @@ export async function requireAuth() {
   const session = await getSession();
 
   if (!session?.user) {
-    redirect("/login");
+    redirect(isHubAuthEnabled() ? "/auth/sso" : "/login");
   }
 
   return session;
