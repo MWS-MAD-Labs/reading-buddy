@@ -176,9 +176,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          test -n "$DEPLOY_HOST"
-          test -n "$DEPLOY_USER"
-          test -n "$DEPLOY_SSH_KEY"
+          missing=0
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Secret STAGING_$name is not set"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ]
 
           eval "$(ssh-agent -s)"
           trap 'ssh-agent -k' EXIT

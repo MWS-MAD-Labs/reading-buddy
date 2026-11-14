@@ -34,7 +34,7 @@ export default async function DashboardLayout({
           <div className="flex items-center gap-2 lg:gap-3">
             <div className="heading-font inline-flex items-center gap-2 rounded-full border border-[#7E1518]/15 bg-[#F5E7E8] px-3 py-2 text-sm font-bold text-[#7E1518]">
               <Image
-                src="/logo.svg"
+                src="/Reading_Buddy_Icon.svg"
                 alt="Reading Buddy logo"
                 width={22}
                 height={22}
