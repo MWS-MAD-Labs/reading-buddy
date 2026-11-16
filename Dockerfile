@@ -106,6 +106,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/web/scripts ./web/scripts
 COPY --from=builder --chown=nextjs:nodejs /app/web/src ./web/src
 COPY --from=builder --chown=nextjs:nodejs /app/web/tsconfig.json ./web/tsconfig.json
 
+# Deploy-safe SQL migrations, applied by web/scripts/migrate.mjs on start.
+COPY --chown=nextjs:nodejs sql/migrations ./sql/migrations
+COPY --chown=nextjs:nodejs sql/deploy-migrations.txt ./sql/deploy-migrations.txt
+
 # Set the correct permission for prerender cache
 RUN mkdir -p ./web/.next && chown -R nextjs:nodejs ./web/.next
 
@@ -116,5 +120,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Start the application
-CMD ["node", "web/server.js"]
+# Apply pending DB migrations, then start the application
+CMD ["sh", "-c", "node web/scripts/migrate.mjs && exec node web/server.js"]
